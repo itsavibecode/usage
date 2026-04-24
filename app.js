@@ -18,7 +18,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1285,6 +1285,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('dialog-close').addEventListener('click', closeDialog);
   document.getElementById('dialog-cancel').addEventListener('click', closeDialog);
 
+  const f = form();
+  f.addEventListener('submit', handleSubmit);
+  f.elements.bundleStatus.addEventListener('change', setBundleSizeVisibility);
+
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
   document.getElementById('scanner-close').addEventListener('click', closeScanner);
   document.getElementById('scanner-cancel').addEventListener('click', closeScanner);
@@ -1310,10 +1314,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('upc-match-no').addEventListener('click', closeUpcMatchDialog);
   document.getElementById('upc-match-close').addEventListener('click', closeUpcMatchDialog);
   document.getElementById('upc-match-dialog').addEventListener('close', () => { pendingUpcCode = null; });
-
-  const f = form();
-  f.addEventListener('submit', handleSubmit);
-  f.elements.bundleStatus.addEventListener('change', setBundleSizeVisibility);
 
   document.getElementById('continue-bundle').addEventListener('change', handleContinueBundle);
 

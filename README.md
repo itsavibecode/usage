@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.6.0
+**Version:** v0.6.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.6.0)
+## Current status (v0.6.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.6.1 — 2026-04-24
+- **Hotfix for v0.6.0 regression**: the initialization of the product form (`const f = form()`) was declared *after* the UPC field's `blur` listener tried to reference it, triggering a `const` temporal-dead-zone `ReferenceError` during `DOMContentLoaded`. That error aborted the rest of the init handler, so the auth listener never attached — which is why the sign-in UI, data table, and dashboard all appeared blank, and why scanning a UPC filled the input but never kicked off a database lookup.
+- Fix: reordered the init so the form reference and its submit/bundle-size listeners are wired up *before* the UPC + scanner handlers that depend on it. No behavior changes beyond the fix.
 
 ### v0.6.0 — 2026-04-24
 - **UPC field is now first** in the Add/Edit dialog and visually highlighted — fill this in first and the rest of the form can auto-populate.
