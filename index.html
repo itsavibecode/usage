@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="0.1.0">
+  <title>Usage Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <img src="favicon.svg" alt="" class="logo" width="36" height="36">
+      <div class="brand-text">
+        <h1>Usage Tracker</h1>
+        <span class="version" id="version">v0.1.0</span>
+      </div>
+    </div>
+    <nav class="toolbar">
+      <button type="button" id="btn-add" class="btn btn-primary">+ Add product</button>
+      <button type="button" id="btn-import" class="btn">Import</button>
+      <div class="dropdown">
+        <button type="button" id="btn-export" class="btn">Export &#9662;</button>
+        <div class="dropdown-menu" id="export-menu">
+          <button type="button" data-export="json">Export JSON</button>
+          <button type="button" data-export="csv">Export CSV</button>
+        </div>
+      </div>
+      <input type="file" id="file-import" accept=".json,application/json" hidden>
+    </nav>
+  </header>
+
+  <main>
+    <section class="stats-bar" id="stats-bar" aria-label="Summary">
+      <div class="stat"><span class="stat-label">Tracked products</span><span class="stat-value" id="stat-count">0</span></div>
+      <div class="stat"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></div>
+      <div class="stat"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></div>
+      <div class="stat"><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
+    </section>
+
+    <section class="table-wrap">
+      <table class="products" id="products-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Size</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Duration</th>
+            <th>Cost</th>
+            <th>w/ Tax</th>
+            <th>$/unit</th>
+            <th>$/day</th>
+            <th>Bundle</th>
+            <th>Store</th>
+            <th>Buyer</th>
+            <th>Card</th>
+            <th>Purchased</th>
+            <th>UPC</th>
+            <th>Notes</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="products-body"></tbody>
+      </table>
+      <p class="empty-state" id="empty-state" hidden>No products tracked yet. Click <strong>+ Add product</strong> to get started.</p>
+    </section>
+  </main>
+
+  <dialog id="product-dialog" class="product-dialog">
+    <form id="product-form" method="dialog">
+      <header class="dialog-header">
+        <h2 id="dialog-title">Add product</h2>
+        <button type="button" class="icon-btn" id="dialog-close" aria-label="Close">&times;</button>
+      </header>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>Product type <em>*</em></span>
+          <select name="productType" required>
+            <option value="">Select...</option>
+            <option>Food</option>
+            <option>Beverage</option>
+            <option>Personal Care</option>
+            <option>Cleaning</option>
+            <option>Health/Medicine</option>
+            <option>Pet</option>
+            <option>Household</option>
+            <option>Office</option>
+            <option>Other</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Product name <em>*</em></span>
+          <input name="productName" type="text" required maxlength="120">
+        </label>
+
+        <label class="field">
+          <span>Size <em>*</em></span>
+          <input name="size" type="number" step="any" min="0" required>
+        </label>
+
+        <label class="field">
+          <span>Unit <em>*</em></span>
+          <select name="unit" required>
+            <option value="">Select...</option>
+            <option>count</option>
+            <option>oz</option>
+            <option>fl oz</option>
+            <option>lb</option>
+            <option>g</option>
+            <option>kg</option>
+            <option>mL</option>
+            <option>L</option>
+            <option>gal</option>
+            <option>ft</option>
+            <option>m</option>
+            <option>pack</option>
+            <option>roll</option>
+            <option>sheet</option>
+            <option>load</option>
+            <option>serving</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Start date <em>*</em></span>
+          <input name="startDate" type="date" required>
+        </label>
+
+        <label class="field">
+          <span>End date</span>
+          <input name="endDate" type="date">
+        </label>
+
+        <label class="field">
+          <span>Cost (pre-tax) <em>*</em></span>
+          <input name="cost" type="number" step="0.01" min="0" required>
+        </label>
+
+        <label class="field">
+          <span>Cost with tax <em>*</em></span>
+          <input name="costWithTax" type="number" step="0.01" min="0" required>
+        </label>
+
+        <label class="field">
+          <span>Store</span>
+          <input name="store" type="text" maxlength="80">
+        </label>
+
+        <label class="field">
+          <span>Buyer</span>
+          <input name="buyer" type="text" maxlength="80">
+        </label>
+
+        <label class="field">
+          <span>Card (last 4)</span>
+          <input name="cardLast4" type="text" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="1234">
+        </label>
+
+        <label class="field">
+          <span>Purchase date</span>
+          <input name="purchaseDate" type="date">
+        </label>
+
+        <label class="field">
+          <span>UPC <em>*</em></span>
+          <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="012345678901">
+        </label>
+
+        <label class="field checkbox-field">
+          <input name="bundleStatus" type="checkbox">
+          <span>Part of a bundle purchase</span>
+        </label>
+
+        <label class="field field-wide">
+          <span>Notes</span>
+          <textarea name="notes" rows="2" maxlength="500"></textarea>
+        </label>
+      </div>
+
+      <footer class="dialog-footer">
+        <button type="button" class="btn" id="dialog-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="dialog-save">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="confirm-dialog">
+    <p id="confirm-message">Are you sure?</p>
+    <div class="confirm-actions">
+      <button type="button" class="btn" id="confirm-no">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirm-yes">Delete</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
