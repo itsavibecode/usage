@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.0
+**Version:** v0.7.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.0)
+## Current status (v0.7.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.1 — 2026-04-24
+- **Fixed: bundle fields were still showing when "Part of a bundle" was unchecked.** The HTML `hidden` attribute was being overridden by the component-level `.field { display: flex; }` rule — a classic CSS specificity gotcha. Added a global `[hidden] { display: none !important; }` rule so `hidden` works reliably on any element.
+- **New: Year-to-date (YTD) summary cards** in the stats bar — **YTD spend** (sum of allocated cost for products purchased in the current calendar year) and **YTD daily cost** (sum of $/day for products that were in use at any point this year). Legacy rows without a `purchaseDate` fall back to `startDate` for the spend calculation.
+- **Audit (no code change)**: verified there is no code path that can overwrite one product's UPC when another product with the same name is saved. Every Firestore write goes to `users/{uid}/products/{product.id}`, and every Add generates a fresh `crypto.randomUUID()`. If you see two rows with the same UPC, the most likely cause is the **Continue existing bundle** dropdown, which intentionally copies UPC + other fields from the source row — so you end up with a new row that shares the source's UPC, not the source being overwritten.
 
 ### v0.7.0 — 2026-04-24
 - **Fixed off-by-one date display** in the table. Dates coming from `<input type="date">` are `YYYY-MM-DD` strings; `new Date("2026-04-20")` parses those as UTC midnight, which in any negative-offset timezone renders as the day before. New `parseLocalDate()` helper parses date-only strings as local dates, fixing both `formatDate()` (table display) and `daysBetween()` (duration math). The edit dialog already showed the correct value because `<input type="date">` reads the string directly.

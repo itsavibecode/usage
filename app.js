@@ -18,7 +18,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -357,10 +357,38 @@ function renderStats() {
   const active = products.filter(isActive).length;
   const finished = count - active;
   const total = products.reduce((s, p) => s + (allocatedCost(p) || 0), 0);
+
+  // Year-to-date metrics
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const yearStart = new Date(currentYear, 0, 1);
+
+  // YTD spend: products purchased in the current calendar year.
+  // Falls back to startDate if purchaseDate is missing (legacy rows).
+  const ytdSpend = products.reduce((s, p) => {
+    const purchase = parseLocalDate(p.purchaseDate || p.startDate);
+    if (!purchase || purchase.getFullYear() !== currentYear) return s;
+    return s + (allocatedCost(p) || 0);
+  }, 0);
+
+  // YTD $/day: sum of per-day burn for products that were in use at any
+  // point during this year — i.e. startDate <= today AND (endDate blank
+  // OR endDate >= Jan 1 of this year).
+  const ytdPerDay = products.reduce((s, p) => {
+    const start = parseLocalDate(p.startDate);
+    if (!start || start > now) return s;
+    const end = p.endDate ? parseLocalDate(p.endDate) : now;
+    if (!end || end < yearStart) return s;
+    const perDay = calcCostPerDay(p);
+    return s + (perDay != null && isFinite(perDay) ? perDay : 0);
+  }, 0);
+
   document.getElementById('stat-count').textContent = count;
   document.getElementById('stat-active').textContent = active;
   document.getElementById('stat-finished').textContent = finished;
   document.getElementById('stat-total').textContent = money(total);
+  document.getElementById('stat-ytd-spend').textContent = money(ytdSpend);
+  document.getElementById('stat-ytd-perday').textContent = moneyFine(ytdPerDay);
 }
 
 /* ---------- dashboard ---------- */

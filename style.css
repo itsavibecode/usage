@@ -17,6 +17,13 @@
 
 * { box-sizing: border-box; }
 
+/* Make the HTML `hidden` attribute reliably hide any element, even ones
+ * with an explicit `display:` rule further down. Without this, `<label
+ * class="field" hidden>` still renders because `.field { display: flex; }`
+ * wins on specificity. This is the global safety net — individual
+ * `[hidden]` overrides below can stay as belt-and-braces. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   padding: 0;
