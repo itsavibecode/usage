@@ -1,7 +1,9 @@
-/* Usage Tracker — v0.3.0
+/* Usage Tracker — v0.4.0
+ * Phase 5: Dashboard with Chart.js.
  * Phases 3 + 4: Google Sign-In + Firestore per-user storage.
  * Data lives at /users/{uid}/products/{id} and /users/{uid}/meta/customTypes.
- * Products are synced live via onSnapshot so multi-tab/multi-device stays in sync. */
+ * Products are synced live via onSnapshot so multi-tab/multi-device stays in sync.
+ * Dashboard re-renders on every snapshot (and on view switch). */
 
 import { auth, db, googleProvider } from './firebase-init.js';
 import {
@@ -10,8 +12,10 @@ import {
 import {
   collection, doc, onSnapshot, setDoc, deleteDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
+Chart.register(...registerables);
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -41,6 +45,15 @@ let sortState = { column: 'startDate', dir: 'desc' };
 let unsubProducts = null;
 let unsubTypes = null;
 let firstSnapshotSeen = false;
+let currentView = 'table'; // 'table' | 'dashboard'
+let charts = { byType: null, byStore: null, finishedByMonth: null };
+
+// Palette used for donut/category coloring — colorblind-friendly-ish and consistent across renders.
+const CHART_PALETTE = [
+  '#2b5fd9', '#2d8a5f', '#c23b3b', '#d98f2b', '#7a4ad9',
+  '#2b9fd9', '#d92b8f', '#4a9e4a', '#b97020', '#5b6b8a',
+  '#08697d', '#b03b8a'
+];
 
 /* ---------- calculations ---------- */
 
@@ -178,6 +191,9 @@ function unsubscribeData() {
   if (unsubProducts) { unsubProducts(); unsubProducts = null; }
   if (unsubTypes) { unsubTypes(); unsubTypes = null; }
   firstSnapshotSeen = false;
+  destroyChart('byType');
+  destroyChart('byStore');
+  destroyChart('finishedByMonth');
 }
 
 /* ---------- recent-used helpers ---------- */
@@ -261,6 +277,7 @@ function handleHeaderClick(th) {
 function render() {
   renderTable();
   renderStats();
+  renderDashboard();
 }
 
 function renderTable() {
@@ -328,6 +345,216 @@ function renderStats() {
   document.getElementById('stat-active').textContent = active;
   document.getElementById('stat-finished').textContent = finished;
   document.getElementById('stat-total').textContent = money(total);
+}
+
+/* ---------- dashboard ---------- */
+
+function renderDashboard() {
+  const emptyEl = document.getElementById('dash-empty');
+  const chartsWrap = document.querySelector('.dash-charts');
+  const cardsWrap = document.querySelector('.dash-cards');
+  if (!emptyEl || !chartsWrap || !cardsWrap) return; // dashboard not in DOM (shouldn't happen, defensive)
+
+  const hasData = products.length > 0;
+  emptyEl.hidden = hasData;
+  chartsWrap.hidden = !hasData;
+  cardsWrap.hidden = !hasData;
+
+  renderDashCards();
+
+  // Only actually draw charts when dashboard is visible — avoids laying out into zero-height canvases
+  // which causes Chart.js to render at odd sizes. We also re-render on tab switch.
+  if (currentView === 'dashboard' && hasData) {
+    renderChartByType();
+    renderChartByStore();
+    renderChartFinishedByMonth();
+  }
+}
+
+function renderDashCards() {
+  // Avg $/day across active products that have a meaningful value
+  const activePerDays = products
+    .filter(isActive)
+    .map(p => calcCostPerDay(p))
+    .filter(v => v != null && isFinite(v) && v > 0);
+  const avgPerDay = activePerDays.length
+    ? activePerDays.reduce((s, v) => s + v, 0) / activePerDays.length
+    : null;
+  document.getElementById('dash-avg-per-day').textContent =
+    avgPerDay != null ? moneyFine(avgPerDay) : '—';
+
+  // Avg lifespan of finished products
+  const finishedDurations = products
+    .filter(p => p.endDate)
+    .map(p => calcDuration(p))
+    .filter(v => v != null && isFinite(v) && v > 0);
+  const avgLifespan = finishedDurations.length
+    ? finishedDurations.reduce((s, v) => s + v, 0) / finishedDurations.length
+    : null;
+  document.getElementById('dash-avg-lifespan').textContent =
+    avgLifespan != null ? `${Math.round(avgLifespan)} day${Math.round(avgLifespan) === 1 ? '' : 's'}` : '—';
+
+  // Top category + store by allocated spend
+  const byType = groupAllocatedSpend(p => p.productType || 'Unknown');
+  const byStore = groupAllocatedSpend(p => p.store || 'Unknown');
+  const topType = topEntry(byType);
+  const topStore = topEntry(byStore);
+  document.getElementById('dash-top-category').textContent =
+    topType ? `${topType[0]} (${money(topType[1])})` : '—';
+  document.getElementById('dash-top-store').textContent =
+    topStore ? `${topStore[0]} (${money(topStore[1])})` : '—';
+}
+
+function groupAllocatedSpend(keyFn) {
+  const map = new Map();
+  for (const p of products) {
+    const k = keyFn(p);
+    if (!k) continue;
+    const v = allocatedCost(p) || 0;
+    map.set(k, (map.get(k) || 0) + v);
+  }
+  return map;
+}
+
+function topEntry(map) {
+  let best = null;
+  for (const [k, v] of map) {
+    if (v <= 0) continue;
+    if (!best || v > best[1]) best = [k, v];
+  }
+  return best;
+}
+
+function sortedEntriesDesc(map) {
+  return [...map.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+}
+
+function destroyChart(key) {
+  if (charts[key]) { charts[key].destroy(); charts[key] = null; }
+}
+
+function renderChartByType() {
+  const entries = sortedEntriesDesc(groupAllocatedSpend(p => p.productType || 'Unknown'));
+  destroyChart('byType');
+  if (entries.length === 0) return;
+  const labels = entries.map(([k]) => k);
+  const values = entries.map(([, v]) => round2(v));
+  const colors = labels.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]);
+
+  charts.byType = new Chart(document.getElementById('chart-by-type'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#fff', borderWidth: 2 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.label}: ${money(ctx.parsed)}`
+          }
+        }
+      },
+      cutout: '55%'
+    }
+  });
+}
+
+function renderChartByStore() {
+  const entries = sortedEntriesDesc(groupAllocatedSpend(p => p.store || 'Unknown'));
+  destroyChart('byStore');
+  if (entries.length === 0) return;
+  const labels = entries.map(([k]) => k);
+  const values = entries.map(([, v]) => round2(v));
+
+  charts.byStore = new Chart(document.getElementById('chart-by-store'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: '#2b5fd9', borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => money(ctx.parsed.x) } }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { callback: v => money(v) },
+          grid: { color: '#eef1f7' }
+        },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderChartFinishedByMonth() {
+  // Last 12 months bucketed by endDate. Products without endDate are ignored.
+  const now = new Date();
+  const buckets = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: d.toLocaleString(undefined, { month: 'short', year: '2-digit' }),
+      count: 0
+    });
+  }
+  const bucketIndex = new Map(buckets.map((b, i) => [b.key, i]));
+
+  for (const p of products) {
+    if (!p.endDate) continue;
+    const d = new Date(p.endDate);
+    if (isNaN(d)) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const idx = bucketIndex.get(key);
+    if (idx != null) buckets[idx].count += 1;
+  }
+
+  destroyChart('finishedByMonth');
+  charts.finishedByMonth = new Chart(document.getElementById('chart-finished-per-month'), {
+    type: 'bar',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{ data: buckets.map(b => b.count), backgroundColor: '#2d8a5f', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} finished` } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0, stepSize: 1 },
+          grid: { color: '#eef1f7' }
+        }
+      }
+    }
+  });
+}
+
+function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+/* ---------- view switching ---------- */
+
+function setView(view) {
+  if (view !== 'table' && view !== 'dashboard') return;
+  currentView = view;
+  document.getElementById('view-table').hidden = view !== 'table';
+  document.getElementById('view-dashboard').hidden = view !== 'dashboard';
+  for (const btn of document.querySelectorAll('.view-tab')) {
+    const isActive = btn.dataset.view === view;
+    btn.classList.toggle('is-active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  }
+  // Dashboard charts must render after the container is visible so Chart.js measures width correctly.
+  if (view === 'dashboard') renderDashboard();
 }
 
 /* ---------- select population ---------- */
@@ -783,6 +1010,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('#products-table thead th[data-sort]').forEach(th => {
     th.addEventListener('click', () => handleHeaderClick(th));
+  });
+
+  document.querySelectorAll('.view-tab').forEach(btn => {
+    btn.addEventListener('click', () => setView(btn.dataset.view));
   });
 
   const exportBtn = document.getElementById('btn-export');

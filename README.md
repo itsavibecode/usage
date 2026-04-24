@@ -1,14 +1,14 @@
 # Usage Tracker
 
-**Version:** v0.3.0
+**Version:** v0.4.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
-Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–4 are complete; later phases add a dashboard.
+Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–5 are complete.
 
 ---
 
-## Current status (v0.3.0)
+## Current status (v0.4.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -69,11 +69,18 @@ Firestore, with security rules scoped to `request.auth.uid` so each account can 
 
 All reads use `onSnapshot` so changes propagate live across tabs and devices. On first sign-in, any leftover localStorage data is detected and the app offers to migrate it into Firestore (archived locally as `.migrated` after upload, not deleted).
 
-### 🔜 Phase 5 — Dashboard
-Charts (usage over time, cost breakdown by category/store) and summary panels (avg $/day, days tracked, most/least expensive categories).
+### ✅ Phase 5 — Dashboard
+A **Dashboard** tab beside the Table view (toggle in the page body). Extras on the dashboard:
 
-### 🔜 Phase 6 — Deployment
-Published via GitHub Pages from the `main` branch.
+- Summary cards: avg $/day across active products, avg lifespan of finished products, top category by spend, top store by spend.
+- **Allocated spend by product type** — donut chart.
+- **Allocated spend by store** — horizontal bar chart.
+- **Products finished per month** — last 12 months bar chart.
+
+All charts re-render live as Firestore data changes. Charts are rendered with [Chart.js v4](https://www.chartjs.org/) via ES module import from jsDelivr — no build step.
+
+### ✅ Phase 6 — Deployment
+Published via GitHub Pages from the `main` branch since v0.1.0.
 
 ### 🔭 Future discovery
 - Amazon purchase history autofill
@@ -169,6 +176,14 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.4.0 — 2026-04-24
+- **Phase 5 — Dashboard**: new **Table / Dashboard** view tabs below the stats bar.
+  - Dashboard adds four summary cards: avg $/day (active), avg lifespan of finished products (days), top category by spend, top store by spend.
+  - Three Chart.js v4 charts: donut of allocated spend by product type, horizontal bar of allocated spend by store, 12-month bar of products finished per month.
+  - All dashboard metrics and charts refresh live from the Firestore `onSnapshot` stream.
+- Chart.js imported as ESM from `https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm` — no build step, no new dev dependency.
+- Chart instances are torn down on sign-out to avoid leaking canvases across sessions.
 
 ### v0.3.0 — 2026-04-24
 - **Phase 3 — Google Sign-In**: full-page sign-in card when signed out; after sign-in the header shows avatar, name, and a Sign out button. Only `profile` + `email` scopes requested.
