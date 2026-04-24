@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.1
+**Version:** v0.7.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.1)
+## Current status (v0.7.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.2 — 2026-04-24
+- **Stat cards cap at 2 decimals** for all money values. The YTD daily cost card was rendering with 4 decimals (e.g. `$1.8597`) because it was using the fine-grained `moneyFine` formatter; swapped it to the standard `money` formatter.
+- **"in use" indicator reformatted** in the Duration column — now a smaller, uppercase-muted suffix on its own line under the day count, instead of inline on the same line.
+- **Bundle badge distinguishes originator from members.** The row that introduced a bundle purchase keeps the deeper-tinted "bundle × N" chip; sibling rows recorded via **Continue existing bundle** show the lighter "N of M" chip. Makes it easy to spot the canonical bundle row.
 
 ### v0.7.1 — 2026-04-24
 - **Fixed: bundle fields were still showing when "Part of a bundle" was unchecked.** The HTML `hidden` attribute was being overridden by the component-level `.field { display: flex; }` rule — a classic CSS specificity gotcha. Added a global `[hidden] { display: none !important; }` rule so `hidden` works reliably on any element.

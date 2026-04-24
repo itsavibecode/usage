@@ -291,6 +291,24 @@ main {
 .badge-active { background: #e3f5ec; color: var(--success); }
 .badge-finished { background: #efe9fb; color: #5b3ba8; }
 
+/* Bundle chips — originator ("bundle × N") is the row that first introduced
+ * the bundle purchase; members ("2 of 3") are sibling rows recorded later.
+ * A slightly deeper primary tone for the originator so you can tell the
+ * canonical row from its siblings at a glance. */
+.badge-bundle-origin { background: #d4e0fb; color: var(--primary-hover); font-weight: 600; }
+.badge-bundle-member { background: #eef2fc; color: #4a5a85; }
+
+/* "in use" indicator — smaller, on its own line under the duration number */
+.in-use-suffix {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
 .empty-state {
   text-align: center;
   color: var(--text-muted);

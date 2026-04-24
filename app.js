@@ -18,7 +18,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.1';
+const APP_VERSION = '0.7.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -138,7 +138,9 @@ function formatDate(str) {
 function formatDuration(p) {
   const d = calcDuration(p);
   if (d == null) return '—';
-  return `${d}d${isActive(p) ? ' (in use)' : ''}`;
+  return isActive(p)
+    ? `${d}d<span class="in-use-suffix">in use</span>`
+    : `${d}d`;
 }
 
 function escapeHtml(s) {
@@ -337,7 +339,7 @@ function renderRow(p) {
     <td class="num">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
     <td class="num">${moneyFine(calcCostPerUnit(p))}</td>
     <td class="num">${moneyFine(calcCostPerDay(p))}</td>
-    <td>${p.bundleStatus ? `<span class="badge">${p.bundlePosition ? `${escapeHtml(p.bundlePosition)} of ` : 'bundle × '}${escapeHtml(p.bundleSize || '?')}</span>` : '—'}</td>
+    <td>${p.bundleStatus ? (p.bundlePosition ? `<span class="badge badge-bundle-member">${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}</span>` : `<span class="badge badge-bundle-origin">bundle × ${escapeHtml(p.bundleSize || '?')}</span>`) : '—'}</td>
     <td>${escapeHtml(p.store) || '—'}</td>
     <td>${escapeHtml(p.buyer) || '—'}</td>
     <td>${p.cardLast4 ? '•••• ' + escapeHtml(p.cardLast4) : '—'}</td>
@@ -388,7 +390,10 @@ function renderStats() {
   document.getElementById('stat-finished').textContent = finished;
   document.getElementById('stat-total').textContent = money(total);
   document.getElementById('stat-ytd-spend').textContent = money(ytdSpend);
-  document.getElementById('stat-ytd-perday').textContent = moneyFine(ytdPerDay);
+  // Top-level stat cards stay at 2 decimals for readability. The dashboard
+  // "avg $/day" card still uses moneyFine because it's comparing fine-grained
+  // values. See user request v0.7.2.
+  document.getElementById('stat-ytd-perday').textContent = money(ytdPerDay);
 }
 
 /* ---------- dashboard ---------- */
