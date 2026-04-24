@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.6.1
+**Version:** v0.7.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.6.1)
+## Current status (v0.7.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.0 — 2026-04-24
+- **Fixed off-by-one date display** in the table. Dates coming from `<input type="date">` are `YYYY-MM-DD` strings; `new Date("2026-04-20")` parses those as UTC midnight, which in any negative-offset timezone renders as the day before. New `parseLocalDate()` helper parses date-only strings as local dates, fixing both `formatDate()` (table display) and `daysBetween()` (duration math). The edit dialog already showed the correct value because `<input type="date">` reads the string directly.
+- **New: bundle position field.** When **Part of a bundle** is checked, the form now asks two questions: how many are in the bundle, and *which number* of the bundle this row represents (e.g., #2 of 3). Enforced in validation: must be an integer between 1 and the bundle size. Table badge now reads **"2 of 3"** instead of **"bundle × 3"** when a position is known. Older rows without a position still render as before.
+- **Fixed: bundle size field never cleared when unchecking.** Unchecking **Part of a bundle** now also clears `bundlePosition` alongside `bundleSize`. The size + position inputs are required only while the checkbox is on.
+- **New: Import template download.** The **Import** button is now a dropdown with two options: **Import from file…** (existing behavior) and **Download template**. The template is a self-documenting JSON file with one placeholder product, a `_help` block explaining each field, and sensible today's-date defaults — edit in any text editor and re-import.
 
 ### v0.6.1 — 2026-04-24
 - **Hotfix for v0.6.0 regression**: the initialization of the product form (`const f = form()`) was declared *after* the UPC field's `blur` listener tried to reference it, triggering a `const` temporal-dead-zone `ReferenceError` during `DOMContentLoaded`. That error aborted the rest of the init handler, so the auth listener never attached — which is why the sign-in UI, data table, and dashboard all appeared blank, and why scanning a UPC filled the input but never kicked off a database lookup.

@@ -18,7 +18,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.7.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -31,7 +31,7 @@ const SEED_PRODUCT_TYPES = [
 const FIELDS = [
   'id', 'productType', 'productName', 'size', 'unit',
   'startDate', 'endDate', 'cost', 'costWithTax',
-  'bundleStatus', 'bundleSize',
+  'bundleStatus', 'bundleSize', 'bundlePosition',
   'store', 'buyer', 'cardLast4',
   'purchaseDate', 'notes', 'upc'
 ];
@@ -62,11 +62,23 @@ const CHART_PALETTE = [
 
 /* ---------- calculations ---------- */
 
+// Parse a date string as a LOCAL date (not UTC). Critical for `YYYY-MM-DD`
+// inputs coming from <input type="date"> — `new Date("2026-04-20")` parses
+// as UTC midnight, which in any negative-offset timezone renders as the day
+// before. See v0.7.0 changelog.
+function parseLocalDate(str) {
+  if (!str) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str).trim());
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
 function daysBetween(startStr, endStr) {
-  if (!startStr) return null;
-  const start = new Date(startStr);
-  const end = endStr ? new Date(endStr) : new Date();
-  if (isNaN(start) || isNaN(end)) return null;
+  const start = parseLocalDate(startStr);
+  if (!start) return null;
+  const end = endStr ? parseLocalDate(endStr) : new Date();
+  if (!end) return null;
   return Math.max(1, Math.round((end - start) / 86400000));
 }
 
@@ -118,9 +130,8 @@ const money = n => (n == null || !isFinite(Number(n))) ? '—' : usdFormatter.fo
 const moneyFine = n => (n == null || !isFinite(Number(n))) ? '—' : usdFineFormatter.format(Number(n));
 
 function formatDate(str) {
-  if (!str) return '—';
-  const d = new Date(str);
-  if (isNaN(d)) return '—';
+  const d = parseLocalDate(str);
+  if (!d) return '—';
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
@@ -326,7 +337,7 @@ function renderRow(p) {
     <td class="num">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
     <td class="num">${moneyFine(calcCostPerUnit(p))}</td>
     <td class="num">${moneyFine(calcCostPerDay(p))}</td>
-    <td>${p.bundleStatus ? `<span class="badge">bundle × ${escapeHtml(p.bundleSize || '?')}</span>` : '—'}</td>
+    <td>${p.bundleStatus ? `<span class="badge">${p.bundlePosition ? `${escapeHtml(p.bundlePosition)} of ` : 'bundle × '}${escapeHtml(p.bundleSize || '?')}</span>` : '—'}</td>
     <td>${escapeHtml(p.store) || '—'}</td>
     <td>${escapeHtml(p.buyer) || '—'}</td>
     <td>${p.cardLast4 ? '•••• ' + escapeHtml(p.cardLast4) : '—'}</td>
@@ -633,10 +644,30 @@ const form = () => document.getElementById('product-form');
 function setBundleSizeVisibility() {
   const f = form();
   const bundled = f.elements.bundleStatus.checked;
-  const wrap = document.getElementById('bundle-size-wrap');
-  wrap.hidden = !bundled;
+  const sizeWrap = document.getElementById('bundle-size-wrap');
+  const posWrap = document.getElementById('bundle-position-wrap');
+  sizeWrap.hidden = !bundled;
+  if (posWrap) posWrap.hidden = !bundled;
   f.elements.bundleSize.required = bundled;
-  if (!bundled) f.elements.bundleSize.value = '';
+  if (f.elements.bundlePosition) f.elements.bundlePosition.required = bundled;
+  if (!bundled) {
+    f.elements.bundleSize.value = '';
+    if (f.elements.bundlePosition) f.elements.bundlePosition.value = '';
+  }
+  updateBundlePositionMax();
+}
+
+function updateBundlePositionMax() {
+  const f = form();
+  const pos = f.elements.bundlePosition;
+  if (!pos) return;
+  const size = Number(f.elements.bundleSize.value);
+  if (isFinite(size) && size > 0) {
+    pos.max = String(size);
+    if (Number(pos.value) > size) pos.value = '';
+  } else {
+    pos.removeAttribute('max');
+  }
 }
 
 function populateFormSelects(current = {}) {
@@ -740,8 +771,14 @@ async function handleSubmit(e) {
       toast('Enter how many were in the bundle');
       return;
     }
+    const bp = Number(data.bundlePosition);
+    if (!isFinite(bp) || bp <= 0 || bp > bs || Math.floor(bp) !== bp) {
+      toast(`Enter which number of the bundle this is (1 to ${bs})`);
+      return;
+    }
   } else {
     data.bundleSize = '';
+    data.bundlePosition = '';
   }
 
   const id = editingId || newId();
@@ -800,7 +837,7 @@ function exportCSV() {
     'id', 'productType', 'productName', 'size', 'unit',
     'startDate', 'endDate', 'durationDays',
     'cost', 'costWithTax', 'allocatedCost', 'costPerUnit', 'costPerDay',
-    'bundleStatus', 'bundleSize',
+    'bundleStatus', 'bundleSize', 'bundlePosition',
     'store', 'buyer', 'cardLast4',
     'purchaseDate', 'upc', 'notes'
   ];
@@ -833,6 +870,50 @@ function download(text, filename, mime) {
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadImportTemplate() {
+  // Minimal, self-documenting import template. Mirrors the JSON export shape so
+  // a user can export, edit in a text editor, and re-import. Placeholder values
+  // show the expected format for each field.
+  const today = new Date().toISOString().slice(0, 10);
+  const template = {
+    app: 'usage-tracker',
+    version: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    _help: {
+      instructions: 'Edit the "products" array. Each object may omit "id" (a new one will be generated). All fields are optional except productType, productName, and upc. Dates use YYYY-MM-DD. Leave endDate blank for in-use products.',
+      productType: 'Underarm | Toothbrush | Toothpaste | Floss | Mouthwash | Facewash | Shampoo | Soap | any custom type you have added',
+      unit: 'count | oz | fl oz | lb | g | kg | mL | L | gal | ft | m | pack | roll | sheet | load | serving',
+      bundleStatus: 'true if purchased as part of a multi-pack; requires bundleSize and bundlePosition',
+      bundleSize: 'total count in the bundle (e.g. 3 for a 3-pack)',
+      bundlePosition: 'which item of the bundle this row is (1..bundleSize)'
+    },
+    customTypes: [],
+    products: [
+      {
+        productType: 'Toothpaste',
+        productName: 'Example Toothpaste',
+        size: 4.7,
+        unit: 'oz',
+        startDate: today,
+        endDate: '',
+        cost: 3.99,
+        costWithTax: 4.29,
+        bundleStatus: false,
+        bundleSize: '',
+        bundlePosition: '',
+        store: 'Example Store',
+        buyer: 'Me',
+        cardLast4: '',
+        purchaseDate: today,
+        notes: 'Delete this example row before importing.',
+        upc: '000000000000'
+      }
+    ]
+  };
+  download(JSON.stringify(template, null, 2), `usage-import-template.json`, 'application/json');
+  toast('Template downloaded — edit and re-import');
 }
 
 async function handleImportFile(file) {
@@ -1288,6 +1369,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const f = form();
   f.addEventListener('submit', handleSubmit);
   f.elements.bundleStatus.addEventListener('change', setBundleSizeVisibility);
+  f.elements.bundleSize.addEventListener('input', updateBundlePositionMax);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
   document.getElementById('scanner-close').addEventListener('click', closeScanner);
@@ -1355,6 +1437,7 @@ document.addEventListener('DOMContentLoaded', () => {
   exportBtn.addEventListener('click', e => {
     e.stopPropagation();
     exportMenu.classList.toggle('open');
+    document.getElementById('import-menu')?.classList.remove('open');
   });
   document.addEventListener('click', () => exportMenu.classList.remove('open'));
   exportMenu.addEventListener('click', e => {
@@ -1366,7 +1449,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const fileInput = document.getElementById('file-import');
-  document.getElementById('btn-import').addEventListener('click', () => fileInput.click());
+  const importBtn = document.getElementById('btn-import');
+  const importMenu = document.getElementById('import-menu');
+  importBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    importMenu.classList.toggle('open');
+    // close the sibling Export menu if it's open
+    document.getElementById('export-menu')?.classList.remove('open');
+  });
+  document.addEventListener('click', () => importMenu.classList.remove('open'));
+  importMenu.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-import]');
+    if (!btn) return;
+    if (btn.dataset.import === 'file') fileInput.click();
+    if (btn.dataset.import === 'template') downloadImportTemplate();
+    importMenu.classList.remove('open');
+  });
   fileInput.addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) handleImportFile(file);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.6.1">
+  <meta name="version" content="0.7.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,12 +14,18 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.6.1</span>
+        <span class="version" id="version">v0.7.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
       <button type="button" id="btn-add" class="btn btn-primary">+ Add product</button>
-      <button type="button" id="btn-import" class="btn">Import</button>
+      <div class="dropdown">
+        <button type="button" id="btn-import" class="btn">Import &#9662;</button>
+        <div class="dropdown-menu" id="import-menu">
+          <button type="button" data-import="file">Import from file…</button>
+          <button type="button" data-import="template">Download template</button>
+        </div>
+      </div>
       <div class="dropdown">
         <button type="button" id="btn-export" class="btn">Export &#9662;</button>
         <div class="dropdown-menu" id="export-menu">
@@ -251,6 +257,11 @@
         <label class="field" id="bundle-size-wrap" hidden>
           <span>How many in the bundle? <em>*</em></span>
           <input name="bundleSize" type="number" min="1" step="1" placeholder="e.g. 3">
+        </label>
+
+        <label class="field" id="bundle-position-wrap" hidden>
+          <span>Which number of the bundle is this? <em>*</em></span>
+          <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
         <label class="field field-wide">
