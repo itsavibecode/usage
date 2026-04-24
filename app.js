@@ -1,11 +1,20 @@
-/* Usage Tracker — v0.2.0
- * Phases 1 + 2: data schema, CRUD, import/export, bundle allocation, sortable table.
- * Storage abstracted for Phase 4 Firestore swap. */
+/* Usage Tracker — v0.3.0
+ * Phases 3 + 4: Google Sign-In + Firestore per-user storage.
+ * Data lives at /users/{uid}/products/{id} and /users/{uid}/meta/customTypes.
+ * Products are synced live via onSnapshot so multi-tab/multi-device stays in sync. */
 
-const APP_VERSION = '0.2.0';
+import { auth, db, googleProvider } from './firebase-init.js';
+import {
+  onAuthStateChanged, signInWithPopup, signOut
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+import {
+  collection, doc, onSnapshot, setDoc, deleteDoc, getDocs
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
-const STORAGE_KEY = 'usage.products.v1';
-const CUSTOM_TYPES_KEY = 'usage.customTypes.v1';
+const APP_VERSION = '0.3.0';
+
+const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
+const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
 
 const SEED_PRODUCT_TYPES = [
   'Underarm', 'Toothbrush', 'Toothpaste', 'Floss',
@@ -22,27 +31,16 @@ const FIELDS = [
 
 const ADD_NEW = '__add_new__';
 
-/* ---------- storage ---------- */
+/* ---------- module state ---------- */
 
-const storage = {
-  load() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-    catch { return []; }
-  },
-  save(items) { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
-};
-
-const customTypes = {
-  load() {
-    try { return JSON.parse(localStorage.getItem(CUSTOM_TYPES_KEY)) || []; }
-    catch { return []; }
-  },
-  save(list) { localStorage.setItem(CUSTOM_TYPES_KEY, JSON.stringify(list)); }
-};
-
-let products = storage.load();
+let currentUser = null;
+let products = [];
+let customTypesCache = [];
 let editingId = null;
 let sortState = { column: 'startDate', dir: 'desc' };
+let unsubProducts = null;
+let unsubTypes = null;
+let firstSnapshotSeen = false;
 
 /* ---------- calculations ---------- */
 
@@ -56,7 +54,6 @@ function daysBetween(startStr, endStr) {
 
 function calcDuration(p) { return daysBetween(p.startDate, p.endDate); }
 
-/* effectiveCost: if costWithTax is set, use it; otherwise fall back to pre-tax cost. */
 function effectiveCost(p) {
   const withTax = Number(p.costWithTax);
   if (isFinite(withTax) && withTax > 0) return withTax;
@@ -64,7 +61,6 @@ function effectiveCost(p) {
   return isFinite(pre) ? pre : 0;
 }
 
-/* For bundled items, the purchase cost is divided across the bundle size. */
 function bundleDivisor(p) {
   if (!p.bundleStatus) return 1;
   const n = Number(p.bundleSize);
@@ -130,6 +126,60 @@ function newId() {
   return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+/* ---------- Firestore storage ---------- */
+
+function productsColl(uid = currentUser?.uid) {
+  return collection(db, 'users', uid, 'products');
+}
+function productDoc(id, uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'products', id);
+}
+function typesDoc(uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'meta', 'customTypes');
+}
+
+async function saveProduct(product) {
+  try { await setDoc(productDoc(product.id), product); }
+  catch (e) { toast('Save failed: ' + e.message); throw e; }
+}
+
+async function deleteProduct(id) {
+  try { await deleteDoc(productDoc(id)); }
+  catch (e) { toast('Delete failed: ' + e.message); throw e; }
+}
+
+async function saveCustomTypes(list) {
+  try { await setDoc(typesDoc(), { types: list }); }
+  catch (e) { toast('Could not save custom types: ' + e.message); }
+}
+
+function subscribeData(uid) {
+  unsubscribeData();
+
+  unsubProducts = onSnapshot(productsColl(uid), snap => {
+    const next = [];
+    snap.forEach(d => next.push({ id: d.id, ...d.data() }));
+    products = next;
+    firstSnapshotSeen = true;
+    render();
+  }, err => {
+    console.error('Products subscription error:', err);
+    toast('Sync error: ' + err.message);
+  });
+
+  unsubTypes = onSnapshot(typesDoc(uid), d => {
+    customTypesCache = d.exists() ? (d.data().types || []) : [];
+  }, err => {
+    console.error('Types subscription error:', err);
+  });
+}
+
+function unsubscribeData() {
+  if (unsubProducts) { unsubProducts(); unsubProducts = null; }
+  if (unsubTypes) { unsubTypes(); unsubTypes = null; }
+  firstSnapshotSeen = false;
+}
+
 /* ---------- recent-used helpers ---------- */
 
 function uniqueValues(key) {
@@ -142,9 +192,8 @@ function uniqueValues(key) {
 }
 
 function allProductTypes() {
-  const custom = customTypes.load();
   const combined = [...SEED_PRODUCT_TYPES];
-  for (const c of custom) if (!combined.includes(c)) combined.push(c);
+  for (const c of customTypesCache) if (!combined.includes(c)) combined.push(c);
   return combined;
 }
 
@@ -169,7 +218,7 @@ function getSortValue(p, column) {
     case 'costPerUnit': return calcCostPerUnit(p) ?? 0;
     case 'costPerDay': return calcCostPerDay(p) ?? 0;
     case 'bundleStatus': return p.bundleStatus ? 1 : 0;
-    case 'endDate': return p.endDate || '\uffff'; // empty (still active) sorts last
+    case 'endDate': return p.endDate || '\uffff';
     default: return (p[column] ?? '').toString().toLowerCase();
   }
 }
@@ -217,7 +266,15 @@ function render() {
 function renderTable() {
   const body = document.getElementById('products-body');
   const empty = document.getElementById('empty-state');
+  const loading = document.getElementById('loading-state');
   body.innerHTML = '';
+
+  if (!firstSnapshotSeen && currentUser) {
+    loading.hidden = false;
+    empty.hidden = true;
+    return;
+  }
+  loading.hidden = true;
 
   if (products.length === 0) {
     empty.hidden = false;
@@ -307,7 +364,7 @@ function populateBundleSelect(el) {
   }
 }
 
-function handleAddNew(selectEl, kind) {
+async function handleAddNew(selectEl, kind) {
   let value = prompt(`Add new ${kind}:`);
   if (value == null || !(value = value.trim())) {
     selectEl.value = '';
@@ -319,10 +376,11 @@ function handleAddNew(selectEl, kind) {
     return;
   }
   if (kind === 'product type') {
-    const list = customTypes.load();
+    const list = [...customTypesCache];
     if (!SEED_PRODUCT_TYPES.includes(value) && !list.includes(value)) {
       list.push(value);
-      customTypes.save(list);
+      await saveCustomTypes(list);
+      customTypesCache = list; // optimistic — snapshot will confirm
     }
     populateTypeSelect(selectEl, value);
     return;
@@ -418,8 +476,9 @@ function handleContinueBundle(e) {
   toast('Bundle details filled in — set your start date and save');
 }
 
-function handleSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
+  if (!currentUser) { toast('Please sign in first'); return; }
   const f = form();
   const data = {};
   for (const key of FIELDS) {
@@ -451,18 +510,18 @@ function handleSubmit(e) {
     data.bundleSize = '';
   }
 
-  if (editingId) {
-    const idx = products.findIndex(p => p.id === editingId);
-    if (idx >= 0) products[idx] = { id: editingId, ...data };
-    toast('Product updated');
-  } else {
-    products.push({ id: newId(), ...data });
-    toast('Product added');
+  const id = editingId || newId();
+  const saveBtn = document.getElementById('dialog-save');
+  saveBtn.disabled = true;
+  try {
+    await saveProduct({ id, ...data });
+    toast(editingId ? 'Product updated' : 'Product added');
+    closeDialog();
+  } catch {
+    // toast already shown by saveProduct
+  } finally {
+    saveBtn.disabled = false;
   }
-
-  storage.save(products);
-  render();
-  closeDialog();
 }
 
 /* ---------- delete confirm ---------- */
@@ -477,11 +536,13 @@ function confirmDelete(id) {
   const yes = document.getElementById('confirm-yes');
   const no = document.getElementById('confirm-no');
   const cleanup = () => { yes.onclick = null; no.onclick = null; };
-  yes.onclick = () => {
-    products = products.filter(x => x.id !== id);
-    storage.save(products);
-    render();
-    toast('Product deleted');
+  yes.onclick = async () => {
+    yes.disabled = true;
+    try {
+      await deleteProduct(id);
+      toast('Product deleted');
+    } catch {}
+    finally { yes.disabled = false; }
     cd.close(); cleanup();
   };
   no.onclick = () => { cd.close(); cleanup(); };
@@ -493,7 +554,7 @@ function exportJSON() {
   const payload = {
     app: 'usage-tracker', version: APP_VERSION,
     exportedAt: new Date().toISOString(),
-    customTypes: customTypes.load(),
+    customTypes: customTypesCache,
     products
   };
   download(JSON.stringify(payload, null, 2), `usage-export-${dateStamp()}.json`, 'application/json');
@@ -540,9 +601,10 @@ function download(text, filename, mime) {
   URL.revokeObjectURL(url);
 }
 
-function handleImportFile(file) {
+async function handleImportFile(file) {
+  if (!currentUser) { toast('Please sign in first'); return; }
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result);
       const incoming = Array.isArray(data) ? data : data.products;
@@ -557,32 +619,64 @@ function handleImportFile(file) {
         return out;
       });
 
-      if (Array.isArray(data.customTypes)) {
-        const current = customTypes.load();
-        const merged = [...new Set([...current, ...data.customTypes])];
-        customTypes.save(merged);
+      let added = 0;
+      for (const item of cleaned) {
+        await setDoc(productDoc(item.id), item);
+        added++;
       }
 
-      const existingIds = new Set(products.map(p => p.id));
-      let added = 0, updated = 0;
-      for (const item of cleaned) {
-        if (existingIds.has(item.id)) {
-          products = products.map(p => p.id === item.id ? item : p);
-          updated++;
-        } else {
-          products.push(item);
-          added++;
-        }
+      if (Array.isArray(data.customTypes) && data.customTypes.length) {
+        const merged = [...new Set([...customTypesCache, ...data.customTypes])];
+        await saveCustomTypes(merged);
       }
-      storage.save(products);
-      render();
-      toast(`Imported: ${added} added, ${updated} updated`);
+
+      toast(`Imported ${added} product${added === 1 ? '' : 's'}`);
     } catch (err) {
       toast('Import failed: ' + err.message);
     }
   };
   reader.onerror = () => toast('Could not read file');
   reader.readAsText(file);
+}
+
+/* ---------- legacy localStorage migration ---------- */
+
+async function offerLegacyMigration(uid) {
+  const legacyRaw = localStorage.getItem(LEGACY_PRODUCTS_KEY);
+  if (!legacyRaw) return;
+  let legacy;
+  try { legacy = JSON.parse(legacyRaw); } catch { return; }
+  if (!Array.isArray(legacy) || legacy.length === 0) return;
+
+  // Only offer if this account's Firestore is empty
+  const snap = await getDocs(productsColl(uid));
+  if (!snap.empty) return;
+
+  const n = legacy.length;
+  if (!confirm(`Found ${n} product${n === 1 ? '' : 's'} saved locally from testing.\n\nUpload to your account so they sync across devices?`)) {
+    return;
+  }
+
+  try {
+    for (const p of legacy) {
+      const id = p.id || newId();
+      await setDoc(productDoc(id, uid), { ...p, id });
+    }
+    const legacyTypes = JSON.parse(localStorage.getItem(LEGACY_TYPES_KEY) || '[]');
+    if (Array.isArray(legacyTypes) && legacyTypes.length) {
+      await setDoc(typesDoc(uid), { types: legacyTypes });
+    }
+    // Archive, don't delete
+    localStorage.setItem(LEGACY_PRODUCTS_KEY + '.migrated', legacyRaw);
+    localStorage.removeItem(LEGACY_PRODUCTS_KEY);
+    if (legacyTypes.length) {
+      localStorage.setItem(LEGACY_TYPES_KEY + '.migrated', localStorage.getItem(LEGACY_TYPES_KEY));
+      localStorage.removeItem(LEGACY_TYPES_KEY);
+    }
+    toast(`Migrated ${n} product${n === 1 ? '' : 's'} to your account`);
+  } catch (e) {
+    toast('Migration failed: ' + e.message);
+  }
 }
 
 /* ---------- toast ---------- */
@@ -593,10 +687,10 @@ function toast(message) {
   el.textContent = message;
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2800);
 }
 
-/* ---------- cost formatting (blur → $0.00) ---------- */
+/* ---------- cost input → $0.00 on blur ---------- */
 
 function formatCostInput(e) {
   const el = e.target;
@@ -606,11 +700,53 @@ function formatCostInput(e) {
   el.value = n.toFixed(2);
 }
 
+/* ---------- auth UI ---------- */
+
+function showSignedIn(user) {
+  document.getElementById('auth-gate').hidden = true;
+  document.getElementById('main-wrap').hidden = false;
+  document.getElementById('toolbar').hidden = false;
+  document.getElementById('user-chip').hidden = false;
+  const avatar = document.getElementById('user-avatar');
+  if (user.photoURL) { avatar.src = user.photoURL; avatar.hidden = false; }
+  else { avatar.hidden = true; }
+  document.getElementById('user-name').textContent = user.displayName || user.email || 'Signed in';
+}
+
+function showSignedOut() {
+  document.getElementById('auth-gate').hidden = false;
+  document.getElementById('main-wrap').hidden = true;
+  document.getElementById('toolbar').hidden = true;
+  document.getElementById('user-chip').hidden = true;
+}
+
+async function doSignIn() {
+  const btn = document.getElementById('btn-signin');
+  btn.disabled = true;
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (e) {
+    if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      toast('Sign-in failed: ' + (e.message || e.code));
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doSignOut() {
+  try { await signOut(auth); }
+  catch (e) { toast('Sign-out failed: ' + e.message); }
+}
+
 /* ---------- init ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('version').textContent = `v${APP_VERSION}`;
   document.querySelector('meta[name="version"]')?.setAttribute('content', APP_VERSION);
+
+  document.getElementById('btn-signin').addEventListener('click', doSignIn);
+  document.getElementById('btn-signout').addEventListener('click', doSignOut);
 
   document.getElementById('btn-add').addEventListener('click', openAddDialog);
   document.getElementById('dialog-close').addEventListener('click', closeDialog);
@@ -672,5 +808,19 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = '';
   });
 
-  render();
+  // Auth state listener — drives everything
+  onAuthStateChanged(auth, async user => {
+    currentUser = user;
+    if (user) {
+      showSignedIn(user);
+      subscribeData(user.uid);
+      await offerLegacyMigration(user.uid);
+    } else {
+      showSignedOut();
+      unsubscribeData();
+      products = [];
+      customTypesCache = [];
+      render();
+    }
+  });
 });

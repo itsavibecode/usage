@@ -1,14 +1,14 @@
 # Usage Tracker
 
-**Version:** v0.2.0
+**Version:** v0.3.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
-Hosted as a static site on GitHub Pages. Phases 1–2 are complete; later phases add Google Sign-In, cloud storage, and a dashboard.
+Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–4 are complete; later phases add a dashboard.
 
 ---
 
-## Current status (v0.2.0)
+## Current status (v0.3.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -52,17 +52,22 @@ Data schema and calculations are in place. Each product stores:
 - **Continue bundle** — when adding a new product, a selector at the top of the dialog lists all existing bundles. Picking one pre-fills product name, cost, UPC, bundle size, and the rest of the purchase details so you can just set a new start date and save.
 - **Cost fields** show a `$` prefix and auto-format to two decimals on blur (`5` → `5.00`).
 
-### 🔜 Phase 3 — Authentication
+### ✅ Phase 3 — Authentication
 Google Sign-In via Firebase. Scopes kept minimal — only `profile` + `email`, pulling:
 - `uid` (unique Google account identifier — used as the primary key for per-user data)
 - `email`
 - `displayName`
 - `photoURL`
 
-No access to Gmail, Drive, contacts, or other Google services.
+No access to Gmail, Drive, contacts, or other Google services. When signed out, the app shows a sign-in card and nothing else. When signed in, the header shows the user's avatar, name, and a Sign out button.
 
-### 🔜 Phase 4 — Data storage
-Firestore, with security rules scoped to `request.auth.uid` so each account can only read/write its own products.
+### ✅ Phase 4 — Data storage
+Firestore, with security rules scoped to `request.auth.uid` so each account can only read/write its own products. Documents:
+
+- `/users/{uid}/products/{productId}` — one doc per tracked product
+- `/users/{uid}/meta/customTypes` — the user's custom product types list
+
+All reads use `onSnapshot` so changes propagate live across tabs and devices. On first sign-in, any leftover localStorage data is detected and the app offers to migrate it into Firestore (archived locally as `.migrated` after upload, not deleted).
 
 ### 🔜 Phase 5 — Dashboard
 Charts (usage over time, cost breakdown by category/store) and summary panels (avg $/day, days tracked, most/least expensive categories).
@@ -115,11 +120,27 @@ npx serve .
 
 Then open http://localhost:8080.
 
-Data is stored in `localStorage`:
-- `usage.products.v1` — product entries
-- `usage.customTypes.v1` — user-added product types
+Because the app uses Firebase Google Sign-In, your local origin needs to be whitelisted in the Firebase Console once: **Authentication → Settings → Authorized domains → Add `localhost`**. The live GitHub Pages domain `itsavibecode.github.io` must also be added there.
 
-Phase 4 will swap the storage layer for Firestore.
+After signing in with Google, data lives in Firestore under `/users/{uid}/`:
+- `/users/{uid}/products/{id}` — product entries
+- `/users/{uid}/meta/customTypes` — custom product types
+
+Legacy localStorage data (from v0.2.0 or earlier) is automatically offered for one-time migration on first sign-in.
+
+---
+
+## Firebase setup (one-time, already done for this project)
+
+If you fork this or stand up your own instance:
+
+1. **Create a Firebase project**, then add a Web app. Paste the resulting `firebaseConfig` into `firebase-init.js`.
+2. **Enable Google Sign-In**: Firebase Console → Authentication → Sign-in method → Google → Enable.
+3. **Create Firestore** (Native mode, any region).
+4. **Paste `firestore.rules`** from this repo into Firebase Console → Firestore → Rules → Publish. These rules enforce per-user isolation (`request.auth.uid == userId` on everything under `/users/{uid}/…`).
+5. **Authorized domains**: Authentication → Settings → Authorized domains → add your hosting domain(s) — e.g. `itsavibecode.github.io` and `localhost` for local dev.
+
+The `apiKey` in `firebase-init.js` is safe to commit — Firebase Web API keys identify the project, they don't authenticate it. Security is enforced entirely through Firestore rules and the authorized-domains list.
 
 ---
 
@@ -127,10 +148,12 @@ Phase 4 will swap the storage layer for Firestore.
 
 ```
 usage/
-├── index.html     # markup + form + table
-├── style.css      # styling
-├── app.js         # logic: storage, calculations, form, sort, import/export
-├── favicon.svg    # site icon
+├── index.html          # markup + form + table + auth gate
+├── style.css           # styling
+├── app.js              # ES module: Firestore, auth, calculations, form, sort, import/export
+├── firebase-init.js    # ES module: Firebase app/auth/db/analytics singletons
+├── firestore.rules     # security rules (paste into Firebase Console)
+├── favicon.svg         # site icon
 └── README.md
 ```
 
@@ -146,6 +169,14 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.3.0 — 2026-04-24
+- **Phase 3 — Google Sign-In**: full-page sign-in card when signed out; after sign-in the header shows avatar, name, and a Sign out button. Only `profile` + `email` scopes requested.
+- **Phase 4 — Firestore backend**: product data and custom types moved from `localStorage` to `/users/{uid}/products/{id}` and `/users/{uid}/meta/customTypes`. Reads use `onSnapshot` for live cross-device sync.
+- **Security rules** (`firestore.rules`): per-user isolation enforced by `request.auth.uid == userId`.
+- **One-time migration**: any pre-existing localStorage entries are detected on first sign-in, the user is prompted, and the data is copied to Firestore. Local entries are suffix-archived as `.migrated` — never deleted.
+- App script is now an ES module importing the Firebase v12.12.1 modular SDK from `gstatic.com`.
+- New files: `firebase-init.js`, `firestore.rules`.
 
 ### v0.2.0 — 2026-04-23
 - **Product type** dropdown: replaced generic list with specific seed (Underarm, Toothbrush, Toothpaste, Floss, Mouthwash, Facewash, Shampoo, Soap); added **+ Add new type…** at the bottom, custom types persist in `localStorage`.
