@@ -1,4 +1,6 @@
-/* Usage Tracker — v0.5.0
+/* Usage Tracker — v0.6.0
+ * UPC database lookup via UPCitemdb — populates the form after scan/entry
+ *   with user confirmation. Free trial endpoint, 100 req/day/IP.
  * UPC camera scanning (ZXing) lazy-loaded on first tap.
  * Phase 5: Dashboard with Chart.js.
  * Phases 3 + 4: Google Sign-In + Firestore per-user storage.
@@ -16,7 +18,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -315,7 +317,7 @@ function renderRow(p) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td>${escapeHtml(p.productType)}</td>
-    <td><strong>${escapeHtml(p.productName)}</strong></td>
+    <td class="name-cell"><button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td>${formatDate(p.startDate)}</td>
     <td>${p.endDate ? formatDate(p.endDate) : '<span class="badge badge-active">active</span>'}</td>
@@ -658,6 +660,7 @@ function openAddDialog() {
   f.elements.startDate.value = today;
   f.elements.purchaseDate.value = today;
   setBundleSizeVisibility();
+  setUpcStatus('');
   dialog().showModal();
 }
 
@@ -678,6 +681,7 @@ function openEditDialog(id) {
     else el.value = p[key] ?? '';
   }
   setBundleSizeVisibility();
+  setUpcStatus('');
   dialog().showModal();
 }
 
@@ -965,9 +969,10 @@ function handleScanResult(text) {
   if (upcInput) {
     upcInput.value = text;
     upcInput.dispatchEvent(new Event('input', { bubbles: true }));
-    upcInput.focus();
   }
   toast('Scanned UPC: ' + text);
+  // Fire-and-forget — lookup will drive the confirm dialog when it resolves
+  lookupAndOfferUpc(text, { fromScan: true });
 }
 
 function closeScanner() {
@@ -996,6 +1001,215 @@ function describeCameraError(e) {
     return 'Camera is in use by another app. Close it and try again.';
   }
   return 'Could not start camera: ' + ((e && e.message) || e);
+}
+
+/* ---------- UPC database lookup (UPCitemdb trial) ---------- */
+// Free tier: 100 requests/day/IP. CORS-enabled. Response shape:
+//   { code: "OK", total: N, items: [{ ean, upc, title, brand, category, size, offers: [...] }] }
+// We cache hits in module state so repeated UPC scans within a session don't burn requests.
+
+const UPCITEMDB_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
+const upcCache = new Map(); // upc -> item (or null if no match)
+let pendingUpcLookup = null;
+let pendingUpcCode = null; // the UPC whose confirm dialog is currently open
+
+function setUpcStatus(text, kind = '') {
+  const el = document.getElementById('upc-status');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.remove('is-busy', 'is-error', 'is-ok');
+  if (kind) el.classList.add(`is-${kind}`);
+}
+
+function normalizeUpc(code) {
+  return String(code || '').replace(/\D/g, '');
+}
+
+async function lookupUpc(rawCode) {
+  const code = normalizeUpc(rawCode);
+  if (code.length < 8) return null;
+
+  if (upcCache.has(code)) return upcCache.get(code);
+
+  setUpcStatus('Looking up product…', 'busy');
+  try {
+    const res = await fetch(`${UPCITEMDB_URL}?upc=${encodeURIComponent(code)}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) {
+      // 429 = trial rate-limit; other non-OK = generic network issue
+      if (res.status === 429) {
+        setUpcStatus('UPC lookup limit reached for today — enter details manually.', 'error');
+      } else {
+        setUpcStatus(`Lookup failed (${res.status}).`, 'error');
+      }
+      return null;
+    }
+    const data = await res.json();
+    const item = (data.items && data.items[0]) || null;
+    upcCache.set(code, item);
+    return item;
+  } catch (e) {
+    console.error('UPC lookup failed:', e);
+    setUpcStatus('Lookup failed — check connection.', 'error');
+    return null;
+  }
+}
+
+/* Kicks off a lookup for whatever is currently in the UPC input.
+ * Called on scan result and on UPC input blur (when the value has changed). */
+async function lookupAndOfferUpc(rawCode, { fromScan = false } = {}) {
+  const code = normalizeUpc(rawCode);
+  if (!code) { setUpcStatus(''); return; }
+  if (code.length < 8) { setUpcStatus('UPC too short to look up.', 'error'); return; }
+
+  pendingUpcLookup = code;
+  const item = await lookupUpc(code);
+
+  // Abort if the user changed the UPC while the request was in flight
+  if (pendingUpcLookup !== code) return;
+  pendingUpcLookup = null;
+
+  if (!item) {
+    if (fromScan) setUpcStatus('No match in UPC database — enter details manually.', '');
+    else setUpcStatus('No match — enter details manually.', '');
+    return;
+  }
+
+  setUpcStatus(`Match: ${item.brand ? item.brand + ' — ' : ''}${item.title || 'unknown'}`, 'ok');
+  openUpcMatchDialog(code, item);
+}
+
+function openUpcMatchDialog(code, item) {
+  pendingUpcCode = code;
+  const dlg = document.getElementById('upc-match-dialog');
+  document.getElementById('upc-match-code').textContent = code;
+  const grid = document.getElementById('upc-match-grid');
+  grid.innerHTML = '';
+
+  const rows = [];
+  if (item.brand) rows.push(['Brand', item.brand]);
+  if (item.title) rows.push(['Title', item.title]);
+  if (item.category) rows.push(['Category', item.category]);
+  if (item.size) rows.push(['Size', item.size]);
+  if (!rows.length) rows.push(['Match', 'Found in database, but no usable fields returned.']);
+
+  for (const [k, v] of rows) {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    grid.append(dt, dd);
+  }
+
+  // Stash the item on the dialog so the accept handler can read it
+  dlg._upcItem = item;
+  if (!dlg.open) dlg.showModal();
+}
+
+function closeUpcMatchDialog() {
+  const dlg = document.getElementById('upc-match-dialog');
+  if (dlg.open) dlg.close();
+  pendingUpcCode = null;
+}
+
+function acceptUpcMatch() {
+  const dlg = document.getElementById('upc-match-dialog');
+  const item = dlg._upcItem;
+  if (item) applyUpcItemToForm(item);
+  closeUpcMatchDialog();
+}
+
+/* Fill product form from a UPCitemdb item. Only fills empty fields — never
+ * overwrites values the user already entered. */
+function applyUpcItemToForm(item) {
+  const f = form();
+  const setIfEmpty = (name, value) => {
+    const el = f.elements[name];
+    if (!el || value == null || value === '') return;
+    if (!el.value) {
+      el.value = value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  };
+
+  // Product name: prefer title; drop size suffix if present so it's not duplicated
+  const title = (item.title || '').trim();
+  if (title) setIfEmpty('productName', title);
+
+  // Product type from category
+  const guessedType = guessProductTypeFromCategory(item.category || '');
+  if (guessedType) setIfEmpty('productType', guessedType);
+
+  // Size + unit from "4.8 oz" style string
+  const parsed = parseSizeString(item.size || '');
+  if (parsed) {
+    setIfEmpty('size', parsed.size);
+    setIfEmpty('unit', parsed.unit);
+  }
+
+  toast('Prefilled from UPC database');
+}
+
+function guessProductTypeFromCategory(category) {
+  const c = (category || '').toLowerCase();
+  if (!c) return null;
+  const rules = [
+    [['toothpaste'], 'Toothpaste'],
+    [['toothbrush'], 'Toothbrush'],
+    [['floss', 'dental floss'], 'Floss'],
+    [['mouthwash'], 'Mouthwash'],
+    [['face wash', 'facewash', 'facial cleanser'], 'Facewash'],
+    [['shampoo'], 'Shampoo'],
+    [['body wash', 'bar soap', 'hand soap', 'soap'], 'Soap'],
+    [['deodorant', 'antiperspirant', 'underarm'], 'Underarm'],
+  ];
+  for (const [needles, type] of rules) {
+    if (needles.some(n => c.includes(n))) {
+      // Only return types that are currently in the user's list — if they've
+      // removed the default types, we don't want to resurrect them.
+      if (allProductTypes().includes(type)) return type;
+    }
+  }
+  return null;
+}
+
+/* Parse "4.8 oz" / "12 fl oz" / "300 mL" into { size, unit } matching one of our supported units. */
+function parseSizeString(raw) {
+  const UNIT_SET = new Set([
+    'count', 'oz', 'fl oz', 'lb', 'g', 'kg', 'mL', 'L',
+    'gal', 'ft', 'm', 'pack', 'roll', 'sheet', 'load', 'serving'
+  ]);
+  // Lowercase alias → canonical unit in our list
+  const ALIASES = {
+    'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+    'fl oz': 'fl oz', 'floz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
+    'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
+    'g': 'g', 'gram': 'g', 'grams': 'g',
+    'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
+    'ml': 'mL', 'milliliter': 'mL', 'milliliters': 'mL',
+    'l': 'L', 'liter': 'L', 'liters': 'L',
+    'gal': 'gal', 'gallon': 'gal', 'gallons': 'gal',
+    'ft': 'ft', 'foot': 'ft', 'feet': 'ft',
+    'm': 'm', 'meter': 'm', 'meters': 'm',
+    'ct': 'count', 'count': 'count',
+    'pack': 'pack', 'packs': 'pack',
+    'roll': 'roll', 'rolls': 'roll',
+    'sheet': 'sheet', 'sheets': 'sheet',
+    'load': 'load', 'loads': 'load',
+    'serving': 'serving', 'servings': 'serving'
+  };
+
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return null;
+  // "4.8 oz", "12 fl oz"
+  const m = s.match(/^([\d.]+)\s*(fl\s*oz|[a-z]+)/i);
+  if (!m) return null;
+  const size = parseFloat(m[1]);
+  if (!isFinite(size)) return null;
+  const unitKey = m[2].replace(/\s+/g, ' ').trim();
+  const unit = ALIASES[unitKey] || (UNIT_SET.has(unitKey) ? unitKey : null);
+  if (!unit) return null;
+  return { size, unit };
 }
 
 /* ---------- toast ---------- */
@@ -1077,6 +1291,26 @@ document.addEventListener('DOMContentLoaded', () => {
   // Browser Esc-closes dialogs by firing a "close" event — release the camera if that happens
   document.getElementById('scanner-dialog').addEventListener('close', closeScanner);
 
+  // UPC blur → look up; skip if the value is unchanged from a prior lookup
+  let lastLookedUpUpc = '';
+  f.elements.upc.addEventListener('blur', () => {
+    const code = normalizeUpc(f.elements.upc.value);
+    if (!code || code === lastLookedUpUpc) return;
+    lastLookedUpUpc = code;
+    lookupAndOfferUpc(code, { fromScan: false });
+  });
+  f.elements.upc.addEventListener('input', () => {
+    // If the user is editing, clear the "last looked up" so another blur re-triggers lookup
+    if (normalizeUpc(f.elements.upc.value) !== lastLookedUpUpc) {
+      setUpcStatus('');
+    }
+  });
+
+  document.getElementById('upc-match-yes').addEventListener('click', acceptUpcMatch);
+  document.getElementById('upc-match-no').addEventListener('click', closeUpcMatchDialog);
+  document.getElementById('upc-match-close').addEventListener('click', closeUpcMatchDialog);
+  document.getElementById('upc-match-dialog').addEventListener('close', () => { pendingUpcCode = null; });
+
   const f = form();
   f.addEventListener('submit', handleSubmit);
   f.elements.bundleStatus.addEventListener('change', setBundleSizeVisibility);
@@ -1102,8 +1336,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('products-body').addEventListener('click', e => {
     const editBtn = e.target.closest('.edit-btn');
     const delBtn = e.target.closest('.delete-btn');
+    const nameLink = e.target.closest('.name-link');
     if (editBtn) openEditDialog(editBtn.dataset.id);
-    if (delBtn) confirmDelete(delBtn.dataset.id);
+    else if (nameLink) openEditDialog(nameLink.dataset.id);
+    else if (delBtn) confirmDelete(delBtn.dataset.id);
   });
 
   document.querySelectorAll('#products-table thead th[data-sort]').forEach(th => {

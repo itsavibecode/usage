@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.5.0">
+  <meta name="version" content="0.6.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.5.0</span>
+        <span class="version" id="version">v0.6.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -144,6 +144,21 @@
       </section>
 
       <div class="form-grid">
+        <label class="field field-wide upc-field">
+          <span>UPC <em>*</em></span>
+          <div class="input-with-btn">
+            <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="Scan or type — we'll look it up automatically">
+            <button type="button" id="btn-scan-upc" class="btn btn-scan" title="Scan a barcode with your camera">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2z"/>
+                <path d="M7 7v10M11 7v10M15 7v10M19 7v10"/>
+              </svg>
+              Scan
+            </button>
+          </div>
+          <span class="upc-status" id="upc-status" aria-live="polite"></span>
+        </label>
+
         <label class="field">
           <span>Product type <em>*</em></span>
           <select name="productType" required></select>
@@ -228,20 +243,6 @@
           <input name="purchaseDate" type="date">
         </label>
 
-        <label class="field">
-          <span>UPC <em>*</em></span>
-          <div class="input-with-btn">
-            <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="012345678901">
-            <button type="button" id="btn-scan-upc" class="btn btn-scan" title="Scan a barcode with your camera">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M23 19V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2z"/>
-                <path d="M7 7v10M11 7v10M15 7v10M19 7v10"/>
-              </svg>
-              Scan
-            </button>
-          </div>
-        </label>
-
         <label class="field checkbox-field">
           <input name="bundleStatus" type="checkbox">
           <span>Part of a bundle purchase</span>
@@ -271,6 +272,22 @@
       <button type="button" class="btn" id="confirm-no">Cancel</button>
       <button type="button" class="btn btn-danger" id="confirm-yes">Delete</button>
     </div>
+  </dialog>
+
+  <dialog id="upc-match-dialog" class="upc-match-dialog">
+    <header class="dialog-header">
+      <h2>Match found</h2>
+      <button type="button" class="icon-btn" id="upc-match-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="upc-match-body">
+      <p class="upc-match-lead">We found this product for UPC <code id="upc-match-code"></code>. Use it to pre-fill the form?</p>
+      <dl class="upc-match-grid" id="upc-match-grid"></dl>
+      <p class="upc-match-hint">Fields you've already filled in won't be overwritten.</p>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="upc-match-no">No, I'll enter it</button>
+      <button type="button" class="btn btn-primary" id="upc-match-yes">Yes, use this</button>
+    </footer>
   </dialog>
 
   <dialog id="scanner-dialog" class="scanner-dialog">

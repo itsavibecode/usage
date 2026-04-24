@@ -396,6 +396,78 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 }
 .btn-scan svg { flex-shrink: 0; }
 
+/* UPC field at the top of the form — slightly emphasized */
+.upc-field {
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.upc-field > span:first-child {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.upc-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+  margin-top: 2px;
+}
+.upc-status.is-busy { color: var(--primary); }
+.upc-status.is-error { color: var(--danger); }
+.upc-status.is-ok { color: var(--success); }
+
+/* UPC match confirmation dialog */
+.upc-match-dialog { max-width: 460px; }
+.upc-match-body { padding: 16px 20px 12px; }
+.upc-match-lead {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.upc-match-lead code {
+  background: var(--surface-alt);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.upc-match-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+.upc-match-grid dt {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.upc-match-grid dd { margin: 0; color: var(--text); }
+.upc-match-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Clickable product name in the table */
+.products tbody td.name-cell .name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  font-weight: 600;
+}
+.products tbody td.name-cell .name-link:hover { text-decoration: underline; }
+
 /* Scanner dialog */
 .scanner-dialog { max-width: 480px; }
 .scanner-body {

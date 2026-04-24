@@ -1,14 +1,14 @@
 # Usage Tracker
 
-**Version:** v0.5.0
+**Version:** v0.6.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
-Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–6 are complete. UPC camera scanning added in v0.5.0.
+Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–6 are complete. UPC camera scanning added in v0.5.0; UPC database lookup with auto-fill added in v0.6.0.
 
 ---
 
-## Current status (v0.5.0)
+## Current status (v0.6.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,15 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.6.0 — 2026-04-24
+- **UPC field is now first** in the Add/Edit dialog and visually highlighted — fill this in first and the rest of the form can auto-populate.
+- **UPC database lookup**: after a scan or manual UPC entry, we call the free [UPCitemdb](https://www.upcitemdb.com/) trial endpoint. On a hit, a **Match found** confirmation dialog shows the brand, title, category, and size from the database.
+  - Choosing **Yes, use this** pre-fills product name, product type (mapped from category), and size + unit (parsed from the database's size string).
+  - Fields you've already typed into are **never overwritten** — the lookup only fills blanks.
+- **Click product name to edit** — on the table, the product name is now a link that opens the Edit dialog. Much easier to reach on narrow screens than the Edit button at the far right.
+- UPC status line under the field tells you what happened ("Looking up product…", "Match: Colgate — …", "No match — enter details manually"). Lookups are cached in memory so re-scanning the same UPC doesn't burn another API call.
+- Trial endpoint limits are 100 requests/day per IP. If you hit it, the status line tells you and you can still enter details manually.
 
 ### v0.5.0 — 2026-04-24
 - **UPC camera scanning**: new **Scan** button next to the UPC field in Add/Edit. Opens a modal with a live camera preview and a reticle overlay; decodes the barcode with `@zxing/browser` and fills the UPC input on first valid read.
