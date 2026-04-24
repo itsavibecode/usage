@@ -221,6 +221,25 @@ main {
   white-space: nowrap;
 }
 
+.products thead th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+  padding-right: 22px;
+}
+.products thead th[data-sort]::after {
+  content: '';
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--primary);
+  width: 8px;
+}
+.products thead th[data-sort]:hover { color: var(--text); }
+.products thead th.sort-asc::after { content: '▲'; }
+.products thead th.sort-desc::after { content: '▼'; }
+.products thead th.sort-asc,
+.products thead th.sort-desc { color: var(--text); }
+
 .products tbody td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
@@ -350,6 +369,45 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   letter-spacing: normal;
 }
 .checkbox-field input[type="checkbox"] { width: 16px; height: 16px; }
+
+/* Currency input with $ prefix */
+.currency-wrap {
+  position: relative;
+  display: block;
+}
+.currency-prefix {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.currency-wrap input {
+  width: 100%;
+  padding-left: 22px;
+}
+
+/* Continue-bundle banner inside dialog */
+.form-banner {
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  padding: 12px 16px;
+  margin: 16px 20px 0;
+  border-radius: var(--radius);
+}
+.form-banner[hidden] { display: none; }
+.form-banner .field > span {
+  color: var(--primary);
+  font-weight: 600;
+}
+.form-banner-hint {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 
 .dialog-footer {
   display: flex;

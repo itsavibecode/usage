@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.1.0">
+  <meta name="version" content="0.2.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.1.0</span>
+        <span class="version" id="version">v0.2.0</span>
       </div>
     </div>
     <nav class="toolbar">
@@ -43,23 +43,23 @@
       <table class="products" id="products-table">
         <thead>
           <tr>
-            <th>Type</th>
-            <th>Name</th>
-            <th>Size</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Duration</th>
-            <th>Cost</th>
-            <th>w/ Tax</th>
-            <th>$/unit</th>
-            <th>$/day</th>
-            <th>Bundle</th>
-            <th>Store</th>
-            <th>Buyer</th>
-            <th>Card</th>
-            <th>Purchased</th>
-            <th>UPC</th>
-            <th>Notes</th>
+            <th data-sort="productType">Type</th>
+            <th data-sort="productName">Name</th>
+            <th data-sort="size">Size</th>
+            <th data-sort="startDate">Start</th>
+            <th data-sort="endDate">End</th>
+            <th data-sort="duration">Duration</th>
+            <th data-sort="cost">Cost</th>
+            <th data-sort="costWithTax">w/ Tax</th>
+            <th data-sort="costPerUnit">$/unit</th>
+            <th data-sort="costPerDay">$/day</th>
+            <th data-sort="bundleStatus">Bundle</th>
+            <th data-sort="store">Store</th>
+            <th data-sort="buyer">Buyer</th>
+            <th data-sort="cardLast4">Card</th>
+            <th data-sort="purchaseDate">Purchased</th>
+            <th data-sort="upc">UPC</th>
+            <th data-sort="notes">Notes</th>
             <th class="actions-col">Actions</th>
           </tr>
         </thead>
@@ -76,21 +76,20 @@
         <button type="button" class="icon-btn" id="dialog-close" aria-label="Close">&times;</button>
       </header>
 
+      <section id="continue-bundle-wrap" class="form-banner">
+        <label class="field">
+          <span>Continue existing bundle</span>
+          <select id="continue-bundle">
+            <option value="">— New product (not continuing a bundle) —</option>
+          </select>
+        </label>
+        <p class="form-banner-hint">Continue a previous bundle to auto-fill product name, cost, UPC, and bundle size.</p>
+      </section>
+
       <div class="form-grid">
         <label class="field">
           <span>Product type <em>*</em></span>
-          <select name="productType" required>
-            <option value="">Select...</option>
-            <option>Food</option>
-            <option>Beverage</option>
-            <option>Personal Care</option>
-            <option>Cleaning</option>
-            <option>Health/Medicine</option>
-            <option>Pet</option>
-            <option>Household</option>
-            <option>Office</option>
-            <option>Other</option>
-          </select>
+          <select name="productType" required></select>
         </label>
 
         <label class="field">
@@ -138,27 +137,33 @@
 
         <label class="field">
           <span>Cost (pre-tax) <em>*</em></span>
-          <input name="cost" type="number" step="0.01" min="0" required>
+          <div class="currency-wrap">
+            <span class="currency-prefix">$</span>
+            <input name="cost" type="number" step="0.01" min="0" required placeholder="0.00">
+          </div>
         </label>
 
         <label class="field">
-          <span>Cost with tax <em>*</em></span>
-          <input name="costWithTax" type="number" step="0.01" min="0" required>
+          <span>Cost with tax</span>
+          <div class="currency-wrap">
+            <span class="currency-prefix">$</span>
+            <input name="costWithTax" type="number" step="0.01" min="0" placeholder="0.00">
+          </div>
         </label>
 
         <label class="field">
           <span>Store</span>
-          <input name="store" type="text" maxlength="80">
+          <select name="store"></select>
         </label>
 
         <label class="field">
           <span>Buyer</span>
-          <input name="buyer" type="text" maxlength="80">
+          <select name="buyer"></select>
         </label>
 
         <label class="field">
           <span>Card (last 4)</span>
-          <input name="cardLast4" type="text" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="1234">
+          <select name="cardLast4"></select>
         </label>
 
         <label class="field">
@@ -174,6 +179,11 @@
         <label class="field checkbox-field">
           <input name="bundleStatus" type="checkbox">
           <span>Part of a bundle purchase</span>
+        </label>
+
+        <label class="field" id="bundle-size-wrap" hidden>
+          <span>How many in the bundle? <em>*</em></span>
+          <input name="bundleSize" type="number" min="1" step="1" placeholder="e.g. 3">
         </label>
 
         <label class="field field-wide">
