@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.4.0
+/* Usage Tracker — v0.5.0
+ * UPC camera scanning (ZXing) lazy-loaded on first tap.
  * Phase 5: Dashboard with Chart.js.
  * Phases 3 + 4: Google Sign-In + Firestore per-user storage.
  * Data lives at /users/{uid}/products/{id} and /users/{uid}/meta/customTypes.
@@ -15,7 +16,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -47,6 +48,8 @@ let unsubTypes = null;
 let firstSnapshotSeen = false;
 let currentView = 'table'; // 'table' | 'dashboard'
 let charts = { byType: null, byStore: null, finishedByMonth: null };
+let zxingModule = null;       // lazy-loaded on first Scan tap
+let scannerControls = null;   // IScannerControls returned by @zxing/browser
 
 // Palette used for donut/category coloring — colorblind-friendly-ish and consistent across renders.
 const CHART_PALETTE = [
@@ -906,6 +909,95 @@ async function offerLegacyMigration(uid) {
   }
 }
 
+/* ---------- UPC camera scanner (ZXing, lazy-loaded) ---------- */
+
+async function loadZXing() {
+  if (!zxingModule) {
+    zxingModule = await import("https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm");
+  }
+  return zxingModule;
+}
+
+function setScannerHint(text, isError = false) {
+  const hint = document.getElementById('scanner-hint');
+  hint.textContent = text;
+  hint.classList.toggle('is-error', !!isError);
+}
+
+async function openScanner() {
+  const dlg = document.getElementById('scanner-dialog');
+  const video = document.getElementById('scanner-video');
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('This browser does not support camera access.');
+    return;
+  }
+
+  setScannerHint('Starting camera…');
+  if (!dlg.open) dlg.showModal();
+
+  try {
+    const { BrowserMultiFormatReader } = await loadZXing();
+    const reader = new BrowserMultiFormatReader();
+    // decodeFromConstraints opens the camera with the given getUserMedia constraints
+    // and calls the callback on each decode attempt. We stop on first valid result.
+    scannerControls = await reader.decodeFromConstraints(
+      { video: { facingMode: { ideal: 'environment' } } },
+      video,
+      (result, _err, controls) => {
+        if (result) {
+          try { controls.stop(); } catch {}
+          scannerControls = null;
+          handleScanResult(result.getText());
+        }
+      }
+    );
+    setScannerHint('Point your camera at the barcode.');
+  } catch (e) {
+    console.error('Scanner failed to start:', e);
+    setScannerHint(describeCameraError(e), true);
+  }
+}
+
+function handleScanResult(text) {
+  closeScanner();
+  const upcInput = form().elements.upc;
+  if (upcInput) {
+    upcInput.value = text;
+    upcInput.dispatchEvent(new Event('input', { bubbles: true }));
+    upcInput.focus();
+  }
+  toast('Scanned UPC: ' + text);
+}
+
+function closeScanner() {
+  if (scannerControls) {
+    try { scannerControls.stop(); } catch {}
+    scannerControls = null;
+  }
+  const video = document.getElementById('scanner-video');
+  if (video && video.srcObject) {
+    try { video.srcObject.getTracks().forEach(t => t.stop()); } catch {}
+    video.srcObject = null;
+  }
+  const dlg = document.getElementById('scanner-dialog');
+  if (dlg.open) dlg.close();
+}
+
+function describeCameraError(e) {
+  const name = (e && e.name) || '';
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Camera permission denied. Enable camera access for this site in your browser settings and try again.';
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    return 'No camera found on this device.';
+  }
+  if (name === 'NotReadableError') {
+    return 'Camera is in use by another app. Close it and try again.';
+  }
+  return 'Could not start camera: ' + ((e && e.message) || e);
+}
+
 /* ---------- toast ---------- */
 
 let toastTimer = null;
@@ -978,6 +1070,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add').addEventListener('click', openAddDialog);
   document.getElementById('dialog-close').addEventListener('click', closeDialog);
   document.getElementById('dialog-cancel').addEventListener('click', closeDialog);
+
+  document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
+  document.getElementById('scanner-close').addEventListener('click', closeScanner);
+  document.getElementById('scanner-cancel').addEventListener('click', closeScanner);
+  // Browser Esc-closes dialogs by firing a "close" event — release the camera if that happens
+  document.getElementById('scanner-dialog').addEventListener('close', closeScanner);
 
   const f = form();
   f.addEventListener('submit', handleSubmit);

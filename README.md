@@ -1,14 +1,14 @@
 # Usage Tracker
 
-**Version:** v0.4.0
+**Version:** v0.5.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
-Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–5 are complete.
+Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phases 1–6 are complete. UPC camera scanning added in v0.5.0.
 
 ---
 
-## Current status (v0.4.0)
+## Current status (v0.5.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -82,9 +82,13 @@ All charts re-render live as Firestore data changes. Charts are rendered with [C
 ### ✅ Phase 6 — Deployment
 Published via GitHub Pages from the `main` branch since v0.1.0.
 
+### ✅ UPC scanning via phone camera (v0.5.0)
+Tap **Scan** next to the UPC field in the Add/Edit dialog to open the camera. Works on iPhone Safari and Android Chrome; also on desktop browsers with a webcam. Uses [@zxing/browser](https://github.com/zxing-js/browser) via ESM from jsDelivr — lazy-loaded on first tap so desktop users who never scan don't pay the bundle cost. Back camera (`facingMode: environment`) is preferred on phones. On first successful decode, the UPC input is filled and the scanner closes.
+
+Camera access requires HTTPS (✅ via GitHub Pages) and a permission grant. If the grant is blocked, the scanner dialog shows a friendly error with instructions.
+
 ### 🔭 Future discovery
 - Amazon purchase history autofill
-- UPC scanning via phone camera (Safari/Chrome on iPhone)
 
 ---
 
@@ -176,6 +180,13 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.5.0 — 2026-04-24
+- **UPC camera scanning**: new **Scan** button next to the UPC field in Add/Edit. Opens a modal with a live camera preview and a reticle overlay; decodes the barcode with `@zxing/browser` and fills the UPC input on first valid read.
+- Back camera (`environment`) preferred on phones; falls back to the default camera elsewhere.
+- ZXing loaded as ESM from `https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/+esm` and **lazy-loaded** — the ~100 KB bundle only downloads the first time you tap Scan.
+- Friendly error states for denied permission, missing camera, and camera-in-use.
+- Scanner cleanly releases the camera on close / Esc / `dialog.close`.
 
 ### v0.4.0 — 2026-04-24
 - **Phase 5 — Dashboard**: new **Table / Dashboard** view tabs below the stats bar.

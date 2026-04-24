@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.4.0">
+  <meta name="version" content="0.5.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.4.0</span>
+        <span class="version" id="version">v0.5.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -230,7 +230,16 @@
 
         <label class="field">
           <span>UPC <em>*</em></span>
-          <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="012345678901">
+          <div class="input-with-btn">
+            <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="012345678901">
+            <button type="button" id="btn-scan-upc" class="btn btn-scan" title="Scan a barcode with your camera">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2z"/>
+                <path d="M7 7v10M11 7v10M15 7v10M19 7v10"/>
+              </svg>
+              Scan
+            </button>
+          </div>
         </label>
 
         <label class="field checkbox-field">
@@ -262,6 +271,23 @@
       <button type="button" class="btn" id="confirm-no">Cancel</button>
       <button type="button" class="btn btn-danger" id="confirm-yes">Delete</button>
     </div>
+  </dialog>
+
+  <dialog id="scanner-dialog" class="scanner-dialog">
+    <header class="dialog-header">
+      <h2>Scan barcode</h2>
+      <button type="button" class="icon-btn" id="scanner-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="scanner-body">
+      <div class="scanner-video-wrap">
+        <video id="scanner-video" playsinline muted autoplay></video>
+        <div class="scanner-reticle" aria-hidden="true"></div>
+      </div>
+      <p class="scanner-hint" id="scanner-hint">Starting camera…</p>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="scanner-cancel">Cancel</button>
+    </footer>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

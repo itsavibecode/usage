@@ -370,6 +370,79 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 }
 .checkbox-field input[type="checkbox"] { width: 16px; height: 16px; }
 
+/* Input + trailing button (UPC field with Scan) */
+.input-with-btn {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.input-with-btn input {
+  flex: 1;
+  min-width: 0;
+}
+.btn-scan {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--primary);
+  border-color: var(--primary);
+  background: #fff;
+}
+.btn-scan:hover {
+  background: #eef3ff;
+  border-color: var(--primary-hover);
+  color: var(--primary-hover);
+}
+.btn-scan svg { flex-shrink: 0; }
+
+/* Scanner dialog */
+.scanner-dialog { max-width: 480px; }
+.scanner-body {
+  padding: 16px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scanner-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+#scanner-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scanner-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 72%;
+  height: 32%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.scanner-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  min-height: 1.5em;
+}
+.scanner-hint.is-error { color: var(--danger); }
+
 /* Currency input with $ prefix */
 .currency-wrap {
   position: relative;
