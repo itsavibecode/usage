@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.7
+**Version:** v0.7.8
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.7)
+## Current status (v0.7.8)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.8 — 2026-04-25
+- **Mobile: sort dropdown above the cards.** Desktop has clickable column headers, but on mobile the table renders as a stack of cards with no visible headers. The new dropdown (visible only at viewport ≤720px) offers Newest first / Oldest first / Name (A → Z) / Highest $/day / Highest cost — each option sets the same `sortState` the desktop headers use, so the underlying sort logic is shared.
+- **Mobile: "Show more / Show less" per card.** Cards now collapse the *Where* (size · store · buyer · card) and *Notes* rows by default to keep the visible card compact. Tap **Show more** to reveal them; tap again to collapse. Cards that have nothing to hide don't show the button at all. Expansion state is per-card, kept in memory while the page is open.
 
 ### v0.7.7 — 2026-04-25
 - **Fixed: inventory items no longer count toward spend tiles.** Until you actually start using a product, it's just sitting on a shelf — counting it as "spent" mixed cash-flow accounting with the app's usage-tracking purpose. Affects: **Total spend** tile, **YTD spend** tile, **Top category by spend** dashboard card, **Top store by spend** dashboard card, and both dashboard charts (Allocated spend by product type, Allocated spend by store). Inventory items snap into all spend metrics the moment you set a Start date. Counts (Active / Inventory / Finished tiles) are unchanged. Tile tooltips updated to explain the rule.

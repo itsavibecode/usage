@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.7
+/* Usage Tracker — v0.7.8
+ * v0.7.8: Mobile follow-ups — sort dropdown above cards (Newest / Oldest /
+ *   Name / Highest $/day / Highest cost), and a "Show more / Show less"
+ *   expander per card that hides Where + Notes by default to save vertical
+ *   space.
  * v0.7.7: Inventory excluded from spend aggregations. Total spend, YTD spend,
  *   "Top category by spend", "Top store by spend", and the two dashboard
  *   donut/bar charts now skip products without a startDate. Counts
@@ -34,7 +38,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.7';
+const APP_VERSION = '0.7.8';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -85,6 +89,10 @@ let preTaxMode = (() => {
   try { return localStorage.getItem(PRETAX_KEY) === '1'; }
   catch { return false; }
 })();
+// Mobile cards collapse Where + Notes by default to save vertical space.
+// Per-product expansion state survives re-renders (in-memory only — no
+// localStorage; users open detail temporarily, re-collapses on reload is fine).
+const expandedCards = new Set();
 let charts = { byType: null, byStore: null, finishedByMonth: null };
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
@@ -346,6 +354,16 @@ function handleHeaderClick(th) {
   render();
 }
 
+// Mobile sort dropdown — desktop has clickable column headers, but on mobile
+// the table is a stack of cards with no headers visible. The dropdown encodes
+// "column.dir" pairs (e.g. "productName.asc") that map directly into sortState.
+function handleMobileSortChange(value) {
+  const [column, dir] = String(value).split('.');
+  if (!column || !dir) return;
+  sortState = { column, dir };
+  render();
+}
+
 /* ---------- rendering ---------- */
 
 function render() {
@@ -426,8 +444,14 @@ function renderMobileCard(p) {
         : `<span class="badge badge-bundle-origin">bundle &times; ${escapeHtml(p.bundleSize || '?')}</span>`)
     : '';
 
+  // Show-more expander: Where + Notes are tagged with .mc-row-extra so the
+  // CSS can hide them by default. The button only renders if there's anything
+  // to hide — no point showing "Show more" on a card with no extra rows.
+  const expanded = expandedCards.has(p.id);
+  const hasExtras = !!(meta || p.notes);
+
   return `
-    <div class="mc">
+    <div class="mc${expanded ? ' mc-expanded' : ''}">
       <div class="mc-head">
         <span class="mc-type">${escapeHtml(p.productType)}</span>
         <span class="mc-status">${endLabel}</span>
@@ -436,10 +460,11 @@ function renderMobileCard(p) {
       <dl class="mc-grid">
         <div class="mc-row"><dt>Started</dt><dd>${startLabel}${durationStr}</dd></div>
         <div class="mc-row"><dt>Cost</dt><dd>${costPrimary}${perDayStr}</dd></div>
-        ${meta ? `<div class="mc-row"><dt>Where</dt><dd>${meta}</dd></div>` : ''}
         ${bundleChip ? `<div class="mc-row"><dt>Bundle</dt><dd>${bundleChip}</dd></div>` : ''}
-        ${p.notes ? `<div class="mc-row mc-row-notes"><dt>Notes</dt><dd>${escapeHtml(p.notes)}</dd></div>` : ''}
+        ${meta ? `<div class="mc-row mc-row-extra"><dt>Where</dt><dd>${meta}</dd></div>` : ''}
+        ${p.notes ? `<div class="mc-row mc-row-extra mc-row-notes"><dt>Notes</dt><dd>${escapeHtml(p.notes)}</dd></div>` : ''}
       </dl>
+      ${hasExtras ? `<button type="button" class="mc-more-btn" data-id="${p.id}">${expanded ? 'Show less' : 'Show more'}</button>` : ''}
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
@@ -1792,11 +1817,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const dupBtn = e.target.closest('.duplicate-btn');
     const delBtn = e.target.closest('.delete-btn');
     const nameLink = e.target.closest('.name-link');
+    const moreBtn = e.target.closest('.mc-more-btn');
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
     else if (delBtn) confirmDelete(delBtn.dataset.id);
+    else if (moreBtn) {
+      // Toggle this card's expansion in-place — no full re-render needed.
+      const id = moreBtn.dataset.id;
+      const card = moreBtn.closest('.mc');
+      if (expandedCards.has(id)) {
+        expandedCards.delete(id);
+        card.classList.remove('mc-expanded');
+        moreBtn.textContent = 'Show more';
+      } else {
+        expandedCards.add(id);
+        card.classList.add('mc-expanded');
+        moreBtn.textContent = 'Show less';
+      }
+    }
   });
+
+  // Mobile sort dropdown — encodes "column.dir" in option values.
+  const mobileSort = document.getElementById('mobile-sort');
+  if (mobileSort) {
+    // Sync the dropdown to whatever sortState started at (default startDate.desc),
+    // falling back to the first option if no exact match.
+    const initial = `${sortState.column}.${sortState.dir}`;
+    const match = Array.from(mobileSort.options).find(o => o.value === initial);
+    if (match) mobileSort.value = initial;
+    mobileSort.addEventListener('change', e => handleMobileSortChange(e.target.value));
+  }
 
   document.querySelectorAll('#products-table thead th[data-sort]').forEach(th => {
     th.addEventListener('click', () => handleHeaderClick(th));

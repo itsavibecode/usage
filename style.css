@@ -830,6 +830,10 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 
 #btn-reset-filters { margin-left: auto; }
 
+/* Mobile-only sort dropdown — desktop has clickable column headers, so we
+ * hide this above 720px. See @media block below for the visible state. */
+.mobile-sort-wrap { display: none; }
+
 /* Inline hint under a date input — explains optional fields. */
 .field-hint {
   font-size: 11px;
@@ -1072,6 +1076,55 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 
   /* Row-filter tabs already wrap; tighten the gap a touch */
   .row-filter-tabs { gap: 6px; }
+
+  /* Mobile sort dropdown — visible on phones in place of the desktop column
+   * headers. Sits between the row-filter tabs and the first card. */
+  .mobile-sort-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .mobile-sort-label { font-weight: 500; }
+  .mobile-sort {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 38px;
+  }
+  .mobile-sort:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: -1px;
+    border-color: var(--primary);
+  }
+
+  /* Show-more / Show-less expander on each card. The Where + Notes rows are
+   * hidden by default (.mc-row-extra) and revealed when the user taps the
+   * button (parent gets .mc-expanded). The button itself stays compact and
+   * left-aligned, hugging the bottom of the visible card content. */
+  .mc-more-btn {
+    background: none;
+    border: none;
+    padding: 4px 0 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--primary);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .mc-more-btn:hover { color: var(--primary-hover); }
+  .mc .mc-row-extra { display: none; }
+  .mc.mc-expanded .mc-row-extra { display: grid; }
 }
 
 @media (max-width: 640px) {

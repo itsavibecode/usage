@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.7">
+  <meta name="version" content="0.7.8">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.7</span>
+        <span class="version" id="version">v0.7.8</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -92,6 +92,16 @@
         <button type="button" class="row-filter-tab" data-filter="inventory" role="tab" aria-selected="false" title="Only products purchased but not yet started">Inventory</button>
         <button type="button" id="btn-reset-filters" class="btn btn-ghost" title="Clear filters and show all rows">Reset</button>
       </nav>
+      <label class="mobile-sort-wrap" for="mobile-sort">
+        <span class="mobile-sort-label">Sort:</span>
+        <select id="mobile-sort" class="mobile-sort">
+          <option value="purchaseDate.desc">Newest first</option>
+          <option value="purchaseDate.asc">Oldest first</option>
+          <option value="productName.asc">Name (A → Z)</option>
+          <option value="costPerDay.desc">Highest $/day</option>
+          <option value="cost.desc">Highest cost</option>
+        </select>
+      </label>
       <div class="table-wrap">
         <table class="products" id="products-table">
           <thead>
