@@ -1,4 +1,6 @@
-/* Usage Tracker — v0.7.8
+/* Usage Tracker — v0.7.9
+ * v0.7.9: Desktop notes column collapse — long notes render as a chip,
+ *   click to expand inline. State shared with mobile expandedCards Set.
  * v0.7.8: Mobile follow-ups — sort dropdown above cards (Newest / Oldest /
  *   Name / Highest $/day / Highest cost), and a "Show more / Show less"
  *   expander per card that hides Where + Notes by default to save vertical
@@ -38,7 +40,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.8';
+const APP_VERSION = '0.7.9';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -498,7 +500,23 @@ function renderRow(p) {
     <td>${p.cardLast4 ? '•••• ' + escapeHtml(p.cardLast4) : '—'}</td>
     <td>${formatDate(p.purchaseDate)}</td>
     <td><code>${escapeHtml(p.upc)}</code></td>
-    <td class="notes-cell">${escapeHtml(p.notes) || ''}</td>
+    <td class="notes-cell">${(() => {
+      // Notes column is space-hungry on a wide desktop table. Show a short
+      // preview chip; click to expand inline. Reuses the .mc-more-btn click
+      // handler? No — desktop has its own toggle (notes-chip class).
+      // Expansion state shares the expandedCards Set so opening on mobile
+      // and switching to desktop keeps it open.
+      if (!p.notes) return '';
+      const PREVIEW = 40;
+      const expanded = expandedCards.has(p.id);
+      const text = escapeHtml(p.notes);
+      const truncated = p.notes.length > PREVIEW;
+      if (!truncated) return `<span class="notes-text">${text}</span>`;
+      const preview = escapeHtml(p.notes.slice(0, PREVIEW)) + '…';
+      return expanded
+        ? `<button type="button" class="notes-chip is-expanded" data-id="${p.id}" title="Click to collapse"><span class="notes-text">${text}</span></button>`
+        : `<button type="button" class="notes-chip" data-id="${p.id}" title="Click to expand">${preview}</button>`;
+    })()}</td>
     <td class="actions-cell">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
@@ -1818,10 +1836,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const delBtn = e.target.closest('.delete-btn');
     const nameLink = e.target.closest('.name-link');
     const moreBtn = e.target.closest('.mc-more-btn');
+    const notesChip = e.target.closest('.notes-chip');
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
     else if (delBtn) confirmDelete(delBtn.dataset.id);
+    else if (notesChip) {
+      // Toggle expansion on the desktop notes chip. Re-renders this row
+      // only — cheap — by re-rendering the whole table since we don't
+      // track row → tr mapping. For the table sizes we expect (<200) this
+      // is fine. Shares expandedCards with mobile so state is consistent.
+      const id = notesChip.dataset.id;
+      if (expandedCards.has(id)) expandedCards.delete(id);
+      else expandedCards.add(id);
+      renderTable();
+    }
     else if (moreBtn) {
       // Toggle this card's expansion in-place — no full re-render needed.
       const id = moreBtn.dataset.id;

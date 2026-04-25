@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.8
+**Version:** v0.7.9
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.8)
+## Current status (v0.7.9)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.9 — 2026-04-25
+- **Desktop: Notes column no longer expands the table.** Long notes (>40 chars) render as a small pill-shaped chip showing the first 40 characters and an ellipsis. Click the chip to expand the cell inline (full text wraps; the row grows to fit). Click the expanded text to collapse again. Short notes still render as plain inline text — no chip overhead. Expansion state is shared with the mobile show-more state, so opening a row's detail on phone and switching to desktop keeps it open.
 
 ### v0.7.8 — 2026-04-25
 - **Mobile: sort dropdown above the cards.** Desktop has clickable column headers, but on mobile the table renders as a stack of cards with no visible headers. The new dropdown (visible only at viewport ≤720px) offers Newest first / Oldest first / Name (A → Z) / Highest $/day / Highest cost — each option sets the same `sortState` the desktop headers use, so the underlying sort logic is shared.
