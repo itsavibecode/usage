@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.9
+**Version:** v0.7.10
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.9)
+## Current status (v0.7.10)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.10 — 2026-04-25
+- **New: clickable filter chips on Type / Buyer / Card cells.** Tap any of those table cells to drill into "only rows where this column equals this value." A new bar appears above the table showing each active filter as a dismissible chip (`Buyer: Frank ×`). Tap a chip's × to remove it, or use the **Clear all** link when two or more filters are active. Multiple filters AND together (e.g. `Buyer: Frank` + `Type: Toothpaste`). Selection persists per browser via `localStorage`. The existing **Reset** button now clears both the row-filter tabs and any active chip filters in one go.
 
 ### v0.7.9 — 2026-04-25
 - **Desktop: Notes column no longer expands the table.** Long notes (>40 chars) render as a small pill-shaped chip showing the first 40 characters and an ellipsis. Click the chip to expand the cell inline (full text wraps; the row grows to fit). Click the expanded text to collapse again. Short notes still render as plain inline text — no chip overhead. Expansion state is shared with the mobile show-more state, so opening a row's detail on phone and switching to desktop keeps it open.

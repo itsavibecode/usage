@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.7.9
+/* Usage Tracker — v0.7.10
+ * v0.7.10: Filter chips — Type / Buyer / Card cells in the table are now
+ *   clickable; clicking adds an active filter (AND logic across columns).
+ *   Active filters render as dismissible chips above the table.
  * v0.7.9: Desktop notes column collapse — long notes render as a chip,
  *   click to expand inline. State shared with mobile expandedCards Set.
  * v0.7.8: Mobile follow-ups — sort dropdown above cards (Newest / Oldest /
@@ -40,7 +43,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.9';
+const APP_VERSION = '0.7.10';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -95,6 +98,23 @@ let preTaxMode = (() => {
 // Per-product expansion state survives re-renders (in-memory only — no
 // localStorage; users open detail temporarily, re-collapses on reload is fine).
 const expandedCards = new Set();
+
+// Cell-click filters (v0.7.10). User clicks a Type / Buyer / Card cell to
+// drill down to "only rows where this column equals this value." Multiple
+// active filters AND together (e.g. Buyer=Me + Type=Toothpaste). Persisted
+// in localStorage like the row-filter so per-user views survive reloads.
+const CHIP_FILTER_KEY = 'usage.activeFilters.v1';
+let activeFilters = (() => {
+  try {
+    const raw = localStorage.getItem(CHIP_FILTER_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch { return {}; }
+})();
+function persistActiveFilters() {
+  try { localStorage.setItem(CHIP_FILTER_KEY, JSON.stringify(activeFilters)); } catch {}
+}
 let charts = { byType: null, byStore: null, finishedByMonth: null };
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
@@ -318,9 +338,43 @@ function getSortValue(p, column) {
 }
 
 function filteredProducts() {
-  if (currentFilter === 'active') return products.filter(isActive);
-  if (currentFilter === 'inventory') return products.filter(isInventory);
-  return products;
+  let list = products;
+  // Row-filter tabs (All / Active / Inventory) — applied first.
+  if (currentFilter === 'active') list = list.filter(isActive);
+  else if (currentFilter === 'inventory') list = list.filter(isInventory);
+  // Cell-click chip filters (v0.7.10). AND across columns: a row must match
+  // every active filter to survive. Empty-string filter values (defensive)
+  // are treated as "no filter" for that column.
+  for (const [col, val] of Object.entries(activeFilters)) {
+    if (val === '' || val == null) continue;
+    list = list.filter(p => String(p[col] ?? '') === String(val));
+  }
+  return list;
+}
+
+// v0.7.10 helpers — manipulate activeFilters and re-render. Each filter is
+// keyed by the column name (productType / buyer / cardLast4) with a single
+// string value. Setting the same column twice just replaces the value.
+function addFilter(col, val) {
+  if (!col) return;
+  activeFilters[col] = String(val ?? '');
+  persistActiveFilters();
+  renderTable();
+}
+function removeFilter(col) {
+  delete activeFilters[col];
+  persistActiveFilters();
+  renderTable();
+}
+function clearChipFilters() {
+  activeFilters = {};
+  persistActiveFilters();
+  renderTable();
+}
+
+// Human-friendly label for a filter column. Used in the active-filter bar.
+function filterColLabel(col) {
+  return ({ productType: 'Type', buyer: 'Buyer', cardLast4: 'Card' })[col] || col;
 }
 
 function sortedProducts() {
@@ -368,6 +422,33 @@ function handleMobileSortChange(value) {
 
 /* ---------- rendering ---------- */
 
+// v0.7.10 — show a strip of dismissible chips for any active cell-click
+// filters. Hidden when no filters are active. Each chip shows
+// "Type: Toothpaste ×" and clicking the × removes that filter. There's
+// also a "Clear all" link when 2+ filters are active.
+function renderActiveFilterBar() {
+  const bar = document.getElementById('active-filter-bar');
+  if (!bar) return;
+  const entries = Object.entries(activeFilters).filter(([, v]) => v !== '' && v != null);
+  if (entries.length === 0) {
+    bar.hidden = true;
+    bar.innerHTML = '';
+    return;
+  }
+  bar.hidden = false;
+  const chips = entries.map(([col, val]) =>
+    `<button type="button" class="filter-chip" data-clear-col="${escapeHtml(col)}" title="Click to remove this filter">
+      <span class="filter-chip-key">${escapeHtml(filterColLabel(col))}:</span>
+      <span class="filter-chip-val">${escapeHtml(val)}</span>
+      <span class="filter-chip-x" aria-hidden="true">&times;</span>
+    </button>`
+  ).join('');
+  const clearAll = entries.length > 1
+    ? `<button type="button" id="filter-chip-clear-all" class="btn btn-ghost">Clear all</button>`
+    : '';
+  bar.innerHTML = chips + clearAll;
+}
+
 function render() {
   renderTable();
   renderStats();
@@ -375,6 +456,7 @@ function render() {
 }
 
 function renderTable() {
+  renderActiveFilterBar();
   const body = document.getElementById('products-body');
   const empty = document.getElementById('empty-state');
   const loading = document.getElementById('loading-state');
@@ -388,10 +470,13 @@ function renderTable() {
   loading.hidden = true;
 
   const visible = sortedProducts();
+  const hasChipFilters = Object.values(activeFilters).some(v => v !== '' && v != null);
   if (visible.length === 0) {
     empty.hidden = false;
     if (products.length === 0) {
       empty.innerHTML = 'No products tracked yet. Click <strong>+ Add product</strong> to get started.';
+    } else if (hasChipFilters) {
+      empty.innerHTML = 'No products match the active filters. Click the <strong>×</strong> on any chip above to remove it.';
     } else if (currentFilter === 'active') {
       empty.innerHTML = 'No <strong>active</strong> products right now. Switch to <strong>All</strong> or <strong>Inventory</strong> to see your other items.';
     } else if (currentFilter === 'inventory') {
@@ -484,7 +569,7 @@ function renderRow(p) {
   // on the row and lets the card render as a block. Same DOM, two layouts,
   // no duplicated event-handler wiring.
   tr.innerHTML = `
-    <td>${escapeHtml(p.productType)}</td>
+    <td>${p.productType ? `<button type="button" class="cell-chip" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
     <td class="name-cell"><button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td>${formatDate(p.startDate)}</td>
@@ -496,8 +581,8 @@ function renderRow(p) {
     <td class="num">${moneyFine(calcCostPerDay(p))}</td>
     <td>${p.bundleStatus ? (p.bundlePosition ? `<span class="badge badge-bundle-member">${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}</span>` : `<span class="badge badge-bundle-origin">bundle × ${escapeHtml(p.bundleSize || '?')}</span>`) : '—'}</td>
     <td>${escapeHtml(p.store) || '—'}</td>
-    <td>${escapeHtml(p.buyer) || '—'}</td>
-    <td>${p.cardLast4 ? '•••• ' + escapeHtml(p.cardLast4) : '—'}</td>
+    <td>${p.buyer ? `<button type="button" class="cell-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button>` : '—'}</td>
+    <td>${p.cardLast4 ? `<button type="button" class="cell-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card •••• ${escapeHtml(p.cardLast4)}">•••• ${escapeHtml(p.cardLast4)}</button>` : '—'}</td>
     <td>${formatDate(p.purchaseDate)}</td>
     <td><code>${escapeHtml(p.upc)}</code></td>
     <td class="notes-cell">${(() => {
@@ -800,6 +885,11 @@ function setFilter(filter) {
 }
 
 function resetFilters() {
+  // Reset both axes: row-filter tabs back to "all" and any cell-click chips
+  // cleared. setFilter calls renderTable; clearChipFilters does too, so we
+  // get a redundant render here — fine, cheap.
+  activeFilters = {};
+  persistActiveFilters();
   setFilter('all');
   toast('Filters reset');
 }
@@ -1837,6 +1927,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const nameLink = e.target.closest('.name-link');
     const moreBtn = e.target.closest('.mc-more-btn');
     const notesChip = e.target.closest('.notes-chip');
+    const cellChip = e.target.closest('.cell-chip');
+    if (cellChip) {
+      addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
+      return;
+    }
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
@@ -1893,6 +1988,15 @@ document.addEventListener('DOMContentLoaded', () => {
   setFilter(currentFilter);
 
   document.getElementById('btn-reset-filters')?.addEventListener('click', resetFilters);
+
+  // v0.7.10: active filter chips bar — clicking a chip removes that filter,
+  // clicking "Clear all" wipes all chip filters at once.
+  document.getElementById('active-filter-bar')?.addEventListener('click', e => {
+    const clearAll = e.target.closest('#filter-chip-clear-all');
+    if (clearAll) { clearChipFilters(); return; }
+    const chip = e.target.closest('.filter-chip');
+    if (chip) removeFilter(chip.dataset.clearCol);
+  });
 
   // Pre-tax display toggle. Sync DOM to persisted state, then wire change.
   const preTaxToggle = document.getElementById('pretax-toggle');

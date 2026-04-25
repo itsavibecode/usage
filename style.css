@@ -372,6 +372,77 @@ body.pretax-mode .products tbody td.cell-with-tax {
 .notes-chip.is-expanded:hover { background: var(--surface-alt); }
 .notes-text { display: inline; }
 
+/* v0.7.10 — clickable cell chips for Type / Buyer / Card. Hover/focus
+ * suggests they're interactive; click filters the table to that value. */
+.cell-chip {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.cell-chip:hover {
+  background: #eef3ff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Active-filter bar — sits between the row-filter tabs and the table. Each
+ * chip is dismissible; "Clear all" appears when 2+ filters are active. */
+.active-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  border-radius: var(--radius);
+}
+.active-filter-bar[hidden] { display: none; }
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 3px 4px 3px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.filter-chip:hover { background: var(--surface-alt); }
+.filter-chip-key { color: var(--text-muted); font-size: 11px; font-weight: 500; }
+.filter-chip-val { color: var(--primary); font-weight: 600; }
+.filter-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  margin-left: 2px;
+}
+.filter-chip:hover .filter-chip-x {
+  background: var(--primary);
+  color: #fff;
+}
+#filter-chip-clear-all { font-size: 12px; }
+
 /* Mobile-card cell: rendered into every <tr> alongside the 18 desktop cells.
  * Hidden by default; shown (and the desktop cells hidden) at <=720px. The
  * card markup itself lives inside `.mc`, so no extra DOM is created. */
