@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.5
+/* Usage Tracker — v0.7.6
+ * v0.7.6: Pre-tax display toggle (above stats bar). Single chokepoint:
+ *   effectiveCost() respects the toggle so every $ value flips together.
+ *   "w/ Tax" column hidden via body.pretax-mode CSS class. CSV template
+ *   examples switched to Y/N for bundleStatus.
  * v0.7.5: Fix bundle-continue autofilling startDate (broke inventory mode).
  *   Add Duplicate button next to Edit/Delete.
  * v0.7.4: Mobile card view — at <=720px the table flips to a stacked card
@@ -26,7 +30,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.5';
+const APP_VERSION = '0.7.6';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -67,6 +71,16 @@ let currentFilter = (() => {
     return ['all', 'active', 'inventory'].includes(v) ? v : 'all';
   } catch { return 'all'; }
 })();
+// Pre-tax display mode: when true, all cost calculations ignore costWithTax
+// and use cost only. Affects effectiveCost (the canonical helper) and
+// therefore allocatedCost / calcCostPerUnit / calcCostPerDay / totals / YTD —
+// every dollar value in the UI flows through one function. The "w/ Tax"
+// table column is also hidden when this is on. Persists per browser.
+const PRETAX_KEY = 'usage.preTaxMode.v1';
+let preTaxMode = (() => {
+  try { return localStorage.getItem(PRETAX_KEY) === '1'; }
+  catch { return false; }
+})();
 let charts = { byType: null, byStore: null, finishedByMonth: null };
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
@@ -103,6 +117,14 @@ function daysBetween(startStr, endStr) {
 function calcDuration(p) { return daysBetween(p.startDate, p.endDate); }
 
 function effectiveCost(p) {
+  // Pre-tax mode: ignore costWithTax entirely, use the pre-tax cost only.
+  // Single chokepoint — every downstream calc (allocated, $/unit, $/day,
+  // totals, YTD) flows through this, so flipping the toggle re-renders the
+  // entire UI's monetary values consistently.
+  if (preTaxMode) {
+    const pre = Number(p.cost);
+    return isFinite(pre) ? pre : 0;
+  }
   const withTax = Number(p.costWithTax);
   if (isFinite(withTax) && withTax > 0) return withTax;
   const pre = Number(p.cost);
@@ -381,7 +403,9 @@ function renderMobileCard(p) {
     else if (isFinished(p)) durationStr = ` &middot; ${dur}d total`;
   }
 
-  const costPrimary = p.costWithTax ? money(p.costWithTax) : (p.cost ? money(p.cost) : '—');
+  // Route through effectiveCost so the mobile card respects the pre-tax toggle.
+  const eff = effectiveCost(p);
+  const costPrimary = eff > 0 ? money(eff) : '—';
   const costPerDay = calcCostPerDay(p);
   const perDayStr = costPerDay != null ? ` &middot; ${moneyFine(costPerDay)}/day` : '';
 
@@ -436,7 +460,7 @@ function renderRow(p) {
     <td>${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
     <td class="num">${formatDuration(p)}</td>
     <td class="num">${money(p.cost)}</td>
-    <td class="num">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
+    <td class="num cell-with-tax">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
     <td class="num">${moneyFine(calcCostPerUnit(p))}</td>
     <td class="num">${moneyFine(calcCostPerDay(p))}</td>
     <td>${p.bundleStatus ? (p.bundlePosition ? `<span class="badge badge-bundle-member">${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}</span>` : `<span class="badge badge-bundle-origin">bundle × ${escapeHtml(p.bundleSize || '?')}</span>`) : '—'}</td>
@@ -695,6 +719,13 @@ function renderChartFinishedByMonth() {
 function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
 
 /* ---------- view + filter switching ---------- */
+
+// Apply preTaxMode to the DOM. Adds/removes a body class that the CSS uses
+// to hide the "w/ Tax" column header + every w/ Tax cell. Renders are
+// triggered separately by the caller — this is purely presentational.
+function applyPreTaxMode() {
+  document.body.classList.toggle('pretax-mode', preTaxMode);
+}
 
 function setFilter(filter) {
   if (!['all', 'active', 'inventory'].includes(filter)) return;
@@ -1135,7 +1166,7 @@ function downloadCSVTemplate() {
       size: 4.7, unit: 'oz',
       startDate: today, endDate: '',
       cost: 3.99, costWithTax: 4.29,
-      bundleStatus: 'false', bundleSize: '', bundlePosition: '',
+      bundleStatus: 'N', bundleSize: '', bundlePosition: '',
       store: 'Example Store', buyer: 'Me', cardLast4: '',
       purchaseDate: today, upc: '000000000000',
       notes: 'Delete this example row before importing.'
@@ -1145,7 +1176,7 @@ function downloadCSVTemplate() {
       size: 2.7, unit: 'oz',
       startDate: '', endDate: '',
       cost: 5.99, costWithTax: 6.44,
-      bundleStatus: 'true', bundleSize: 3, bundlePosition: 2,
+      bundleStatus: 'Y', bundleSize: 3, bundlePosition: 2,
       store: 'Example Store', buyer: 'Me', cardLast4: '1234',
       purchaseDate: today, upc: '000000000001',
       notes: 'Blank startDate = inventory (purchased, not in use yet).'
@@ -1765,6 +1796,20 @@ document.addEventListener('DOMContentLoaded', () => {
   setFilter(currentFilter);
 
   document.getElementById('btn-reset-filters')?.addEventListener('click', resetFilters);
+
+  // Pre-tax display toggle. Sync DOM to persisted state, then wire change.
+  const preTaxToggle = document.getElementById('pretax-toggle');
+  if (preTaxToggle) {
+    preTaxToggle.checked = preTaxMode;
+    applyPreTaxMode();
+    preTaxToggle.addEventListener('change', () => {
+      preTaxMode = preTaxToggle.checked;
+      try { localStorage.setItem(PRETAX_KEY, preTaxMode ? '1' : '0'); } catch {}
+      applyPreTaxMode();
+      render();
+      toast(preTaxMode ? 'Showing pre-tax prices' : 'Showing prices with tax');
+    });
+  }
 
   const exportBtn = document.getElementById('btn-export');
   const exportMenu = document.getElementById('export-menu');

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.5
+**Version:** v0.7.6
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.5)
+## Current status (v0.7.6)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.6 — 2026-04-24
+- **New: Pre-tax display toggle.** A small switch sits above the stats bar — flip it on and every dollar value in the app (stat tiles, table cells, dashboard charts, mobile cards, YTD totals) recomputes using `cost` only and ignores `costWithTax`. Single chokepoint: every monetary calculation flows through `effectiveCost()`, so one function change drives the whole UI. The "w/ Tax" table column is hidden entirely when the toggle is on (per user preference — no `—` placeholder rows). Choice persists per browser via `localStorage`.
+- **CSV import template: bundle column shows `Y` / `N` instead of `true` / `false`.** Easier to read and write in a spreadsheet. The parser already accepted both.
 
 ### v0.7.5 — 2026-04-24
 - **Fixed: "Continue existing bundle" was overwriting an empty Start date with today.** When the inventory concept landed in v0.7.3, the bundle-continue handler was missed — line 890 of `app.js` still wrote `new Date().toISOString().slice(0, 10)` into `startDate` every time you picked a bundle. So even though we'd told users "leave Start date blank for inventory," picking a bundle to continue silently filled today's date back in. Reported on both mobile and desktop. Now the handler clears both `startDate` and `endDate`; the toast message changed to "Bundle details filled — leave start date blank to record as inventory."

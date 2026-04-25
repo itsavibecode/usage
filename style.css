@@ -166,6 +166,75 @@ main {
   max-width: 100%;
 }
 
+/* Display controls — small bar above the stats with a pre-tax toggle.
+ * Sits flush with the stats bar above; on mobile it hugs the left edge. */
+.display-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.pretax-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text);
+}
+.pretax-toggle input[type="checkbox"] {
+  /* Hidden — the visible UI is the .pretax-track + .pretax-thumb pair.
+   * Keep the input focusable for keyboard a11y. */
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.pretax-track {
+  display: inline-block;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 999px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.pretax-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s;
+}
+.pretax-toggle input:checked + .pretax-track {
+  background: var(--primary);
+}
+.pretax-toggle input:checked + .pretax-track .pretax-thumb {
+  transform: translateX(16px);
+}
+.pretax-toggle input:focus-visible + .pretax-track {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.pretax-label { font-weight: 500; color: var(--text-muted); }
+.pretax-toggle input:checked ~ .pretax-label { color: var(--primary); }
+
+/* Hide the "w/ Tax" column entirely when pre-tax mode is on (per user
+ * preference — don't show "—" placeholders, just remove the column). The
+ * <th> already has data-sort="costWithTax" which we can target directly;
+ * matching <td>s carry .cell-with-tax. */
+body.pretax-mode .products thead th[data-sort="costWithTax"],
+body.pretax-mode .products tbody td.cell-with-tax {
+  display: none;
+}
+
 /* Stats bar */
 .stats-bar {
   display: grid;
