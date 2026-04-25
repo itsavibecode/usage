@@ -1,4 +1,6 @@
-/* Usage Tracker — v0.7.4
+/* Usage Tracker — v0.7.5
+ * v0.7.5: Fix bundle-continue autofilling startDate (broke inventory mode).
+ *   Add Duplicate button next to Edit/Delete.
  * v0.7.4: Mobile card view — at <=720px the table flips to a stacked card
  *   layout per product. No more 1400px-min horizontal scroll on phones.
  * v0.7.3: Inventory concept (blank startDate), filter tabs (All/Active/Inventory),
@@ -24,7 +26,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.4';
+const APP_VERSION = '0.7.5';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -412,6 +414,7 @@ function renderMobileCard(p) {
       </dl>
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+        <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
         <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
       </div>
     </div>
@@ -445,6 +448,7 @@ function renderRow(p) {
     <td class="notes-cell">${escapeHtml(p.notes) || ''}</td>
     <td class="actions-cell">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+      <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
       <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
     </td>
     <td class="mobile-card-cell">${renderMobileCard(p)}</td>
@@ -887,10 +891,50 @@ function handleContinueBundle(e) {
     if (el) el.value = source[key] ?? '';
   }
   f.elements.bundleStatus.checked = true;
-  f.elements.startDate.value = new Date().toISOString().slice(0, 10);
+  // v0.7.5: do NOT autofill startDate. Pre-v0.7.3 we filled today's date here,
+  // which fought the inventory concept introduced in v0.7.3 — users who left a
+  // bundle row blank to mark it as inventory got today's date written over it
+  // every time. Leave both date fields blank; user fills startDate when (and if)
+  // they actually start using the item.
+  f.elements.startDate.value = '';
   f.elements.endDate.value = '';
   setBundleSizeVisibility();
-  toast('Bundle details filled in — set your start date and save');
+  toast('Bundle details filled — leave start date blank to record as inventory');
+}
+
+// Duplicate: copy a product's metadata into a fresh Add dialog, leaving dates
+// blank so the new row reads as inventory until the user explicitly sets a
+// startDate. Bundle membership is preserved (status + size) but the new row
+// gets a clean position field — siblings within a bundle should have unique
+// positions, so the user picks the next number.
+function openDuplicateDialog(id) {
+  const source = products.find(p => p.id === id);
+  if (!source) return;
+  openAddDialog();
+  const f = form();
+  // Fields that should carry over from source. Excludes: id (new one assigned
+  // on save), startDate/endDate (always blank — duplicate = new physical item),
+  // bundlePosition (must be unique per bundle), notes (usually item-specific).
+  const carryOver = [
+    'productType', 'productName', 'size', 'unit',
+    'cost', 'costWithTax',
+    'bundleStatus', 'bundleSize',
+    'store', 'buyer', 'cardLast4',
+    'upc'
+  ];
+  populateFormSelects(source);
+  for (const key of carryOver) {
+    const el = f.elements[key];
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!source[key];
+    else el.value = source[key] ?? '';
+  }
+  // Today's purchaseDate is a sensible default for "I just bought another";
+  // user can correct it if they're back-filling history.
+  f.elements.purchaseDate.value = new Date().toISOString().slice(0, 10);
+  setBundleSizeVisibility();
+  document.getElementById('dialog-title').textContent = 'Duplicate product';
+  toast('Duplicated — set start date when you begin using it');
 }
 
 async function handleSubmit(e) {
@@ -1697,9 +1741,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('products-body').addEventListener('click', e => {
     const editBtn = e.target.closest('.edit-btn');
+    const dupBtn = e.target.closest('.duplicate-btn');
     const delBtn = e.target.closest('.delete-btn');
     const nameLink = e.target.closest('.name-link');
     if (editBtn) openEditDialog(editBtn.dataset.id);
+    else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
     else if (delBtn) confirmDelete(delBtn.dataset.id);
   });

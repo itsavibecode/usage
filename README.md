@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.4
+**Version:** v0.7.5
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.4)
+## Current status (v0.7.5)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.5 — 2026-04-24
+- **Fixed: "Continue existing bundle" was overwriting an empty Start date with today.** When the inventory concept landed in v0.7.3, the bundle-continue handler was missed — line 890 of `app.js` still wrote `new Date().toISOString().slice(0, 10)` into `startDate` every time you picked a bundle. So even though we'd told users "leave Start date blank for inventory," picking a bundle to continue silently filled today's date back in. Reported on both mobile and desktop. Now the handler clears both `startDate` and `endDate`; the toast message changed to "Bundle details filled — leave start date blank to record as inventory."
+- **New: Duplicate button** next to Edit and Delete in every row (and in the bottom of every mobile card). It opens an Add dialog pre-filled with the source row's metadata — name, type, size, unit, cost, store, buyer, card, UPC, bundle status + size — but **leaves both dates blank** so the new entry registers as inventory until you actually start using it. Bundle position is intentionally NOT carried over (siblings within a bundle should have unique positions). Title bar of the dialog reads "Duplicate product" so you can tell it apart from a fresh Add.
 
 ### v0.7.4 — 2026-04-24
 - **Mobile: the table now becomes a stacked card view on phones.** Below 720px viewport width, the 1400px-min horizontal scroll is gone — each product renders as a self-contained card showing the type, name, status badge, start date + duration, cost + $/day, size/store/buyer/card, bundle position (if any), and notes. Edit/Delete buttons live at the bottom of the card with touch-friendly hit targets. Same DOM as desktop — CSS just flips the layout — so the existing event handlers and live-update plumbing keep working without changes.
