@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.7.10
+/* Usage Tracker — v0.7.11
+ * v0.7.11: Three new dashboard charts — $/day by product type (burn rate),
+ *   purchases by product type (frequency), and combined longest-running
+ *   chart (active + past finished, top 10).
  * v0.7.10: Filter chips — Type / Buyer / Card cells in the table are now
  *   clickable; clicking adds an active filter (AND logic across columns).
  *   Active filters render as dismissible chips above the table.
@@ -43,7 +46,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.10';
+const APP_VERSION = '0.7.11';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -115,7 +118,11 @@ let activeFilters = (() => {
 function persistActiveFilters() {
   try { localStorage.setItem(CHIP_FILTER_KEY, JSON.stringify(activeFilters)); } catch {}
 }
-let charts = { byType: null, byStore: null, finishedByMonth: null };
+let charts = {
+  byType: null, byStore: null, finishedByMonth: null,
+  // v0.7.11
+  perDayByType: null, countByType: null, longestRunning: null
+};
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
 
@@ -292,6 +299,9 @@ function unsubscribeData() {
   destroyChart('byType');
   destroyChart('byStore');
   destroyChart('finishedByMonth');
+  destroyChart('perDayByType');
+  destroyChart('countByType');
+  destroyChart('longestRunning');
 }
 
 /* ---------- recent-used helpers ---------- */
@@ -686,6 +696,9 @@ function renderDashboard() {
     renderChartByType();
     renderChartByStore();
     renderChartFinishedByMonth();
+    renderChartPerDayByType();
+    renderChartCountByType();
+    renderChartLongestRunning();
   }
 }
 
@@ -862,6 +875,128 @@ function renderChartFinishedByMonth() {
 }
 
 function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+// v0.7.11 charts ---------------------------------------------------------
+
+// $/day by product type — sum of calcCostPerDay across rows in each type.
+// Inventory rows have null cost-per-day so they fall through naturally;
+// finished rows still contribute (their per-day rate over their lifespan).
+function renderChartPerDayByType() {
+  const map = new Map();
+  for (const p of products) {
+    const v = calcCostPerDay(p);
+    if (v == null || !isFinite(v) || v <= 0) continue;
+    const k = p.productType || 'Unknown';
+    map.set(k, (map.get(k) || 0) + v);
+  }
+  const entries = sortedEntriesDesc(map);
+  destroyChart('perDayByType');
+  if (entries.length === 0) return;
+  const labels = entries.map(([k]) => k);
+  const values = entries.map(([, v]) => round2(v));
+  charts.perDayByType = new Chart(document.getElementById('chart-perday-by-type'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: '#7a4ad9', borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${moneyFine(ctx.parsed.x)}/day` } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => moneyFine(v) }, grid: { color: '#eef1f7' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// Purchase count by product type — simple histogram, "how often do I buy
+// these categories." All products count, including inventory (a purchase
+// is a purchase whether or not you've started it).
+function renderChartCountByType() {
+  const map = new Map();
+  for (const p of products) {
+    const k = p.productType || 'Unknown';
+    map.set(k, (map.get(k) || 0) + 1);
+  }
+  const entries = [...map.entries()].sort((a, b) => b[1] - a[1]);
+  destroyChart('countByType');
+  if (entries.length === 0) return;
+  const labels = entries.map(([k]) => k);
+  const values = entries.map(([, v]) => v);
+  charts.countByType = new Chart(document.getElementById('chart-count-by-type'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: '#d98f2b', borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.x} purchase${ctx.parsed.x === 1 ? '' : 's'}` } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 }, grid: { color: '#eef1f7' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// Longest-running products — combined active + finished, sorted by duration
+// descending, top 10. Active rows colored primary, finished rows slate so
+// you can see at a glance which are still running. Inventory rows have no
+// duration and are excluded.
+function renderChartLongestRunning() {
+  const rows = products
+    .map(p => {
+      const dur = calcDuration(p);
+      if (dur == null || !isFinite(dur) || dur <= 0) return null;
+      return { p, dur, status: isActive(p) ? 'active' : 'finished' };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.dur - a.dur)
+    .slice(0, 10);
+  destroyChart('longestRunning');
+  if (rows.length === 0) return;
+  const labels = rows.map(r => {
+    const tag = r.status === 'active' ? ' (active)' : '';
+    // Truncate long names to keep the y-axis readable
+    const name = r.p.productName || '(unnamed)';
+    const trimmed = name.length > 32 ? name.slice(0, 32) + '…' : name;
+    return trimmed + tag;
+  });
+  const values = rows.map(r => r.dur);
+  const colors = rows.map(r => r.status === 'active' ? '#2b5fd9' : '#5b6b8a');
+  charts.longestRunning = new Chart(document.getElementById('chart-longest-running'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const r = rows[ctx.dataIndex];
+              const noun = r.status === 'active' ? 'running' : 'used';
+              return `${ctx.parsed.x} day${ctx.parsed.x === 1 ? '' : 's'} ${noun}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0, callback: v => `${v}d` }, grid: { color: '#eef1f7' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
 
 /* ---------- view + filter switching ---------- */
 

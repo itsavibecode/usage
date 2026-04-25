@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.10
+**Version:** v0.7.11
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.10)
+## Current status (v0.7.11)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.11 — 2026-04-25
+- **New: three dashboard charts.**
+  - **$/day by product type** — horizontal bar chart of summed cost-per-day per category. Tells you which categories burn the most cash per day. Inventory rows fall through (their $/day is null until they're started).
+  - **Purchases by product type** — count of all rows per category, including inventory. Tells you what you're buying most often.
+  - **Longest-running products** — combined active + finished, top 10 by duration. Active products colored primary; finished colored slate so you can tell at a glance which ones are still running. Tooltips show "X days running" or "X days used" depending on status.
 
 ### v0.7.10 — 2026-04-25
 - **New: clickable filter chips on Type / Buyer / Card cells.** Tap any of those table cells to drill into "only rows where this column equals this value." A new bar appears above the table showing each active filter as a dismissible chip (`Buyer: Frank ×`). Tap a chip's × to remove it, or use the **Clear all** link when two or more filters are active. Multiple filters AND together (e.g. `Buyer: Frank` + `Type: Toothpaste`). Selection persists per browser via `localStorage`. The existing **Reset** button now clears both the row-filter tabs and any active chip filters in one go.
