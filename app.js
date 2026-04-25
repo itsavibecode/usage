@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.6
+/* Usage Tracker — v0.7.7
+ * v0.7.7: Inventory excluded from spend aggregations. Total spend, YTD spend,
+ *   "Top category by spend", "Top store by spend", and the two dashboard
+ *   donut/bar charts now skip products without a startDate. Counts
+ *   (Active / Inventory / Finished tiles) unchanged.
  * v0.7.6: Pre-tax display toggle (above stats bar). Single chokepoint:
  *   effectiveCost() respects the toggle so every $ value flips together.
  *   "w/ Tax" column hidden via body.pretax-mode CSS class. CSV template
@@ -30,7 +34,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.6';
+const APP_VERSION = '0.7.7';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -485,16 +489,25 @@ function renderStats() {
   const active = products.filter(isActive).length;
   const inventory = products.filter(isInventory).length;
   const finished = products.filter(isFinished).length;
-  const total = products.reduce((s, p) => s + (allocatedCost(p) || 0), 0);
+  // v0.7.7: spend tiles exclude inventory. Rationale: until you start using
+  // a product, treating it as "spent" mixes accounting cash-flow with the
+  // app's usage-tracking purpose. Inventory items only contribute to spend
+  // metrics once they get a startDate (active or finished). Same exclusion
+  // applies to YTD spend and to the dashboard groupAllocatedSpend below.
+  const total = products
+    .filter(p => !isInventory(p))
+    .reduce((s, p) => s + (allocatedCost(p) || 0), 0);
 
   // Year-to-date metrics
   const now = new Date();
   const currentYear = now.getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
 
-  // YTD spend: products purchased in the current calendar year.
-  // Falls back to startDate if purchaseDate is missing (legacy rows).
+  // YTD spend: products purchased AND started using in the current calendar
+  // year. Inventory excluded — see comment on `total` above. Falls back to
+  // startDate if purchaseDate is missing (legacy rows).
   const ytdSpend = products.reduce((s, p) => {
+    if (isInventory(p)) return s;
     const purchase = parseLocalDate(p.purchaseDate || p.startDate);
     if (!purchase || purchase.getFullYear() !== currentYear) return s;
     return s + (allocatedCost(p) || 0);
@@ -583,8 +596,12 @@ function renderDashCards() {
 }
 
 function groupAllocatedSpend(keyFn) {
+  // Inventory items are excluded from all spend aggregations (see renderStats
+  // comment for rationale). This drives the dashboard's "Top category by
+  // spend" / "Top store by spend" cards and the two donut/bar charts.
   const map = new Map();
   for (const p of products) {
+    if (isInventory(p)) continue;
     const k = keyFn(p);
     if (!k) continue;
     const v = allocatedCost(p) || 0;

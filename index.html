@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.6">
+  <meta name="version" content="0.7.7">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.6</span>
+        <span class="version" id="version">v0.7.7</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -75,8 +75,8 @@
       <div class="stat" title="Items you've started using and not yet finished"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></div>
       <div class="stat" title="Items purchased but not yet started — sitting in inventory"><span class="stat-label">Inventory</span><span class="stat-value" id="stat-inventory">0</span></div>
       <div class="stat"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></div>
-      <div class="stat"><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
-      <div class="stat" title="Sum of allocated cost for products purchased in the current calendar year"><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></div>
+      <div class="stat" title="Sum of allocated cost for products you've started using. Inventory items (no start date) are excluded until you begin using them."><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
+      <div class="stat" title="Sum of allocated cost for products purchased AND started using in the current calendar year. Inventory items are excluded."><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></div>
       <div class="stat" title="Sum of $/day for products that were in use at any point this year"><span class="stat-label">YTD daily cost</span><span class="stat-value" id="stat-ytd-perday">$0.00</span></div>
     </section>
 

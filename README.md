@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.6
+**Version:** v0.7.7
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.6)
+## Current status (v0.7.7)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.7 — 2026-04-25
+- **Fixed: inventory items no longer count toward spend tiles.** Until you actually start using a product, it's just sitting on a shelf — counting it as "spent" mixed cash-flow accounting with the app's usage-tracking purpose. Affects: **Total spend** tile, **YTD spend** tile, **Top category by spend** dashboard card, **Top store by spend** dashboard card, and both dashboard charts (Allocated spend by product type, Allocated spend by store). Inventory items snap into all spend metrics the moment you set a Start date. Counts (Active / Inventory / Finished tiles) are unchanged. Tile tooltips updated to explain the rule.
 
 ### v0.7.6 — 2026-04-24
 - **New: Pre-tax display toggle.** A small switch sits above the stats bar — flip it on and every dollar value in the app (stat tiles, table cells, dashboard charts, mobile cards, YTD totals) recomputes using `cost` only and ignores `costWithTax`. Single chokepoint: every monetary calculation flows through `effectiveCost()`, so one function change drives the whole UI. The "w/ Tax" table column is hidden entirely when the toggle is on (per user preference — no `—` placeholder rows). Choice persists per browser via `localStorage`.
