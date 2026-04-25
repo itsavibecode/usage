@@ -1,4 +1,6 @@
-/* Usage Tracker — v0.7.3
+/* Usage Tracker — v0.7.4
+ * v0.7.4: Mobile card view — at <=720px the table flips to a stacked card
+ *   layout per product. No more 1400px-min horizontal scroll on phones.
  * v0.7.3: Inventory concept (blank startDate), filter tabs (All/Active/Inventory),
  *   CSV import + CSV/JSON template downloads.
  * v0.7.0–0.7.2: YTD stats, bundle field show/hide, duplicate-with-bundle,
@@ -22,7 +24,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.3';
+const APP_VERSION = '0.7.4';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -360,8 +362,69 @@ function renderTable() {
   });
 }
 
+// Mobile card layout — what each product looks like at viewport <= 720px.
+// Reuses the .name-link / .edit-btn / .delete-btn classes so the existing
+// table-wrap event delegation in attachTableHandlers picks up clicks here too.
+function renderMobileCard(p) {
+  const startLabel = p.startDate ? formatDate(p.startDate) : 'inventory';
+  let endLabel;
+  if (p.endDate) endLabel = `<span class="badge badge-finished">${formatDate(p.endDate)}</span>`;
+  else if (isInventory(p)) endLabel = '<span class="badge badge-inventory">inventory</span>';
+  else endLabel = '<span class="badge badge-active">active</span>';
+
+  const dur = calcDuration(p);
+  let durationStr = '';
+  if (dur != null) {
+    if (isActive(p)) durationStr = ` &middot; ${dur}d running`;
+    else if (isFinished(p)) durationStr = ` &middot; ${dur}d total`;
+  }
+
+  const costPrimary = p.costWithTax ? money(p.costWithTax) : (p.cost ? money(p.cost) : '—');
+  const costPerDay = calcCostPerDay(p);
+  const perDayStr = costPerDay != null ? ` &middot; ${moneyFine(costPerDay)}/day` : '';
+
+  const meta = [
+    p.size && p.unit ? `${escapeHtml(p.size)} ${escapeHtml(p.unit)}` : null,
+    p.store ? escapeHtml(p.store) : null,
+    p.buyer ? escapeHtml(p.buyer) : null,
+    p.cardLast4 ? '&bull;&bull; ' + escapeHtml(p.cardLast4) : null
+  ].filter(Boolean).join(' &middot; ');
+
+  const bundleChip = p.bundleStatus
+    ? (p.bundlePosition
+        ? `<span class="badge badge-bundle-member">${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}</span>`
+        : `<span class="badge badge-bundle-origin">bundle &times; ${escapeHtml(p.bundleSize || '?')}</span>`)
+    : '';
+
+  return `
+    <div class="mc">
+      <div class="mc-head">
+        <span class="mc-type">${escapeHtml(p.productType)}</span>
+        <span class="mc-status">${endLabel}</span>
+      </div>
+      <button type="button" class="mc-name name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button>
+      <dl class="mc-grid">
+        <div class="mc-row"><dt>Started</dt><dd>${startLabel}${durationStr}</dd></div>
+        <div class="mc-row"><dt>Cost</dt><dd>${costPrimary}${perDayStr}</dd></div>
+        ${meta ? `<div class="mc-row"><dt>Where</dt><dd>${meta}</dd></div>` : ''}
+        ${bundleChip ? `<div class="mc-row"><dt>Bundle</dt><dd>${bundleChip}</dd></div>` : ''}
+        ${p.notes ? `<div class="mc-row mc-row-notes"><dt>Notes</dt><dd>${escapeHtml(p.notes)}</dd></div>` : ''}
+      </dl>
+      <div class="mc-actions">
+        <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+        <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderRow(p) {
   const tr = document.createElement('tr');
+  // Each row carries BOTH the desktop cells (one td per column) and a single
+  // .mobile-card-cell at the end. CSS toggles which set is visible based on
+  // viewport — desktop hides .mobile-card-cell, mobile hides everything else
+  // on the row and lets the card render as a block. Same DOM, two layouts,
+  // no duplicated event-handler wiring.
   tr.innerHTML = `
     <td>${escapeHtml(p.productType)}</td>
     <td class="name-cell"><button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
@@ -384,6 +447,7 @@ function renderRow(p) {
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
       <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
     </td>
+    <td class="mobile-card-cell">${renderMobileCard(p)}</td>
   `;
   return tr;
 }

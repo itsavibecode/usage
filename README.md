@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.3
+**Version:** v0.7.4
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.3)
+## Current status (v0.7.4)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.4 — 2026-04-24
+- **Mobile: the table now becomes a stacked card view on phones.** Below 720px viewport width, the 1400px-min horizontal scroll is gone — each product renders as a self-contained card showing the type, name, status badge, start date + duration, cost + $/day, size/store/buyer/card, bundle position (if any), and notes. Edit/Delete buttons live at the bottom of the card with touch-friendly hit targets. Same DOM as desktop — CSS just flips the layout — so the existing event handlers and live-update plumbing keep working without changes.
+- The stats bar squeezes to two columns on phones; row-filter tabs already wrap.
 
 ### v0.7.3 — 2026-04-24
 - **New: Inventory concept.** A product without a `startDate` is now treated as **inventory** — purchased but not yet in use. The form's *Start date* is no longer required, and a hint under it explains the inventory behavior. Inventory items don't affect any daily-cost calculations until you set a start date.
