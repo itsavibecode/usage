@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.2
+**Version:** v0.7.3
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.2)
+## Current status (v0.7.3)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,14 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.3 — 2026-04-24
+- **New: Inventory concept.** A product without a `startDate` is now treated as **inventory** — purchased but not yet in use. The form's *Start date* is no longer required, and a hint under it explains the inventory behavior. Inventory items don't affect any daily-cost calculations until you set a start date.
+- **New: filter tabs above the table** — *All / Active / Inventory*. Choice persists in `localStorage` per browser, and a **Reset** button clears it back to *All*. Empty-state messages are filter-aware ("No active products right now…", "No products in inventory…").
+- **New: Inventory stat card** in the summary bar, between Active and Finished. Active now means "started, not yet finished" (was previously "no end date", which conflated active with inventory).
+- **New: end-date column shows status badges** — `inventory` (gold) for items without a startDate, `active` (green) for items started but not finished, or the actual end date for finished items.
+- **New: CSV import** alongside JSON. The Import dropdown now offers **Import from file…**, **Download CSV template**, and **Download JSON template**. CSV opens cleanly in Excel/Numbers/Sheets. Parser is RFC-4180 compliant (handles quoted fields, embedded commas/quotes/newlines, and strips Excel's UTF-8 BOM).
+- The CSV template includes one example active row and one example inventory row (blank `startDate`) so the difference is immediately visible.
 
 ### v0.7.2 — 2026-04-24
 - **Stat cards cap at 2 decimals** for all money values. The YTD daily cost card was rendering with 4 decimals (e.g. `$1.8597`) because it was using the fine-grained `moneyFine` formatter; swapped it to the standard `money` formatter.

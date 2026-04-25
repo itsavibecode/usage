@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.6.0
+/* Usage Tracker — v0.7.3
+ * v0.7.3: Inventory concept (blank startDate), filter tabs (All/Active/Inventory),
+ *   CSV import + CSV/JSON template downloads.
+ * v0.7.0–0.7.2: YTD stats, bundle field show/hide, duplicate-with-bundle,
+ *   import templates, date TZ fix, decimal formatting.
  * UPC database lookup via UPCitemdb — populates the form after scan/entry
  *   with user confirmation. Free trial endpoint, 100 req/day/IP.
  * UPC camera scanning (ZXing) lazy-loaded on first tap.
@@ -18,7 +22,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.2';
+const APP_VERSION = '0.7.3';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -49,6 +53,16 @@ let unsubProducts = null;
 let unsubTypes = null;
 let firstSnapshotSeen = false;
 let currentView = 'table'; // 'table' | 'dashboard'
+// Row filter for the table view: 'all' | 'active' | 'inventory'.
+// Persisted in localStorage so each user's preferred view survives reloads;
+// reset via the "Reset filters" button.
+const FILTER_KEY = 'usage.tableFilter.v1';
+let currentFilter = (() => {
+  try {
+    const v = localStorage.getItem(FILTER_KEY);
+    return ['all', 'active', 'inventory'].includes(v) ? v : 'all';
+  } catch { return 'all'; }
+})();
 let charts = { byType: null, byStore: null, finishedByMonth: null };
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
@@ -113,7 +127,13 @@ function calcCostPerDay(p) {
   return isFinite(c) ? c / d : null;
 }
 
-function isActive(p) { return !p.endDate; }
+// Active = user has started using it and hasn't finished.
+// Inventory = bought but not yet in use (no startDate).
+// Finished = has an endDate.
+// These three categories partition the product set.
+function isActive(p) { return !!p.startDate && !p.endDate; }
+function isInventory(p) { return !p.startDate; }
+function isFinished(p) { return !!p.endDate; }
 
 /* ---------- formatting ---------- */
 
@@ -257,9 +277,15 @@ function getSortValue(p, column) {
   }
 }
 
+function filteredProducts() {
+  if (currentFilter === 'active') return products.filter(isActive);
+  if (currentFilter === 'inventory') return products.filter(isInventory);
+  return products;
+}
+
 function sortedProducts() {
   const { column, dir } = sortState;
-  const list = [...products];
+  const list = filteredProducts().slice();
   list.sort((a, b) => {
     const va = getSortValue(a, column);
     const vb = getSortValue(b, column);
@@ -311,11 +337,19 @@ function renderTable() {
   }
   loading.hidden = true;
 
-  if (products.length === 0) {
+  const visible = sortedProducts();
+  if (visible.length === 0) {
     empty.hidden = false;
+    if (products.length === 0) {
+      empty.innerHTML = 'No products tracked yet. Click <strong>+ Add product</strong> to get started.';
+    } else if (currentFilter === 'active') {
+      empty.innerHTML = 'No <strong>active</strong> products right now. Switch to <strong>All</strong> or <strong>Inventory</strong> to see your other items.';
+    } else if (currentFilter === 'inventory') {
+      empty.innerHTML = 'No products in <strong>inventory</strong>. Add a product and leave the <em>Start date</em> blank to record items you\'ve bought but not started using.';
+    }
   } else {
     empty.hidden = true;
-    for (const p of sortedProducts()) body.appendChild(renderRow(p));
+    for (const p of visible) body.appendChild(renderRow(p));
   }
 
   document.querySelectorAll('#products-table thead th[data-sort]').forEach(th => {
@@ -333,7 +367,7 @@ function renderRow(p) {
     <td class="name-cell"><button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td>${formatDate(p.startDate)}</td>
-    <td>${p.endDate ? formatDate(p.endDate) : '<span class="badge badge-active">active</span>'}</td>
+    <td>${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
     <td class="num">${formatDuration(p)}</td>
     <td class="num">${money(p.cost)}</td>
     <td class="num">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
@@ -357,7 +391,8 @@ function renderRow(p) {
 function renderStats() {
   const count = products.length;
   const active = products.filter(isActive).length;
-  const finished = count - active;
+  const inventory = products.filter(isInventory).length;
+  const finished = products.filter(isFinished).length;
   const total = products.reduce((s, p) => s + (allocatedCost(p) || 0), 0);
 
   // Year-to-date metrics
@@ -387,6 +422,7 @@ function renderStats() {
 
   document.getElementById('stat-count').textContent = count;
   document.getElementById('stat-active').textContent = active;
+  document.getElementById('stat-inventory').textContent = inventory;
   document.getElementById('stat-finished').textContent = finished;
   document.getElementById('stat-total').textContent = money(total);
   document.getElementById('stat-ytd-spend').textContent = money(ytdSpend);
@@ -590,7 +626,24 @@ function renderChartFinishedByMonth() {
 
 function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
 
-/* ---------- view switching ---------- */
+/* ---------- view + filter switching ---------- */
+
+function setFilter(filter) {
+  if (!['all', 'active', 'inventory'].includes(filter)) return;
+  currentFilter = filter;
+  try { localStorage.setItem(FILTER_KEY, filter); } catch {}
+  for (const btn of document.querySelectorAll('.row-filter-tab')) {
+    const active = btn.dataset.filter === filter;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  }
+  renderTable();
+}
+
+function resetFilters() {
+  setFilter('all');
+  toast('Filters reset');
+}
 
 function setView(view) {
   if (view !== 'table' && view !== 'dashboard') return;
@@ -721,7 +774,9 @@ function openAddDialog() {
   populateBundleSelect(document.getElementById('continue-bundle'));
   document.getElementById('continue-bundle-wrap').hidden = false;
   const today = new Date().toISOString().slice(0, 10);
-  f.elements.startDate.value = today;
+  // startDate intentionally left blank — leaving it blank records this as
+  // inventory (bought but not yet in use). User sets a start date when they
+  // actually begin using the product.
   f.elements.purchaseDate.value = today;
   setBundleSizeVisibility();
   setUpcStatus('');
@@ -905,17 +960,29 @@ function download(text, filename, mime) {
   URL.revokeObjectURL(url);
 }
 
-function downloadImportTemplate() {
-  // Minimal, self-documenting import template. Mirrors the JSON export shape so
-  // a user can export, edit in a text editor, and re-import. Placeholder values
-  // show the expected format for each field.
+// Columns the user is expected to fill in via CSV/JSON template — mirrors
+// FIELDS minus `id` (auto-generated). Calculated columns from the CSV export
+// (durationDays, allocatedCost, costPerUnit, costPerDay) are intentionally
+// excluded since they're derived, not stored.
+const IMPORT_COLS = [
+  'productType', 'productName', 'size', 'unit',
+  'startDate', 'endDate', 'cost', 'costWithTax',
+  'bundleStatus', 'bundleSize', 'bundlePosition',
+  'store', 'buyer', 'cardLast4',
+  'purchaseDate', 'upc', 'notes'
+];
+
+function downloadJSONTemplate() {
+  // Self-documenting import template. Mirrors the JSON export shape so a user
+  // can export, edit in a text editor, and re-import. Placeholder values show
+  // the expected format for each field.
   const today = new Date().toISOString().slice(0, 10);
   const template = {
     app: 'usage-tracker',
     version: APP_VERSION,
     exportedAt: new Date().toISOString(),
     _help: {
-      instructions: 'Edit the "products" array. Each object may omit "id" (a new one will be generated). All fields are optional except productType, productName, and upc. Dates use YYYY-MM-DD. Leave endDate blank for in-use products.',
+      instructions: 'Edit the "products" array. Each object may omit "id" (a new one will be generated). All fields are optional except productType, productName, and upc. Dates use YYYY-MM-DD. Leave startDate blank to record an inventory item (purchased but not yet in use). Leave endDate blank for in-use products.',
       productType: 'Underarm | Toothbrush | Toothpaste | Floss | Mouthwash | Facewash | Shampoo | Soap | any custom type you have added',
       unit: 'count | oz | fl oz | lb | g | kg | mL | L | gal | ft | m | pack | roll | sheet | load | serving',
       bundleStatus: 'true if purchased as part of a multi-pack; requires bundleSize and bundlePosition',
@@ -946,23 +1013,139 @@ function downloadImportTemplate() {
     ]
   };
   download(JSON.stringify(template, null, 2), `usage-import-template.json`, 'application/json');
-  toast('Template downloaded — edit and re-import');
+  toast('JSON template downloaded — edit and re-import');
+}
+
+function downloadCSVTemplate() {
+  // CSV template opens cleanly in Excel/Numbers/Sheets. Two example rows show
+  // an active product and an inventory product (blank startDate). Delete both
+  // example rows and add your own before importing.
+  const today = new Date().toISOString().slice(0, 10);
+  const examples = [
+    {
+      productType: 'Toothpaste', productName: 'Example Active Toothpaste',
+      size: 4.7, unit: 'oz',
+      startDate: today, endDate: '',
+      cost: 3.99, costWithTax: 4.29,
+      bundleStatus: 'false', bundleSize: '', bundlePosition: '',
+      store: 'Example Store', buyer: 'Me', cardLast4: '',
+      purchaseDate: today, upc: '000000000000',
+      notes: 'Delete this example row before importing.'
+    },
+    {
+      productType: 'Underarm', productName: 'Example Inventory Item',
+      size: 2.7, unit: 'oz',
+      startDate: '', endDate: '',
+      cost: 5.99, costWithTax: 6.44,
+      bundleStatus: 'true', bundleSize: 3, bundlePosition: 2,
+      store: 'Example Store', buyer: 'Me', cardLast4: '1234',
+      purchaseDate: today, upc: '000000000001',
+      notes: 'Blank startDate = inventory (purchased, not in use yet).'
+    }
+  ];
+  const rows = examples.map(ex => IMPORT_COLS.map(c => csvCell(ex[c] ?? '')).join(','));
+  const csv = [IMPORT_COLS.join(','), ...rows].join('\n');
+  download(csv, `usage-import-template.csv`, 'text/csv');
+  toast('CSV template downloaded — open in Excel, edit, save, then re-import');
+}
+
+// Minimal RFC-4180 CSV parser. Handles quoted fields with embedded quotes
+// (escaped by doubling: `""`), commas, and newlines. Returns an array of rows,
+// each row an array of strings. Strips a leading UTF-8 BOM if present (Excel
+// loves to add one when saving as CSV).
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        field += ch;
+      }
+    } else {
+      if (ch === '"') inQuotes = true;
+      else if (ch === ',') { row.push(field); field = ''; }
+      else if (ch === '\r') { /* swallow; \n handles row break */ }
+      else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else field += ch;
+    }
+  }
+  // Flush trailing field/row if file doesn't end with newline
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  // Drop trailing all-empty rows (common when a file ends with \n)
+  while (rows.length && rows[rows.length - 1].every(c => c === '')) rows.pop();
+  return rows;
+}
+
+// Coerce a CSV cell string to a JS value for a given field. The CSV parser
+// only produces strings; the rest of the app expects numbers for size/cost
+// and booleans for bundleStatus. Empty strings stay empty (blank = unset).
+function coerceImportValue(key, raw) {
+  const s = String(raw ?? '').trim();
+  if (s === '') return key === 'bundleStatus' ? false : '';
+  if (key === 'bundleStatus') {
+    return /^(true|1|yes|y)$/i.test(s);
+  }
+  if (key === 'size' || key === 'cost' || key === 'costWithTax' ||
+      key === 'bundleSize' || key === 'bundlePosition') {
+    const n = Number(s);
+    return isFinite(n) ? n : s;
+  }
+  return s;
+}
+
+// Turn a parsed CSV (rows-of-strings) into product objects. First row must be
+// the header. Unknown columns are silently ignored so users can add their own
+// notes columns without breaking the import.
+function csvRowsToProducts(rows) {
+  if (rows.length < 2) throw new Error('CSV has no data rows');
+  const header = rows[0].map(h => h.trim());
+  return rows.slice(1).map(cells => {
+    const obj = {};
+    header.forEach((col, i) => { obj[col] = cells[i] ?? ''; });
+    return obj;
+  });
 }
 
 async function handleImportFile(file) {
   if (!currentUser) { toast('Please sign in first'); return; }
+  const isCSV = /\.csv$/i.test(file.name) || file.type === 'text/csv';
   const reader = new FileReader();
   reader.onload = async () => {
     try {
-      const data = JSON.parse(reader.result);
-      const incoming = Array.isArray(data) ? data : data.products;
-      if (!Array.isArray(incoming)) throw new Error('Invalid file: no products array found');
+      let incoming;
+      let extraTypes = null;
+      if (isCSV) {
+        const rows = parseCSV(reader.result);
+        incoming = csvRowsToProducts(rows);
+      } else {
+        const data = JSON.parse(reader.result);
+        incoming = Array.isArray(data) ? data : data.products;
+        if (!Array.isArray(incoming)) throw new Error('Invalid file: no products array found');
+        if (Array.isArray(data.customTypes) && data.customTypes.length) extraTypes = data.customTypes;
+      }
 
       const cleaned = incoming.map(item => {
         const out = { id: item.id || newId() };
         for (const key of FIELDS) {
           if (key === 'id') continue;
-          out[key] = item[key] ?? (key === 'bundleStatus' ? false : '');
+          // Only the JSON path produces native types; for CSV, every cell is a
+          // string and needs coercing. coerceImportValue is a no-op on already-
+          // typed values from JSON since they go straight through `?? ''`.
+          const raw = item[key];
+          if (raw === undefined || raw === null) {
+            out[key] = key === 'bundleStatus' ? false : '';
+          } else if (isCSV) {
+            out[key] = coerceImportValue(key, raw);
+          } else {
+            out[key] = raw;
+          }
         }
         return out;
       });
@@ -973,8 +1156,8 @@ async function handleImportFile(file) {
         added++;
       }
 
-      if (Array.isArray(data.customTypes) && data.customTypes.length) {
-        const merged = [...new Set([...customTypesCache, ...data.customTypes])];
+      if (extraTypes) {
+        const merged = [...new Set([...customTypesCache, ...extraTypes])];
         await saveCustomTypes(merged);
       }
 
@@ -1465,6 +1648,14 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => setView(btn.dataset.view));
   });
 
+  document.querySelectorAll('.row-filter-tab').forEach(btn => {
+    btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+  });
+  // Sync the persisted filter onto the DOM (in case localStorage had a non-default value)
+  setFilter(currentFilter);
+
+  document.getElementById('btn-reset-filters')?.addEventListener('click', resetFilters);
+
   const exportBtn = document.getElementById('btn-export');
   const exportMenu = document.getElementById('export-menu');
   exportBtn.addEventListener('click', e => {
@@ -1495,7 +1686,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = e.target.closest('button[data-import]');
     if (!btn) return;
     if (btn.dataset.import === 'file') fileInput.click();
-    if (btn.dataset.import === 'template') downloadImportTemplate();
+    if (btn.dataset.import === 'template-csv') downloadCSVTemplate();
+    if (btn.dataset.import === 'template-json') downloadJSONTemplate();
     importMenu.classList.remove('open');
   });
   fileInput.addEventListener('change', e => {

@@ -289,6 +289,7 @@ main {
   color: var(--primary);
 }
 .badge-active { background: #e3f5ec; color: var(--success); }
+.badge-inventory { background: #fff3d6; color: #8a5a00; }
 .badge-finished { background: #efe9fb; color: #5b3ba8; }
 
 /* Bundle chips — originator ("bundle × N") is the row that first introduced
@@ -715,6 +716,61 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   padding: 40px 20px;
   margin: 0;
   font-size: 13px;
+}
+
+/* Row-filter tabs (All / Active / Inventory) — sit above the products table.
+ * Visually subtler than the top-level view tabs since they're a secondary
+ * filter, not a navigation. Uses a pill background instead of a solid primary
+ * fill for the active state. */
+.row-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.row-filter-tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.row-filter-tab:hover {
+  color: var(--text);
+  border-color: #c9d0de;
+}
+
+.row-filter-tab.is-active {
+  background: #eef3ff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+#btn-reset-filters { margin-left: auto; }
+
+/* Inline hint under a date input — explains optional fields. */
+.field-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+/* The `<em class="muted">` variant in field labels — used for "(leave blank
+ * for inventory)" hint next to "Start date". Overrides the default em color
+ * (red, used for required-field asterisks) since this is informational. */
+.field em.muted {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 /* View tabs (Table / Dashboard) */

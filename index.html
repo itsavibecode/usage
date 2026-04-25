@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.2">
+  <meta name="version" content="0.7.3">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.2</span>
+        <span class="version" id="version">v0.7.3</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -23,7 +23,8 @@
         <button type="button" id="btn-import" class="btn">Import &#9662;</button>
         <div class="dropdown-menu" id="import-menu">
           <button type="button" data-import="file">Import from file…</button>
-          <button type="button" data-import="template">Download template</button>
+          <button type="button" data-import="template-csv">Download CSV template</button>
+          <button type="button" data-import="template-json">Download JSON template</button>
         </div>
       </div>
       <div class="dropdown">
@@ -33,7 +34,7 @@
           <button type="button" data-export="csv">Export CSV</button>
         </div>
       </div>
-      <input type="file" id="file-import" accept=".json,application/json" hidden>
+      <input type="file" id="file-import" accept=".json,application/json,.csv,text/csv" hidden>
       <div class="user-chip" id="user-chip" hidden>
         <img id="user-avatar" alt="" referrerpolicy="no-referrer">
         <span id="user-name"></span>
@@ -63,7 +64,8 @@
   <main id="main-wrap" hidden>
     <section class="stats-bar" id="stats-bar" aria-label="Summary">
       <div class="stat"><span class="stat-label">Tracked products</span><span class="stat-value" id="stat-count">0</span></div>
-      <div class="stat"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></div>
+      <div class="stat" title="Items you've started using and not yet finished"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></div>
+      <div class="stat" title="Items purchased but not yet started — sitting in inventory"><span class="stat-label">Inventory</span><span class="stat-value" id="stat-inventory">0</span></div>
       <div class="stat"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></div>
       <div class="stat"><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
       <div class="stat" title="Sum of allocated cost for products purchased in the current calendar year"><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></div>
@@ -76,6 +78,12 @@
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
+      <nav class="row-filter-tabs" role="tablist" aria-label="Row filter">
+        <button type="button" class="row-filter-tab is-active" data-filter="all" role="tab" aria-selected="true" title="Show every product">All</button>
+        <button type="button" class="row-filter-tab" data-filter="active" role="tab" aria-selected="false" title="Only products you've started using and not yet finished">Active</button>
+        <button type="button" class="row-filter-tab" data-filter="inventory" role="tab" aria-selected="false" title="Only products purchased but not yet started">Inventory</button>
+        <button type="button" id="btn-reset-filters" class="btn btn-ghost" title="Clear filters and show all rows">Reset</button>
+      </nav>
       <div class="table-wrap">
         <table class="products" id="products-table">
           <thead>
@@ -206,8 +214,9 @@
         </label>
 
         <label class="field">
-          <span>Start date <em>*</em></span>
-          <input name="startDate" type="date" required>
+          <span>Start date <em class="muted">(leave blank for inventory)</em></span>
+          <input name="startDate" type="date">
+          <small class="field-hint">If you've purchased this but haven't started using it yet, leave this blank — it'll be tracked as inventory and won't affect daily-cost stats until you set a start date.</small>
         </label>
 
         <label class="field">
