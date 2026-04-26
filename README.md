@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.18
+**Version:** v0.7.19
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.18)
+## Current status (v0.7.19)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.19 — 2026-04-26
+- **New: custom 404 page.** Until now, anyone hitting a typo'd or stale URL under `itsavibecode.github.io/usage/...` saw GitHub's generic black-bar "There isn't a GitHub Pages site here" message — looked like the site itself was broken. Replaced with a clean self-contained `404.html` that matches the rest of the site (favicon, primary blue, system fonts, version footer) and offers a one-click button back to the working app. Standalone — no app.js, Firebase, or auth dependency, so it renders even for signed-out visitors and even if the main bundle has issues.
 
 ### v0.7.18 — 2026-04-26
 - **Trend panel fix: "highest daily-cost category" insight now uses finished products only.** Previously this generator summed `$/day` across both finished and currently-active products. Active products use today's date as a preliminary endpoint, so their rate is a moving target — including them inflated the "burn rate" with not-yet-final data. The insight now waits until you have at least three finished products of any type before it'll fire, then reports the category with the highest combined real (finished) burn rate.

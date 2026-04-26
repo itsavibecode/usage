@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.7.18
+/* Usage Tracker — v0.7.19
+ * v0.7.19: Custom 404 page (standalone 404.html). GitHub Pages auto-serves
+ *   it for any unknown URL; previously visitors saw GitHub's generic black
+ *   error page.
  * v0.7.18: Trend panel fix — "highest daily-cost category" insight now uses
  *   finished products only (no preliminary running rates from active items).
  * v0.7.17: Activity log — `createdAt` durable on Firestore products with
@@ -72,7 +75,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.18';
+const APP_VERSION = '0.7.19';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
