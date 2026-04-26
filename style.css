@@ -420,6 +420,221 @@ body.pretax-mode .products tbody td.cell-with-tax {
 .notes-chip.is-expanded:hover { background: var(--surface-alt); }
 .notes-text { display: inline; }
 
+/* v0.7.16 PNG export templates — these styles render inside a .png-export-stage
+ * div positioned off-screen at exact target dimensions. html2canvas captures
+ * the rendered pixels. Fonts use system defaults (already set on body) so
+ * they render consistently. All dimensions are absolute (px) since the stage
+ * has fixed width/height.
+ *
+ * Per-product card: 1200x900 (4:3). Hero header with thumbnail + name +
+ * status, 2-column grid of stats, branded footer.
+ */
+.png-export-stage {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #1a2238;
+  -webkit-font-smoothing: antialiased;
+}
+.exp-card {
+  width: 100%;
+  height: 100%;
+  padding: 60px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
+}
+.exp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e3e7ef;
+  margin-bottom: 32px;
+}
+.exp-card-thumb,
+.exp-card-thumb-fallback {
+  width: 140px;
+  height: 140px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  flex-shrink: 0;
+}
+.exp-card-thumb-fallback {
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+}
+.exp-card-head-text { flex: 1; min-width: 0; }
+.exp-card-type {
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7390;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.exp-card-name {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1a2238;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.exp-card-bundle {
+  font-size: 16px;
+  color: #2b5fd9;
+  font-weight: 500;
+}
+.exp-card-status {
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.exp-card-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px 32px;
+  align-content: center;
+}
+.exp-card-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.exp-label {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7390;
+  font-weight: 500;
+}
+.exp-val {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a2238;
+  font-variant-numeric: tabular-nums;
+}
+.exp-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20px;
+  border-top: 1px solid #e3e7ef;
+  font-size: 14px;
+  color: #6b7390;
+}
+.exp-card-foot-version { font-variant-numeric: tabular-nums; }
+
+/* Dashboard export — landscape 1600x1200 (4:3) and portrait 1000x1400 (5:7).
+ * Same building blocks (.exp-stat tiles, .exp-chart-block per chart).
+ * Portrait stacks the chart grid in 1 column; landscape uses 2 columns. */
+.exp-dash {
+  width: 100%;
+  height: 100%;
+  padding: 50px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
+}
+.exp-dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 18px;
+  border-bottom: 2px solid #e3e7ef;
+  margin-bottom: 24px;
+}
+.exp-dash-title {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.exp-dash-sub {
+  font-size: 16px;
+  color: #6b7390;
+}
+.exp-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.exp-dash-portrait .exp-dash-stats {
+  grid-template-columns: repeat(3, 1fr);
+}
+.exp-stat {
+  background: #ffffff;
+  border: 1px solid #e3e7ef;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.exp-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7390;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.exp-stat-val {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.exp-dash-charts {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  min-height: 0;
+}
+.exp-dash-portrait .exp-dash-charts {
+  grid-template-columns: 1fr;
+}
+.exp-chart-block {
+  background: #ffffff;
+  border: 1px solid #e3e7ef;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.exp-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a2238;
+  margin-bottom: 8px;
+}
+.exp-chart-img {
+  width: 100%;
+  flex: 1;
+  object-fit: contain;
+  min-height: 0;
+}
+.exp-dash-foot {
+  text-align: right;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #6b7390;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dashboard export bar — sits above the dashboard cards. Right-aligned. */
+.dash-export-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
 /* v0.7.10 — clickable cell chips for Type / Buyer / Card. Hover/focus
  * suggests they're interactive; click filters the table to that value. */
 .cell-chip {

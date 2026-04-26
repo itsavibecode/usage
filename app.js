@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.15
+/* Usage Tracker — v0.7.16
+ * v0.7.16: PNG export — per-product card (4:3, 1200×900), dashboard
+ *   (4:3, 1600×1200), and overview (5:7 portrait, 1000×1400). Lazy-loaded
+ *   html2canvas + custom off-screen templates so the output is a clean
+ *   shareable card, not a screenshot of the live UI chrome.
  * v0.7.15: Product thumbnails — UPCitemdb image URL captured on lookup,
  *   stored on the product, rendered as a small square next to the product
  *   name in the desktop table and mobile cards. HTTPS-only (skips http://
@@ -62,7 +66,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.15';
+const APP_VERSION = '0.7.16';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -698,6 +702,7 @@ function renderMobileCard(p) {
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
+        <button type="button" class="export-btn" data-id="${p.id}" title="Export 4:3 PNG">PNG</button>
         <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
       </div>
     </div>
@@ -761,6 +766,7 @@ function renderRow(p) {
     <td class="actions-cell">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
+      <button type="button" class="export-btn" data-id="${p.id}" title="Export this product as a 4:3 PNG card">PNG</button>
       <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
     </td>
     <td class="mobile-card-cell">${renderMobileCard(p)}</td>
@@ -1777,6 +1783,247 @@ function confirmDelete(id) {
   no.onclick = () => { cd.close(); cleanup(); };
 }
 
+/* ---------- v0.7.16 PNG export ---------- */
+
+// html2canvas is ~80KB; lazy-load on first export click via the existing ESM
+// CDN pattern the app uses for Chart.js. Cached after first load. Returns
+// the html2canvas function (exposed as module default).
+let html2canvasModule = null;
+async function lazyLoadHtml2Canvas() {
+  if (html2canvasModule) return html2canvasModule;
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm');
+    html2canvasModule = mod.default || mod;
+    return html2canvasModule;
+  } catch (err) {
+    toast('Could not load PNG export library: ' + err.message);
+    throw err;
+  }
+}
+
+// Renders a snippet of HTML at exact target dimensions into an off-screen
+// container, captures it via html2canvas, downloads as PNG, then removes
+// the container. Width/height are the canvas dimensions; the snippet's CSS
+// inside should fit those dimensions exactly. We render at 2x device pixel
+// ratio so the PNG is crisp on retina displays. Returns a Promise that
+// resolves when the file has been triggered for download.
+async function captureToPng(html, filename, width, height) {
+  const html2canvas = await lazyLoadHtml2Canvas();
+  const stage = document.createElement('div');
+  stage.className = 'png-export-stage';
+  // Off-screen positioning — visually hidden but laid out at full size so
+  // the export captures real pixel content (display:none would skip layout).
+  stage.style.cssText = `
+    position: fixed; left: -10000px; top: 0;
+    width: ${width}px; height: ${height}px;
+    pointer-events: none;
+    background: #ffffff;
+  `;
+  stage.innerHTML = html;
+  document.body.appendChild(stage);
+  try {
+    // useCORS so the UPCitemdb thumbnails attempt cross-origin loading
+    // properly. If CORS isn't supported by the host, the image fails silently
+    // and the rest of the card still captures cleanly.
+    const canvas = await html2canvas(stage, {
+      width, height,
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false
+    });
+    await new Promise(resolve => {
+      canvas.toBlob(blob => {
+        if (!blob) { resolve(); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        resolve();
+      }, 'image/png');
+    });
+  } finally {
+    stage.remove();
+  }
+}
+
+// Build the inner HTML for a 4:3 product card export. Mirrors the on-screen
+// card's information density but with controlled padding, larger fonts, and
+// a presentation-friendly layout.
+function buildProductCardExportHtml(p) {
+  const startLabel = p.startDate ? formatDate(p.startDate) : 'Inventory';
+  let endLabel = p.endDate ? formatDate(p.endDate) : (isInventory(p) ? 'Inventory' : 'In use');
+  const dur = calcDuration(p);
+  const durationLine = (dur != null)
+    ? (isActive(p) ? `${dur} days running` : isFinished(p) ? `${dur} days total` : '—')
+    : '—';
+  const eff = effectiveCost(p);
+  const costLine = eff > 0 ? money(eff) : '—';
+  const perDay = calcCostPerDay(p);
+  const perDayLine = perDay != null ? `${moneyFine(perDay)}/day` : '—';
+  const perUnit = calcCostPerUnit(p);
+  const perUnitLine = perUnit != null ? `${moneyFine(perUnit)}/${escapeHtml(p.unit)}` : '—';
+  const sizeLine = p.size && p.unit ? `${escapeHtml(p.size)} ${escapeHtml(p.unit)}` : '—';
+  const status = isFinished(p) ? 'Finished' : isActive(p) ? 'Active' : 'Inventory';
+  const statusColor = isFinished(p) ? '#5b3ba8' : isActive(p) ? '#2d8a5f' : '#8a5a00';
+  const statusBg = isFinished(p) ? '#efe9fb' : isActive(p) ? '#e3f5ec' : '#fff3d6';
+
+  const bundleLine = p.bundleStatus
+    ? (p.bundlePosition ? `Bundle ${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}` : `Bundle of ${escapeHtml(p.bundleSize || '?')}`)
+    : '';
+
+  return `
+    <div class="exp-card">
+      <div class="exp-card-head">
+        ${p.imageUrl ? `<img class="exp-card-thumb" src="${escapeHtml(p.imageUrl)}" alt="" crossorigin="anonymous">` : '<div class="exp-card-thumb-fallback"></div>'}
+        <div class="exp-card-head-text">
+          <div class="exp-card-type">${escapeHtml(p.productType) || ''}</div>
+          <div class="exp-card-name">${escapeHtml(p.productName) || '(unnamed)'}</div>
+          ${bundleLine ? `<div class="exp-card-bundle">${bundleLine}</div>` : ''}
+        </div>
+        <div class="exp-card-status" style="background:${statusBg};color:${statusColor}">${status}</div>
+      </div>
+      <div class="exp-card-grid">
+        <div class="exp-card-cell"><span class="exp-label">Started</span><span class="exp-val">${startLabel}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">${p.endDate ? 'Ended' : 'Status'}</span><span class="exp-val">${endLabel}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">Duration</span><span class="exp-val">${durationLine}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">Size</span><span class="exp-val">${sizeLine}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">Cost</span><span class="exp-val">${costLine}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">Per day</span><span class="exp-val">${perDayLine}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">Per unit</span><span class="exp-val">${perUnitLine}</span></div>
+        <div class="exp-card-cell"><span class="exp-label">Store</span><span class="exp-val">${escapeHtml(p.store) || '—'}</span></div>
+      </div>
+      <div class="exp-card-foot">
+        <span>Tracked with Usage Tracker</span>
+        <span class="exp-card-foot-version">v${APP_VERSION}</span>
+      </div>
+    </div>
+  `;
+}
+
+async function exportProductPng(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  const safeName = (p.productName || 'product').replace(/[^a-z0-9-]+/gi, '-').slice(0, 40);
+  toast('Generating PNG…');
+  try {
+    await captureToPng(buildProductCardExportHtml(p), `${safeName}-${dateStamp()}.png`, 1200, 900);
+    toast('PNG saved');
+  } catch (err) {
+    toast('Export failed: ' + err.message);
+  }
+}
+
+// Builds the dashboard export — stats bar + the existing chart canvases as
+// images. Uses canvas.toDataURL() to snapshot each Chart.js canvas (since
+// html2canvas can't fully reach into Chart.js internals).
+function buildDashboardExportHtml({ portrait } = { portrait: false }) {
+  const sb = renderStatsForExport();
+  const charts = renderChartsForExport();
+  const layoutClass = portrait ? 'exp-dash exp-dash-portrait' : 'exp-dash exp-dash-landscape';
+  return `
+    <div class="${layoutClass}">
+      <div class="exp-dash-head">
+        <div class="exp-dash-title">Usage Tracker</div>
+        <div class="exp-dash-sub">${escapeHtml(currentUser?.displayName || '')} · ${dateStamp()}</div>
+      </div>
+      <div class="exp-dash-stats">${sb}</div>
+      <div class="exp-dash-charts">${charts}</div>
+      <div class="exp-dash-foot">
+        <span>v${APP_VERSION}</span>
+      </div>
+    </div>
+  `;
+}
+
+// Stats tiles for the export — pulls fresh values via the same calculations
+// renderStats uses, but as plain divs instead of writing to existing DOM.
+function renderStatsForExport() {
+  const count = products.length;
+  const active = products.filter(isActive).length;
+  const inventory = products.filter(isInventory).length;
+  const finished = products.filter(isFinished).length;
+  const total = products.filter(p => !isInventory(p)).reduce((s, p) => s + (allocatedCost(p) || 0), 0);
+  const now = new Date();
+  const yr = now.getFullYear();
+  const ytdSpend = products.reduce((s, p) => {
+    if (isInventory(p)) return s;
+    const d = parseLocalDate(p.purchaseDate || p.startDate);
+    if (!d || d.getFullYear() !== yr) return s;
+    return s + (allocatedCost(p) || 0);
+  }, 0);
+  const tile = (label, value) =>
+    `<div class="exp-stat"><div class="exp-stat-label">${label}</div><div class="exp-stat-val">${value}</div></div>`;
+  return [
+    tile('Tracked', count),
+    tile('Active', active),
+    tile('Inventory', inventory),
+    tile('Finished', finished),
+    tile('Total spend', money(total)),
+    tile('YTD spend', money(ytdSpend))
+  ].join('');
+}
+
+// Snapshot each existing Chart.js canvas as a PNG data URL and embed.
+// Charts must be rendered (dashboard view active) before this runs;
+// the export functions call setView('dashboard') first if needed.
+function renderChartsForExport() {
+  const ids = ['chart-by-type', 'chart-by-store', 'chart-finished-per-month',
+               'chart-perday-by-type', 'chart-count-by-type', 'chart-longest-running'];
+  const titles = {
+    'chart-by-type': 'Spend by product type',
+    'chart-by-store': 'Spend by store',
+    'chart-finished-per-month': 'Products finished per month',
+    'chart-perday-by-type': '$/day by product type',
+    'chart-count-by-type': 'Purchases by product type',
+    'chart-longest-running': 'Longest-running products'
+  };
+  const blocks = [];
+  for (const id of ids) {
+    const c = document.getElementById(id);
+    if (!c || !(c instanceof HTMLCanvasElement)) continue;
+    let dataUrl = '';
+    try { dataUrl = c.toDataURL('image/png'); } catch { continue; }
+    if (!dataUrl) continue;
+    blocks.push(`<div class="exp-chart-block">
+      <div class="exp-chart-title">${titles[id] || id}</div>
+      <img class="exp-chart-img" src="${dataUrl}" alt="">
+    </div>`);
+  }
+  return blocks.join('');
+}
+
+async function exportDashboardPng() {
+  if (currentView !== 'dashboard') {
+    toast('Switch to Dashboard view first');
+    return;
+  }
+  toast('Generating PNG…');
+  try {
+    await captureToPng(buildDashboardExportHtml({ portrait: false }),
+      `dashboard-${dateStamp()}.png`, 1600, 1200);
+    toast('Dashboard PNG saved');
+  } catch (err) {
+    toast('Export failed: ' + err.message);
+  }
+}
+
+async function exportOverviewPng() {
+  if (currentView !== 'dashboard') {
+    toast('Switch to Dashboard view first');
+    return;
+  }
+  toast('Generating PNG…');
+  try {
+    await captureToPng(buildDashboardExportHtml({ portrait: true }),
+      `overview-${dateStamp()}.png`, 1000, 1400);
+    toast('Overview PNG saved');
+  } catch (err) {
+    toast('Export failed: ' + err.message);
+  }
+}
+
 /* ---------- import / export ---------- */
 
 function exportJSON() {
@@ -2521,6 +2768,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bundleChip = e.target.closest('.bundle-chip');
     const bundleSibling = e.target.closest('.bundle-sibling');
     const bundleClose = e.target.closest('.bundle-siblings-close');
+    const exportBtn = e.target.closest('.export-btn');
     if (cellChip) {
       addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
       return;
@@ -2542,6 +2790,7 @@ document.addEventListener('DOMContentLoaded', () => {
       openEditDialog(bundleSibling.dataset.id);
       return;
     }
+    if (exportBtn) { exportProductPng(exportBtn.dataset.id); return; }
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
@@ -2598,6 +2847,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setFilter(currentFilter);
 
   document.getElementById('btn-reset-filters')?.addEventListener('click', resetFilters);
+
+  // v0.7.16: dashboard PNG export buttons
+  document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);
+  document.getElementById('btn-export-overview')?.addEventListener('click', exportOverviewPng);
 
   // v0.7.10: active filter chips bar — clicking a chip removes that filter,
   // clicking "Clear all" wipes all chip filters at once.

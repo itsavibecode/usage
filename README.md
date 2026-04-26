@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.15
+**Version:** v0.7.16
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.15)
+## Current status (v0.7.16)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.16 — 2026-04-26
+- **New: PNG export — three formats.** Each product row now has a **PNG** button next to Edit / Duplicate / Delete that downloads a clean **4:3 product card** (1200×900) showing the product's image, type, name, status badge, started/ended dates, duration, cost, $/day, $/unit, size, and store. The Dashboard view also has two new buttons: **Export dashboard PNG** (4:3, 1600×1200) which captures every chart plus a stats strip, and **Export overview PNG** (5:7 portrait, 1000×1400) for share-friendly mobile-shaped output. All three exports are clean rendered cards — not screenshots of the live UI — so they don't include the toolbar, scroll bars, or any other page chrome.
+- The PNG library (`html2canvas`) is lazy-loaded the first time you click an export button — no impact on initial page load.
 
 ### v0.7.15 — 2026-04-26
 - **New: product thumbnails next to the name.** When a UPC lookup against UPCitemdb returns one or more product images, the first HTTPS image is now stored with the product and rendered as a small square thumbnail to the left of the product name — both in the desktop table and at the top of every mobile card. Existing products without an image just show the name as before; running a fresh UPC lookup on them (clear and re-enter the UPC, then accept the prefill prompt) populates the thumbnail. HTTP-only image URLs are skipped to avoid mixed-content blocks on the HTTPS-served site, and a broken-image fallback removes the `<img>` cleanly if the host ever fails.

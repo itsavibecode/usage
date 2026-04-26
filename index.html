@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.15">
+  <meta name="version" content="0.7.16">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.15</span>
+        <span class="version" id="version">v0.7.16</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -137,6 +137,10 @@
     </section>
 
     <section class="view" id="view-dashboard" role="tabpanel" hidden>
+      <div class="dash-export-bar">
+        <button type="button" id="btn-export-dashboard" class="btn" title="Export the stats and charts as a 4:3 PNG">Export dashboard PNG</button>
+        <button type="button" id="btn-export-overview" class="btn" title="Export a 5:7 portrait overview combining stats and charts">Export overview PNG</button>
+      </div>
       <div class="dash-cards">
         <div class="stat"><span class="stat-label">Avg $/day (active)</span><span class="stat-value" id="dash-avg-per-day">$0.00</span></div>
         <div class="stat"><span class="stat-label">Avg lifespan (finished)</span><span class="stat-value" id="dash-avg-lifespan">—</span></div>
@@ -308,11 +312,11 @@
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
-        <!-- v0.7.15: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+        <!-- v0.7.16: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
              when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
              bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
         <input name="bundleId" type="hidden">
-        <!-- v0.7.15: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+        <!-- v0.7.16: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
              Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
         <input name="imageUrl" type="hidden">
 
