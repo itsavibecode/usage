@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.14
+**Version:** v0.7.15
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.14)
+## Current status (v0.7.15)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.15 — 2026-04-26
+- **New: product thumbnails next to the name.** When a UPC lookup against UPCitemdb returns one or more product images, the first HTTPS image is now stored with the product and rendered as a small square thumbnail to the left of the product name — both in the desktop table and at the top of every mobile card. Existing products without an image just show the name as before; running a fresh UPC lookup on them (clear and re-enter the UPC, then accept the prefill prompt) populates the thumbnail. HTTP-only image URLs are skipped to avoid mixed-content blocks on the HTTPS-served site, and a broken-image fallback removes the `<img>` cleanly if the host ever fails.
 
 ### v0.7.14 — 2026-04-26
 - **Bundle guardrails: Continue-bundle dropdown shows fill state and disables full bundles.** Each option in **Continue existing bundle** now reads e.g. `Crest Toothpaste — Apr 12 (× 3) — 2/3` so you can see at a glance which bundles still have room. When all slots are filled, the option says `3/3 (full)` and is disabled (greyed by the browser, unselectable) so you can't accidentally try to continue a full bundle.

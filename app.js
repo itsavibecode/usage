@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.14
+/* Usage Tracker — v0.7.15
+ * v0.7.15: Product thumbnails — UPCitemdb image URL captured on lookup,
+ *   stored on the product, rendered as a small square next to the product
+ *   name in the desktop table and mobile cards. HTTPS-only (skips http://
+ *   to avoid mixed-content blocks); onerror handler removes broken images.
  * v0.7.14: Bundle guardrails — Continue-bundle dropdown shows fill state
  *   (e.g. "2/3" or "3/3 (full)") and disables full bundles. Position
  *   uniqueness is enforced on save with a helpful "try position N" suggestion.
@@ -58,7 +62,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.14';
+const APP_VERSION = '0.7.15';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -73,7 +77,7 @@ const FIELDS = [
   'startDate', 'endDate', 'cost', 'costWithTax',
   'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
-  'purchaseDate', 'notes', 'upc'
+  'purchaseDate', 'notes', 'upc', 'imageUrl'
 ];
 
 const ADD_NEW = '__add_new__';
@@ -677,6 +681,7 @@ function renderMobileCard(p) {
   return `
     <div class="mc${expanded ? ' mc-expanded' : ''}">
       <div class="mc-head">
+        ${p.imageUrl ? `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
         <span class="mc-type">${escapeHtml(p.productType)}</span>
         <span class="mc-status">${endLabel}</span>
       </div>
@@ -708,7 +713,7 @@ function renderRow(p) {
   // no duplicated event-handler wiring.
   tr.innerHTML = `
     <td>${p.productType ? `<button type="button" class="cell-chip" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
-    <td class="name-cell"><button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
+    <td class="name-cell">${p.imageUrl ? `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ''}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td>${formatDate(p.startDate)}</td>
     <td>${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
@@ -2307,6 +2312,15 @@ function applyUpcItemToForm(item) {
   if (parsed) {
     setIfEmpty('size', parsed.size);
     setIfEmpty('unit', parsed.unit);
+  }
+
+  // v0.7.15: capture the first HTTPS product image. Reject http:// because
+  // GitHub Pages serves us over HTTPS — mixed-content blocks would silently
+  // hide the thumbnail. Some UPCitemdb entries return zero images; that's
+  // fine, the cell just falls back to no thumbnail.
+  if (Array.isArray(item.images)) {
+    const httpsImage = item.images.find(u => /^https:\/\//i.test(u || ''));
+    if (httpsImage) setIfEmpty('imageUrl', httpsImage);
   }
 
   toast('Prefilled from UPC database');
