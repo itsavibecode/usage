@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.17
+**Version:** v0.7.18
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.17)
+## Current status (v0.7.18)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.18 — 2026-04-26
+- **Trend panel fix: "highest daily-cost category" insight now uses finished products only.** Previously this generator summed `$/day` across both finished and currently-active products. Active products use today's date as a preliminary endpoint, so their rate is a moving target — including them inflated the "burn rate" with not-yet-final data. The insight now waits until you have at least three finished products of any type before it'll fire, then reports the category with the highest combined real (finished) burn rate.
 
 ### v0.7.17 — 2026-04-26
 - **New: Activity log.** A new **Activity** tab sits alongside Table and Dashboard. Every product save records a timestamped entry — `Add`, `Edit`, `Duplicate`, or `Delete` — with the product name and type. Each entry has a clickable name link that opens the product's Edit dialog (or shows the name struck-through if the product has since been deleted). Dropdown selector lets you choose how many recent entries to show — **25 / 50 / 100 / 150**. A Clear button wipes the local log.

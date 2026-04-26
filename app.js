@@ -1,4 +1,6 @@
-/* Usage Tracker — v0.7.17
+/* Usage Tracker — v0.7.18
+ * v0.7.18: Trend panel fix — "highest daily-cost category" insight now uses
+ *   finished products only (no preliminary running rates from active items).
  * v0.7.17: Activity log — `createdAt` durable on Firestore products with
  *   one-time backfill migration; per-action log (add/edit/duplicate/delete)
  *   stored in localStorage per uid. New "Activity" tab alongside Table /
@@ -70,7 +72,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.17';
+const APP_VERSION = '0.7.18';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1289,11 +1291,16 @@ const INSIGHT_GENERATORS = [
     if (recent.length < 2) return null;
     return `You've finished ${recent.length} products in the last 30 days.`;
   },
-  // Highest per-day burn category
+  // Highest per-day burn category — v0.7.18: finished products only.
+  // Active products are still in progress; their `calcCostPerDay` uses today
+  // as the endpoint, which inflates the rate with not-yet-final data.
+  // Inventory has no startDate so it's already excluded by calcCostPerDay,
+  // but we filter explicitly to keep the rule self-evident in the code.
   function topPerDayCategory(ps) {
-    if (ps.filter(p => !isInventory(p)).length < 5) return null;
+    const finished = ps.filter(isFinished);
+    if (finished.length < 3) return null;
     const map = new Map();
-    for (const p of ps) {
+    for (const p of finished) {
       const v = calcCostPerDay(p);
       if (v == null || !isFinite(v) || v <= 0) continue;
       const k = p.productType || 'Unknown';
