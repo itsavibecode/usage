@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.13
+**Version:** v0.7.14
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.13)
+## Current status (v0.7.14)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.14 — 2026-04-26
+- **Bundle guardrails: Continue-bundle dropdown shows fill state and disables full bundles.** Each option in **Continue existing bundle** now reads e.g. `Crest Toothpaste — Apr 12 (× 3) — 2/3` so you can see at a glance which bundles still have room. When all slots are filled, the option says `3/3 (full)` and is disabled (greyed by the browser, unselectable) so you can't accidentally try to continue a full bundle.
+- **Bundle guardrails: position uniqueness on save.** If you try to save a bundle row with a position already claimed by another sibling, you get a clear toast: *"Position 2 is already taken by 'Crest 3D'. Try position 3 — that slot is open."* Editing the current row to its existing position still works fine (a row doesn't conflict with itself).
 
 ### v0.7.13 — 2026-04-26
 - **New: bundle slide-out panel.** Bundle chips in the table (and on mobile cards) are now buttons. Click one and a panel reveals below the row listing every product that's part of the same bundle — each sibling shows its position number, product name, and a status badge (active / inventory / finished). Click any sibling to jump to its Edit dialog. The current row is highlighted so you can tell where you started. The panel also shows how many slots are still unfilled (e.g. "1 slot unfilled"). On mobile, the same panel renders inline at the bottom of the card. Click the chip again, the × button, or another bundle's chip to close.

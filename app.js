@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.7.13
+/* Usage Tracker — v0.7.14
+ * v0.7.14: Bundle guardrails — Continue-bundle dropdown shows fill state
+ *   (e.g. "2/3" or "3/3 (full)") and disables full bundles. Position
+ *   uniqueness is enforced on save with a helpful "try position N" suggestion.
  * v0.7.13: Bundle model refactor — every bundled product now carries a shared
  *   `bundleId` linking siblings from the same multi-pack purchase. Clicking
  *   a bundle chip slides out a panel listing all members. One-time migration
@@ -55,7 +58,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.13';
+const APP_VERSION = '0.7.14';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1448,8 +1451,23 @@ function populateBundleSelect(el) {
   el.innerHTML = '';
   el.append(new Option('— New product (not continuing a bundle) —', ''));
   for (const b of bundlesList()) {
-    const label = `${b.productName} — ${formatDate(b.purchaseDate)} (× ${b.bundleSize})`;
-    el.append(new Option(label, b.id));
+    // v0.7.14: how many siblings already exist? Use bundleId when available
+    // (post-migration); fall back to name+date+size match for legacy rows.
+    const filled = b.bundleId
+      ? bundleSiblings(b.bundleId).length
+      : products.filter(p =>
+          p.bundleStatus &&
+          p.productName === b.productName &&
+          p.purchaseDate === b.purchaseDate &&
+          String(p.bundleSize) === String(b.bundleSize)
+        ).length;
+    const total = Number(b.bundleSize) || 0;
+    const isFull = total > 0 && filled >= total;
+    const fillStr = total > 0 ? ` — ${filled}/${total}${isFull ? ' (full)' : ''}` : '';
+    const label = `${b.productName} — ${formatDate(b.purchaseDate)} (× ${b.bundleSize})${fillStr}`;
+    const opt = new Option(label, b.id);
+    if (isFull) opt.disabled = true;
+    el.append(opt);
   }
 }
 
@@ -1681,6 +1699,35 @@ async function handleSubmit(e) {
     // v0.7.13: ensure bundleId is set. The hidden input carries it through
     // for Continue/Duplicate/Edit; brand-new bundles get a fresh one here.
     if (!data.bundleId) data.bundleId = newBundleId();
+    // v0.7.14: position uniqueness — no two siblings can claim the same
+    // bundlePosition. Editing the current row to its existing position is
+    // fine (the row IS itself, so it shouldn't conflict with itself). Only
+    // run this check when bundleId is real (post-migration / new bundles).
+    if (data.bundleId) {
+      const conflict = products.find(p =>
+        p.bundleId === data.bundleId &&
+        p.id !== editingId &&
+        Number(p.bundlePosition) === bp
+      );
+      if (conflict) {
+        // Suggest the next available position.
+        const taken = new Set(
+          products
+            .filter(p => p.bundleId === data.bundleId && p.id !== editingId)
+            .map(p => Number(p.bundlePosition))
+            .filter(n => isFinite(n) && n > 0)
+        );
+        let suggest = null;
+        for (let i = 1; i <= bs; i++) {
+          if (!taken.has(i)) { suggest = i; break; }
+        }
+        const suggestText = suggest != null
+          ? ` Try position ${suggest} — that slot is open.`
+          : ` All positions in this bundle are filled.`;
+        toast(`Position ${bp} is already taken by "${conflict.productName}".${suggestText}`);
+        return;
+      }
+    }
   } else {
     data.bundleSize = '';
     data.bundlePosition = '';
