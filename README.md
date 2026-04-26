@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.16
+**Version:** v0.7.17
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.16)
+## Current status (v0.7.17)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.17 — 2026-04-26
+- **New: Activity log.** A new **Activity** tab sits alongside Table and Dashboard. Every product save records a timestamped entry — `Add`, `Edit`, `Duplicate`, or `Delete` — with the product name and type. Each entry has a clickable name link that opens the product's Edit dialog (or shows the name struck-through if the product has since been deleted). Dropdown selector lets you choose how many recent entries to show — **25 / 50 / 100 / 150**. A Clear button wipes the local log.
+- **Storage choice:** activity entries are kept in `localStorage` per signed-in account (capped at 500, rolling). The product timestamps themselves (`createdAt`) live durably in Firestore so the moment a product was added is preserved even if you clear the browser. Existing products from before this update get a one-time `createdAt` backfill on first sign-in (inferred from `purchaseDate` / `startDate`, falling back to a 1970 sentinel for rows with neither).
+- The activity log is private to your browser — sharing the same Google account on another device starts a fresh log there.
 
 ### v0.7.16 — 2026-04-26
 - **New: PNG export — three formats.** Each product row now has a **PNG** button next to Edit / Duplicate / Delete that downloads a clean **4:3 product card** (1200×900) showing the product's image, type, name, status badge, started/ended dates, duration, cost, $/day, $/unit, size, and store. The Dashboard view also has two new buttons: **Export dashboard PNG** (4:3, 1600×1200) which captures every chart plus a stats strip, and **Export overview PNG** (5:7 portrait, 1000×1400) for share-friendly mobile-shaped output. All three exports are clean rendered cards — not screenshots of the live UI — so they don't include the toolbar, scroll bars, or any other page chrome.

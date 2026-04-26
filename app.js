@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.16
+/* Usage Tracker — v0.7.17
+ * v0.7.17: Activity log — `createdAt` durable on Firestore products with
+ *   one-time backfill migration; per-action log (add/edit/duplicate/delete)
+ *   stored in localStorage per uid. New "Activity" tab alongside Table /
+ *   Dashboard with 25/50/100/150 page-size selector and a Clear button.
  * v0.7.16: PNG export — per-product card (4:3, 1200×900), dashboard
  *   (4:3, 1600×1200), and overview (5:7 portrait, 1000×1400). Lazy-loaded
  *   html2canvas + custom off-screen templates so the output is a clean
@@ -66,7 +70,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.16';
+const APP_VERSION = '0.7.17';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -81,7 +85,7 @@ const FIELDS = [
   'startDate', 'endDate', 'cost', 'costWithTax',
   'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
-  'purchaseDate', 'notes', 'upc', 'imageUrl'
+  'purchaseDate', 'notes', 'upc', 'imageUrl', 'createdAt'
 ];
 
 const ADD_NEW = '__add_new__';
@@ -127,6 +131,27 @@ const expandedCards = new Set();
 // chip closes the prior one and opens the new one. Clicking the same chip
 // twice collapses. Reset on sign-out via expandedCards.clear() block below.
 let expandedBundleRow = null;
+
+// v0.7.17 — Activity log. Stored in localStorage per uid (NOT in Firestore)
+// because it doesn't need the same durability/sync guarantees as the product
+// data, and avoiding a new subcollection means no firestore.rules change is
+// required. Capped at 500 entries with a rolling window so the bucket stays
+// small. createdAt timestamps for the products themselves DO live in Firestore
+// (they're durable + synced); activity log entries are a derived view.
+const ACTIVITY_KEY_PREFIX = 'usage.activity.v1.';
+const ACTIVITY_MAX = 500;
+// v0.7.17: tracks whether the currently open Add dialog was opened via the
+// Duplicate button. Set by openDuplicateDialog, cleared on save or close.
+// Used so handleSubmit can log the correct action — 'duplicate' instead of
+// 'add' — when the user saves a duplicated row.
+let pendingDuplicateSourceId = null;
+
+let activityPageSize = (() => {
+  try {
+    const v = Number(localStorage.getItem('usage.activityPageSize.v1'));
+    return [25, 50, 100, 150].includes(v) ? v : 25;
+  } catch { return 25; }
+})();
 
 // Cell-click filters (v0.7.10). User clicks a Type / Buyer / Card cell to
 // drill down to "only rows where this column equals this value." Multiple
@@ -322,6 +347,8 @@ function subscribeData(uid) {
     // Runs in the background after first render — non-blocking, idempotent
     // (guarded by a per-user localStorage flag).
     migrateBundleIds(uid);
+    // v0.7.17: backfill createdAt on legacy products. Same pattern.
+    migrateCreatedAt(uid);
   }, err => {
     console.error('Products subscription error:', err);
     toast('Sync error: ' + err.message);
@@ -350,6 +377,87 @@ function unsubscribeData() {
   // doesn't briefly see a stale expanded row id from the previous session.
   expandedBundleRow = null;
   expandedCards.clear();
+}
+
+// v0.7.17 activity log helpers ----------------------------------------------
+
+function activityKey() {
+  return currentUser ? ACTIVITY_KEY_PREFIX + currentUser.uid : null;
+}
+
+function loadActivity() {
+  const k = activityKey();
+  if (!k) return [];
+  try {
+    const raw = localStorage.getItem(k);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function logActivity(action, p, summary = '') {
+  const k = activityKey();
+  if (!k) return;
+  const entry = {
+    ts: new Date().toISOString(),
+    action,
+    productId: p?.id || '',
+    productName: p?.productName || '(unnamed)',
+    productType: p?.productType || '',
+    summary
+  };
+  const list = loadActivity();
+  list.unshift(entry); // newest first
+  if (list.length > ACTIVITY_MAX) list.length = ACTIVITY_MAX;
+  try {
+    localStorage.setItem(k, JSON.stringify(list));
+  } catch {
+    // Storage quota or access denied — fail silently; activity log is best-effort.
+  }
+  // If the user is currently viewing the activity page, refresh it.
+  if (currentView === 'activity') renderActivity();
+}
+
+// v0.7.17 — one-time migration that backfills `createdAt` on legacy products
+// that were saved before this version. Uses purchaseDate || startDate || a
+// sentinel so existing rows still show *some* timestamp on the activity log
+// instead of "unknown". Per-user localStorage flag prevents re-running.
+const CREATEDAT_MIGRATION_KEY = 'usage.createdAtMigrated.v1';
+let createdAtMigrationRunning = false;
+
+async function migrateCreatedAt(uid) {
+  if (createdAtMigrationRunning) return;
+  const flagKey = `${CREATEDAT_MIGRATION_KEY}.${uid}`;
+  try {
+    if (localStorage.getItem(flagKey) === '1') return;
+  } catch {}
+  const needs = products.filter(p => !p.createdAt);
+  if (needs.length === 0) {
+    try { localStorage.setItem(flagKey, '1'); } catch {}
+    return;
+  }
+
+  createdAtMigrationRunning = true;
+  try {
+    let updated = 0;
+    for (const p of needs) {
+      // Best-effort timestamp inference. Convert YYYY-MM-DD to local-midnight
+      // ISO string. If neither date is set, use a 1970 sentinel so sorting
+      // still works without polluting "recent activity" displays.
+      const seedDate = p.purchaseDate || p.startDate || '1970-01-01';
+      const local = parseLocalDate(seedDate);
+      const iso = local ? local.toISOString() : new Date(0).toISOString();
+      await setDoc(productDoc(p.id, uid), { ...p, createdAt: iso });
+      updated++;
+    }
+    try { localStorage.setItem(flagKey, '1'); } catch {}
+    if (updated > 0) console.info(`createdAt backfilled on ${updated} legacy product${updated === 1 ? '' : 's'}.`);
+  } catch (err) {
+    console.error('createdAt migration failed:', err);
+  } finally {
+    createdAtMigrationRunning = false;
+  }
 }
 
 // v0.7.13 — one-time migration that groups existing bundled rows (that lack
@@ -1420,10 +1528,11 @@ function resetFilters() {
 }
 
 function setView(view) {
-  if (view !== 'table' && view !== 'dashboard') return;
+  if (view !== 'table' && view !== 'dashboard' && view !== 'activity') return;
   currentView = view;
   document.getElementById('view-table').hidden = view !== 'table';
   document.getElementById('view-dashboard').hidden = view !== 'dashboard';
+  document.getElementById('view-activity').hidden = view !== 'activity';
   for (const btn of document.querySelectorAll('.view-tab')) {
     const isActive = btn.dataset.view === view;
     btn.classList.toggle('is-active', isActive);
@@ -1431,6 +1540,51 @@ function setView(view) {
   }
   // Dashboard charts must render after the container is visible so Chart.js measures width correctly.
   if (view === 'dashboard') renderDashboard();
+  if (view === 'activity') renderActivity();
+}
+
+// v0.7.17 — render the activity log entries. Pulls from localStorage (newest
+// first), slices to the user's chosen page size, and renders. Re-runs on
+// view switch and after every logActivity write.
+function renderActivity() {
+  const list = document.getElementById('activity-list');
+  const empty = document.getElementById('activity-empty');
+  const sel = document.getElementById('activity-pagesize');
+  if (!list || !empty || !sel) return;
+  // Sync select to persisted size
+  sel.value = String(activityPageSize);
+
+  const all = loadActivity();
+  if (all.length === 0) {
+    list.innerHTML = '';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  const visible = all.slice(0, activityPageSize);
+  const shownText = visible.length < all.length
+    ? `Showing ${visible.length} of ${all.length} entries`
+    : `${all.length} ${all.length === 1 ? 'entry' : 'entries'}`;
+
+  const rows = visible.map(e => {
+    const date = new Date(e.ts);
+    const when = isNaN(date)
+      ? ''
+      : date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const actionClass = `activity-action activity-action-${e.action}`;
+    const actionLabel = e.action.charAt(0).toUpperCase() + e.action.slice(1);
+    const stillExists = !!products.find(p => p.id === e.productId);
+    const nameMarkup = stillExists
+      ? `<button type="button" class="activity-name-link" data-id="${e.productId}" title="Open this product">${escapeHtml(e.productName)}</button>`
+      : `<span class="activity-name-gone">${escapeHtml(e.productName)}</span>`;
+    return `<div class="activity-row">
+      <span class="activity-when">${escapeHtml(when)}</span>
+      <span class="${actionClass}">${actionLabel}</span>
+      <span class="activity-product">${nameMarkup}${e.productType ? ` <span class="activity-type">· ${escapeHtml(e.productType)}</span>` : ''}</span>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = `<div class="activity-summary">${shownText}</div>${rows}`;
 }
 
 /* ---------- select population ---------- */
@@ -1596,6 +1750,7 @@ function openEditDialog(id) {
 function closeDialog() {
   dialog().close();
   editingId = null;
+  pendingDuplicateSourceId = null; // v0.7.17 — clear duplicate flag on cancel
 }
 
 function handleContinueBundle(e) {
@@ -1639,6 +1794,7 @@ function openDuplicateDialog(id) {
   const source = products.find(p => p.id === id);
   if (!source) return;
   openAddDialog();
+  pendingDuplicateSourceId = id; // v0.7.17 — flagged for activity log
   const f = form();
   // Fields that should carry over from source. Excludes: id (new one assigned
   // on save), startDate/endDate (always blank — duplicate = new physical item),
@@ -1746,11 +1902,28 @@ async function handleSubmit(e) {
   }
 
   const id = editingId || newId();
+
+  // v0.7.17: createdAt — assign on first add, preserve on edit. Stored on the
+  // Firestore product so timestamps are durable and synced across devices.
+  if (!editingId) {
+    data.createdAt = new Date().toISOString();
+  } else {
+    const existing = products.find(p => p.id === editingId);
+    data.createdAt = existing?.createdAt || data.createdAt || new Date().toISOString();
+  }
+
   const saveBtn = document.getElementById('dialog-save');
   saveBtn.disabled = true;
   try {
-    await saveProduct({ id, ...data });
+    const product = { id, ...data };
+    await saveProduct(product);
     toast(editingId ? 'Product updated' : 'Product added');
+    // v0.7.17: log to activity feed AFTER successful save. Differentiate
+    // duplicate from plain add using the pendingDuplicateSourceId flag.
+    let action = editingId ? 'edit' : 'add';
+    if (!editingId && pendingDuplicateSourceId) action = 'duplicate';
+    logActivity(action, product);
+    pendingDuplicateSourceId = null;
     closeDialog();
   } catch {
     // toast already shown by saveProduct
@@ -1776,6 +1949,8 @@ function confirmDelete(id) {
     try {
       await deleteProduct(id);
       toast('Product deleted');
+      // v0.7.17: log delete to activity feed.
+      logActivity('delete', p);
     } catch {}
     finally { yes.disabled = false; }
     cd.close(); cleanup();
@@ -2851,6 +3026,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.7.16: dashboard PNG export buttons
   document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);
   document.getElementById('btn-export-overview')?.addEventListener('click', exportOverviewPng);
+
+  // v0.7.17: activity log controls
+  document.getElementById('activity-pagesize')?.addEventListener('change', e => {
+    const v = Number(e.target.value);
+    if ([25, 50, 100, 150].includes(v)) {
+      activityPageSize = v;
+      try { localStorage.setItem('usage.activityPageSize.v1', String(v)); } catch {}
+      renderActivity();
+    }
+  });
+  document.getElementById('btn-clear-activity')?.addEventListener('click', () => {
+    if (!confirm('Clear all activity entries from this browser? This cannot be undone.')) return;
+    const k = activityKey();
+    if (k) try { localStorage.removeItem(k); } catch {}
+    renderActivity();
+    toast('Activity log cleared');
+  });
+  // Click-through to product on activity rows
+  document.getElementById('activity-list')?.addEventListener('click', e => {
+    const link = e.target.closest('.activity-name-link');
+    if (link) openEditDialog(link.dataset.id);
+  });
 
   // v0.7.10: active filter chips bar — clicking a chip removes that filter,
   // clicking "Clear all" wipes all chip filters at once.

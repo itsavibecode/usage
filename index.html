@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.16">
+  <meta name="version" content="0.7.17">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.16</span>
+        <span class="version" id="version">v0.7.17</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -85,6 +85,7 @@
     <nav class="view-tabs" id="view-tabs" role="tablist" aria-label="View">
       <button type="button" class="view-tab is-active" data-view="table" role="tab" aria-selected="true">Table</button>
       <button type="button" class="view-tab" data-view="dashboard" role="tab" aria-selected="false">Dashboard</button>
+      <button type="button" class="view-tab" data-view="activity" role="tab" aria-selected="false">Activity</button>
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
@@ -176,6 +177,25 @@
       </div>
 
       <p class="empty-state" id="dash-empty" hidden>Add some products to see your dashboard.</p>
+    </section>
+
+    <section class="view" id="view-activity" role="tabpanel" hidden>
+      <div class="activity-controls">
+        <h2 class="activity-title">Activity log</h2>
+        <label class="activity-pagesize-wrap">
+          <span>Show</span>
+          <select id="activity-pagesize">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="150">150</option>
+          </select>
+          <span>most-recent entries</span>
+        </label>
+        <button type="button" id="btn-clear-activity" class="btn btn-ghost" title="Clear all activity entries from this browser">Clear</button>
+      </div>
+      <div class="activity-list" id="activity-list"></div>
+      <p class="empty-state" id="activity-empty" hidden>No activity recorded yet. Add, edit, duplicate, or delete a product and it'll show up here.</p>
     </section>
   </main>
 
@@ -312,11 +332,11 @@
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
-        <!-- v0.7.16: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+        <!-- v0.7.17: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
              when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
              bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
         <input name="bundleId" type="hidden">
-        <!-- v0.7.16: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+        <!-- v0.7.17: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
              Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
         <input name="imageUrl" type="hidden">
 

@@ -635,6 +635,121 @@ body.pretax-mode .products tbody td.cell-with-tax {
   flex-wrap: wrap;
 }
 
+/* v0.7.17 — Activity log view. New top-level tab with a page-size selector
+ * and a clear button. Entries render as compact rows with a timestamp,
+ * action chip, and product link. */
+.activity-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.activity-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.activity-pagesize-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.activity-pagesize-wrap select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: 13px;
+}
+#btn-clear-activity { margin-left: auto; }
+
+.activity-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.activity-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 180px 100px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.activity-row:last-child { border-bottom: none; }
+
+.activity-when {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.activity-action {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  width: max-content;
+}
+.activity-action-add { background: #e3f5ec; color: var(--success); }
+.activity-action-edit { background: #eef3ff; color: var(--primary); }
+.activity-action-duplicate { background: #fff3d6; color: #8a5a00; }
+.activity-action-delete { background: #fbeaea; color: var(--danger); }
+
+.activity-product { min-width: 0; }
+.activity-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.activity-name-link:hover { text-decoration: underline; }
+.activity-name-gone {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.activity-type {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .activity-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 10px 0;
+  }
+  .activity-when { font-size: 12px; }
+  #btn-clear-activity { margin-left: 0; }
+}
+
 /* v0.7.10 — clickable cell chips for Type / Buyer / Card. Hover/focus
  * suggests they're interactive; click filters the table to that value. */
 .cell-chip {
