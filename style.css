@@ -166,6 +166,54 @@ main {
   max-width: 100%;
 }
 
+/* v0.7.12 trends panel — sits above everything in the main view. Shows one
+ * "insight" or "did you know" line. Hidden when there are no products and
+ * when no real insight or cold-start fact applies. Computed once per page
+ * load; survives Firestore snapshot re-renders. */
+.trends-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+  border: 1px solid #d8def5;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.trends-panel[hidden] { display: none; }
+
+.trends-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.trends-tag-cold {
+  background: #7a4ad9;
+}
+
+.trends-text {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .trends-panel {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
 /* Display controls — small bar above the stats with a pre-tax toggle.
  * Sits flush with the stats bar above; on mobile it hugs the left edge. */
 .display-controls {

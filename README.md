@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.11
+**Version:** v0.7.12
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.11)
+## Current status (v0.7.12)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.12 — 2026-04-25
+- **New: trends panel above the stats bar.** Shows one rotating insight about your data — "You've spent the most on Toothpaste so far ($24.30 across 6 items)", "Your Crest Toothpaste has been going for 14 days — your longest active product right now", "You've finished 3 products in the last 30 days", and a few others. Five generators total, shuffled per page load so reloads surface different angles. When there's not enough data for a real insight (new accounts, or just one or two products), the panel falls back to a curated "Did you know" fact tied to a product type you actually have (toothbrush replacement timing, deodorant lifespan, shampoo water content, and so on — eight categories × three facts each). The panel hides itself entirely when there are zero products. Computed once per page load and frozen for the session, so Firestore snapshot updates don't reshuffle the line under you mid-glance.
 
 ### v0.7.11 — 2026-04-25
 - **New: three dashboard charts.**

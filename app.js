@@ -1,4 +1,9 @@
-/* Usage Tracker — v0.7.11
+/* Usage Tracker — v0.7.12
+ * v0.7.12: Trends panel above the stats bar. Five real-data insight
+ *   generators (most-spent category, longest active, recently finished,
+ *   top per-day burn, inventory pile-up) shuffled per page load; falls
+ *   back to a "Did you know" fact tied to a product type the user owns
+ *   when no generator can fire. Cached once per session.
  * v0.7.11: Three new dashboard charts — $/day by product type (burn rate),
  *   purchases by product type (frequency), and combined longest-running
  *   chart (active + past finished, top 10).
@@ -46,7 +51,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.11';
+const APP_VERSION = '0.7.12';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -302,6 +307,8 @@ function unsubscribeData() {
   destroyChart('perDayByType');
   destroyChart('countByType');
   destroyChart('longestRunning');
+  // v0.7.12: reset the trend-insight cache so next sign-in re-rolls fresh.
+  trendInsightCache = undefined;
 }
 
 /* ---------- recent-used helpers ---------- */
@@ -460,6 +467,7 @@ function renderActiveFilterBar() {
 }
 
 function render() {
+  renderTrendsPanel();
   renderTable();
   renderStats();
   renderDashboard();
@@ -875,6 +883,186 @@ function renderChartFinishedByMonth() {
 }
 
 function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+/* ---------- v0.7.12 trends panel ----------
+ * One rotating "insight" line above the stats bar. Two layers:
+ *   1) Real-data insights computed from the user's products. Each generator
+ *      returns a string when its conditions are met, otherwise null. We
+ *      shuffle the order on each page load so different insights surface
+ *      across reloads (per user batch-6 answer #2).
+ *   2) Cold-start "Did you know" facts keyed by product type, used when no
+ *      generator can fire (not enough data). Pulled from a static curated
+ *      corpus tied to a product type the user actually has.
+ * Computed once per page load and cached so Firestore snapshot updates
+ * don't re-roll the insight mid-session. Reset on sign-out.
+ */
+
+const COLD_START_FACTS = {
+  Underarm: [
+    "Most antiperspirants take a few days of consistent use before they hit peak effectiveness.",
+    "A standard stick deodorant lasts 2–3 months with daily use.",
+    "Aluminum-free deodorants typically wear off faster — many users report 3–5 hours of coverage."
+  ],
+  Toothbrush: [
+    "Toothbrushes should be replaced every 3 months — sooner if you've been sick.",
+    "Frayed bristles clean up to 30% less effectively than fresh ones.",
+    "An average person spends roughly 38 days of their life brushing their teeth."
+  ],
+  Toothpaste: [
+    "A typical 4oz tube lasts about 30 days for one person brushing twice daily.",
+    "Most dentists recommend a pea-sized amount per brush — about 0.25 grams.",
+    "Whitening toothpastes generally need 2–6 weeks of consistent use to show visible results."
+  ],
+  Floss: [
+    "A 50m roll is about 165 single-use lengths — roughly 2 months of daily flossing.",
+    "Waxed floss glides between tight teeth more easily but may catch less plaque than unwaxed.",
+    "Storing floss in a humid bathroom can degrade the wax coating faster than you'd expect."
+  ],
+  Mouthwash: [
+    "Most mouthwashes have a 2–3 year unopened shelf life and about a year after opening.",
+    "Alcohol-based rinses can dry out oral tissue with prolonged daily use — alternate days helps.",
+    "Therapeutic mouthwashes work best 30 minutes after brushing, not immediately after."
+  ],
+  Facewash: [
+    "A standard pump bottle delivers about 1.5–2ml per pump — roughly 150 uses per 8oz bottle.",
+    "Most face washes are formulated to work in 30–60 seconds of contact time.",
+    "Cleansers with active ingredients can lose potency 6–12 months after first opening."
+  ],
+  Shampoo: [
+    "A 12oz bottle lasts about 2 months for daily use — longer for shorter hair.",
+    "Most shampoos are 75–80% water by volume.",
+    "Sulfate-free shampoos lather less but tend to last about the same number of washes."
+  ],
+  Soap: [
+    "An 8oz bar lasts about 4 weeks for one person showering daily.",
+    "A liquid soap pump is roughly 1.5ml — about 250 pumps per 8oz bottle.",
+    "Glycerin soaps melt faster in humid bathrooms — store on a draining dish to extend life."
+  ]
+};
+
+// Each generator: takes the products array, returns a string or null.
+// Generators get shuffled per page load so the same one doesn't always win.
+const INSIGHT_GENERATORS = [
+  // Most-spent category
+  function topSpendCategory(ps) {
+    const used = ps.filter(p => !isInventory(p));
+    if (used.length < 3) return null;
+    const map = new Map();
+    for (const p of used) {
+      const k = p.productType || 'Unknown';
+      map.set(k, (map.get(k) || 0) + (allocatedCost(p) || 0));
+    }
+    const top = topEntry(map);
+    if (!top || top[1] <= 0) return null;
+    const count = used.filter(p => p.productType === top[0]).length;
+    return `You've spent the most on ${top[0]} so far — ${money(top[1])} across ${count} item${count === 1 ? '' : 's'}.`;
+  },
+  // Longest currently active product
+  function longestActive(ps) {
+    const active = ps.filter(isActive)
+      .map(p => ({ p, dur: calcDuration(p) }))
+      .filter(x => x.dur != null && x.dur >= 7)
+      .sort((a, b) => b.dur - a.dur);
+    if (active.length === 0) return null;
+    const x = active[0];
+    return `${x.p.productName} has been going for ${x.dur} days and counting — your longest active product right now.`;
+  },
+  // Recently finished products
+  function recentlyFinished(ps) {
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    const recent = ps.filter(p => {
+      if (!p.endDate) return false;
+      const d = parseLocalDate(p.endDate);
+      return d && d >= cutoff;
+    });
+    if (recent.length < 2) return null;
+    return `You've finished ${recent.length} products in the last 30 days.`;
+  },
+  // Highest per-day burn category
+  function topPerDayCategory(ps) {
+    if (ps.filter(p => !isInventory(p)).length < 5) return null;
+    const map = new Map();
+    for (const p of ps) {
+      const v = calcCostPerDay(p);
+      if (v == null || !isFinite(v) || v <= 0) continue;
+      const k = p.productType || 'Unknown';
+      map.set(k, (map.get(k) || 0) + v);
+    }
+    const top = topEntry(map);
+    if (!top || top[1] <= 0) return null;
+    return `${top[0]} is your highest daily-cost category, burning ${moneyFine(top[1])} per day.`;
+  },
+  // Inventory pile-up
+  function inventoryPileUp(ps) {
+    const inv = ps.filter(isInventory).length;
+    if (inv < 3) return null;
+    return `You have ${inv} item${inv === 1 ? '' : 's'} sitting in inventory — give one a Start date when you crack it open to start tracking its lifespan.`;
+  }
+];
+
+function pickRealInsight(ps) {
+  // Shuffle generator order each call so reloads surface different insights.
+  const gens = [...INSIGHT_GENERATORS].sort(() => Math.random() - 0.5);
+  for (const gen of gens) {
+    const result = gen(ps);
+    if (result) return result;
+  }
+  return null;
+}
+
+function pickColdStartFact(ps) {
+  if (ps.length === 0) return null;
+  const counts = new Map();
+  for (const p of ps) {
+    const t = p.productType;
+    if (!t) continue;
+    counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  for (const [type] of ranked) {
+    const facts = COLD_START_FACTS[type];
+    if (facts && facts.length) {
+      return { type, fact: facts[Math.floor(Math.random() * facts.length)] };
+    }
+  }
+  return null;
+}
+
+// Cache state: undefined = not yet computed (waiting for first non-empty
+// products snapshot); null = computed and got nothing; object = result.
+// Reset to undefined on sign-out so the next sign-in re-rolls a fresh
+// insight rather than reusing a stale one.
+let trendInsightCache;
+
+function computeTrendInsight() {
+  const real = pickRealInsight(products);
+  if (real) return { kind: 'real', text: real };
+  const cold = pickColdStartFact(products);
+  if (cold) return { kind: 'cold', text: cold.fact };
+  return null;
+}
+
+function renderTrendsPanel() {
+  const panel = document.getElementById('trends-panel');
+  if (!panel) return;
+  // Compute the insight on the FIRST render that has products. Subsequent
+  // renders (from snapshot updates, view switches, etc.) reuse the cached
+  // value — the panel doesn't re-roll mid-session.
+  if (trendInsightCache === undefined && products.length > 0) {
+    trendInsightCache = computeTrendInsight();
+  }
+  const insight = trendInsightCache;
+  if (!insight) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+  panel.hidden = false;
+  const tagLabel = insight.kind === 'real' ? 'Trend' : 'Did you know';
+  const tagClass = insight.kind === 'real' ? 'trends-tag' : 'trends-tag trends-tag-cold';
+  panel.innerHTML = `<span class="${tagClass}">${tagLabel}</span><span class="trends-text">${escapeHtml(insight.text)}</span>`;
+}
 
 // v0.7.11 charts ---------------------------------------------------------
 

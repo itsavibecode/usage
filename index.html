@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.11">
+  <meta name="version" content="0.7.12">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.11</span>
+        <span class="version" id="version">v0.7.12</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -62,6 +62,8 @@
   </section>
 
   <main id="main-wrap" hidden>
+    <section class="trends-panel" id="trends-panel" aria-live="polite" hidden></section>
+
     <div class="display-controls" aria-label="Display controls">
       <label class="pretax-toggle" title="Show all costs with or without tax">
         <input type="checkbox" id="pretax-toggle">
