@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.12
+/* Usage Tracker — v0.7.13
+ * v0.7.13: Bundle model refactor — every bundled product now carries a shared
+ *   `bundleId` linking siblings from the same multi-pack purchase. Clicking
+ *   a bundle chip slides out a panel listing all members. One-time migration
+ *   groups legacy rows. Duplicate of a bundled row inherits its bundleId.
  * v0.7.12: Trends panel above the stats bar. Five real-data insight
  *   generators (most-spent category, longest active, recently finished,
  *   top per-day burn, inventory pile-up) shuffled per page load; falls
@@ -51,7 +55,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.12';
+const APP_VERSION = '0.7.13';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -64,7 +68,7 @@ const SEED_PRODUCT_TYPES = [
 const FIELDS = [
   'id', 'productType', 'productName', 'size', 'unit',
   'startDate', 'endDate', 'cost', 'costWithTax',
-  'bundleStatus', 'bundleSize', 'bundlePosition',
+  'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
   'purchaseDate', 'notes', 'upc'
 ];
@@ -106,6 +110,12 @@ let preTaxMode = (() => {
 // Per-product expansion state survives re-renders (in-memory only — no
 // localStorage; users open detail temporarily, re-collapses on reload is fine).
 const expandedCards = new Set();
+
+// v0.7.13: only one row's bundle slide-out can be open at a time. Tracks the
+// product.id whose siblings panel is currently visible. Clicking a different
+// chip closes the prior one and opens the new one. Clicking the same chip
+// twice collapses. Reset on sign-out via expandedCards.clear() block below.
+let expandedBundleRow = null;
 
 // Cell-click filters (v0.7.10). User clicks a Type / Buyer / Card cell to
 // drill down to "only rows where this column equals this value." Multiple
@@ -249,6 +259,18 @@ function newId() {
   return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
 }
 
+// v0.7.13 — bundleId groups all sibling rows from the same multi-pack
+// purchase. Different purpose from product `id`, distinct for clarity.
+function newBundleId() { return 'b-' + newId(); }
+
+// Look up sibling rows for a given bundle. The originator row is the one
+// that started the bundle (bundlePosition unset OR === 1, the canonical
+// "bundle × N" chip). Sibling rows are the rest.
+function bundleSiblings(bundleId) {
+  if (!bundleId) return [];
+  return products.filter(p => p.bundleId === bundleId);
+}
+
 /* ---------- Firestore storage ---------- */
 
 function productsColl(uid = currentUser?.uid) {
@@ -285,6 +307,10 @@ function subscribeData(uid) {
     products = next;
     firstSnapshotSeen = true;
     render();
+    // v0.7.13: one-time migration to assign bundleId to legacy bundled rows.
+    // Runs in the background after first render — non-blocking, idempotent
+    // (guarded by a per-user localStorage flag).
+    migrateBundleIds(uid);
   }, err => {
     console.error('Products subscription error:', err);
     toast('Sync error: ' + err.message);
@@ -309,6 +335,81 @@ function unsubscribeData() {
   destroyChart('longestRunning');
   // v0.7.12: reset the trend-insight cache so next sign-in re-rolls fresh.
   trendInsightCache = undefined;
+  // v0.7.13: reset bundle-row expansion state on sign-out so the next user
+  // doesn't briefly see a stale expanded row id from the previous session.
+  expandedBundleRow = null;
+  expandedCards.clear();
+}
+
+// v0.7.13 — one-time migration that groups existing bundled rows (that lack
+// a bundleId from before this version) and assigns shared bundleIds plus
+// sequential positions. Heuristic: rows are siblings if they share the same
+// productName + purchaseDate + bundleSize. Edge case: if a user bought two
+// separate 3-packs of the same item on the same day, the migration merges
+// them — accepted risk for a personal usage tracker. Per-user flag in
+// localStorage so we don't re-run on subsequent sessions; flag is set even
+// when there's nothing to migrate so we don't re-scan every load.
+const BUNDLE_MIGRATION_KEY = 'usage.bundleIdMigrated.v1';
+let bundleMigrationRunning = false;
+
+async function migrateBundleIds(uid) {
+  if (bundleMigrationRunning) return;
+  const flagKey = `${BUNDLE_MIGRATION_KEY}.${uid}`;
+  try {
+    if (localStorage.getItem(flagKey) === '1') return;
+  } catch {}
+  const needs = products.filter(p => p.bundleStatus && !p.bundleId);
+  if (needs.length === 0) {
+    try { localStorage.setItem(flagKey, '1'); } catch {}
+    return;
+  }
+
+  bundleMigrationRunning = true;
+  try {
+    // Group by (productName, purchaseDate, bundleSize)
+    const groups = new Map();
+    for (const p of needs) {
+      const k = `${p.productName || ''}|${p.purchaseDate || ''}|${p.bundleSize || ''}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(p);
+    }
+
+    let updated = 0;
+    for (const [, members] of groups) {
+      const sharedBundleId = newBundleId();
+      // Sort by existing bundlePosition (if set), then by id for stability.
+      members.sort((a, b) => {
+        const ap = Number(a.bundlePosition);
+        const bp = Number(b.bundlePosition);
+        const aOk = isFinite(ap) && ap > 0;
+        const bOk = isFinite(bp) && bp > 0;
+        if (aOk && bOk) return ap - bp;
+        if (aOk) return -1;
+        if (bOk) return 1;
+        return String(a.id).localeCompare(String(b.id));
+      });
+      let nextPos = 1;
+      for (const m of members) {
+        const update = { ...m, bundleId: sharedBundleId };
+        const pos = Number(m.bundlePosition);
+        if (!isFinite(pos) || pos <= 0) {
+          update.bundlePosition = nextPos;
+          nextPos++;
+        } else {
+          nextPos = Math.max(nextPos, pos + 1);
+        }
+        await setDoc(productDoc(m.id, uid), update);
+        updated++;
+      }
+    }
+    try { localStorage.setItem(flagKey, '1'); } catch {}
+    if (updated > 0) toast(`Bundles migrated: ${updated} row${updated === 1 ? '' : 's'} grouped.`);
+  } catch (err) {
+    console.error('Bundle migration failed:', err);
+    // Don't set the flag on failure — retry next session.
+  } finally {
+    bundleMigrationRunning = false;
+  }
 }
 
 /* ---------- recent-used helpers ---------- */
@@ -502,7 +603,14 @@ function renderTable() {
     }
   } else {
     empty.hidden = true;
-    for (const p of visible) body.appendChild(renderRow(p));
+    for (const p of visible) {
+      body.appendChild(renderRow(p));
+      // v0.7.13: when this row's bundle chip has been tapped, inject a
+      // full-width sibling-list row immediately below it.
+      if (expandedBundleRow === p.id && p.bundleId) {
+        body.appendChild(renderBundleSiblingsRow(p));
+      }
+    }
   }
 
   document.querySelectorAll('#products-table thead th[data-sort]').forEach(th => {
@@ -543,11 +651,19 @@ function renderMobileCard(p) {
     p.cardLast4 ? '&bull;&bull; ' + escapeHtml(p.cardLast4) : null
   ].filter(Boolean).join(' &middot; ');
 
-  const bundleChip = p.bundleStatus
-    ? (p.bundlePosition
-        ? `<span class="badge badge-bundle-member">${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}</span>`
-        : `<span class="badge badge-bundle-origin">bundle &times; ${escapeHtml(p.bundleSize || '?')}</span>`)
-    : '';
+  // v0.7.13: clickable bundle chip on mobile too, opens the same sibling
+  // slide-out (rendered inline inside the card when expanded).
+  const bundleChip = (() => {
+    if (!p.bundleStatus) return '';
+    const label = p.bundlePosition
+      ? `${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}`
+      : `bundle &times; ${escapeHtml(p.bundleSize || '?')}`;
+    const cls = p.bundlePosition ? 'badge-bundle-member' : 'badge-bundle-origin';
+    if (p.bundleId) {
+      return `<button type="button" class="badge bundle-chip ${cls}" data-bundle-id="${escapeHtml(p.bundleId)}" data-row-id="${p.id}" title="Tap to see all bundle members">${label}</button>`;
+    }
+    return `<span class="badge ${cls}">${label}</span>`;
+  })();
 
   // Show-more expander: Where + Notes are tagged with .mc-row-extra so the
   // CSS can hide them by default. The button only renders if there's anything
@@ -570,6 +686,7 @@ function renderMobileCard(p) {
         ${p.notes ? `<div class="mc-row mc-row-extra mc-row-notes"><dt>Notes</dt><dd>${escapeHtml(p.notes)}</dd></div>` : ''}
       </dl>
       ${hasExtras ? `<button type="button" class="mc-more-btn" data-id="${p.id}">${expanded ? 'Show less' : 'Show more'}</button>` : ''}
+      ${(p.bundleId && expandedBundleRow === p.id) ? renderBundleSiblingsInline(p) : ''}
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
@@ -597,7 +714,20 @@ function renderRow(p) {
     <td class="num cell-with-tax">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
     <td class="num">${moneyFine(calcCostPerUnit(p))}</td>
     <td class="num">${moneyFine(calcCostPerDay(p))}</td>
-    <td>${p.bundleStatus ? (p.bundlePosition ? `<span class="badge badge-bundle-member">${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}</span>` : `<span class="badge badge-bundle-origin">bundle × ${escapeHtml(p.bundleSize || '?')}</span>`) : '—'}</td>
+    <td>${(() => {
+      if (!p.bundleStatus) return '—';
+      const label = p.bundlePosition
+        ? `${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}`
+        : `bundle &times; ${escapeHtml(p.bundleSize || '?')}`;
+      const cls = p.bundlePosition ? 'badge-bundle-member' : 'badge-bundle-origin';
+      // v0.7.13: clickable when bundleId is set — opens the slide-out sibling
+      // panel below the row. Pre-migration legacy rows (no bundleId yet) fall
+      // back to the static span until the migration runs.
+      if (p.bundleId) {
+        return `<button type="button" class="badge bundle-chip ${cls}" data-bundle-id="${escapeHtml(p.bundleId)}" data-row-id="${p.id}" title="Click to see all bundle members">${label}</button>`;
+      }
+      return `<span class="badge ${cls}">${label}</span>`;
+    })()}</td>
     <td>${escapeHtml(p.store) || '—'}</td>
     <td>${p.buyer ? `<button type="button" class="cell-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button>` : '—'}</td>
     <td>${p.cardLast4 ? `<button type="button" class="cell-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card •••• ${escapeHtml(p.cardLast4)}">•••• ${escapeHtml(p.cardLast4)}</button>` : '—'}</td>
@@ -627,6 +757,64 @@ function renderRow(p) {
     </td>
     <td class="mobile-card-cell">${renderMobileCard(p)}</td>
   `;
+  return tr;
+}
+
+// v0.7.13 — full-width row inserted below an expanded bundle row, listing
+// all sibling rows that share the same bundleId. Clicking a sibling jumps
+// to its Edit dialog. The current row is highlighted via .is-current.
+// Renders as a `<tr>` with a single colspan'd `<td>` so it spans the full
+// table width (18 desktop columns + 1 mobile-card-cell = 19 total).
+// Shared body of the slide-out panel — inner HTML only, used both for the
+// desktop full-width row and the mobile inline-in-card variant.
+function renderBundleSiblingsInner(p) {
+  const siblings = bundleSiblings(p.bundleId);
+  siblings.sort((a, b) => {
+    const ap = Number(a.bundlePosition);
+    const bp = Number(b.bundlePosition);
+    const aOk = isFinite(ap) && ap > 0;
+    const bOk = isFinite(bp) && bp > 0;
+    if (aOk && bOk) return ap - bp;
+    if (aOk) return -1;
+    if (bOk) return 1;
+    return 0;
+  });
+  const totalSlots = Number(p.bundleSize) || siblings.length;
+  const filled = siblings.length;
+  const remaining = Math.max(0, totalSlots - filled);
+  const items = siblings.map(s => {
+    const isCurrent = s.id === p.id;
+    const status = isFinished(s) ? 'finished' : isActive(s) ? 'active' : 'inventory';
+    const posLabel = s.bundlePosition ? `#${escapeHtml(s.bundlePosition)}` : '#?';
+    return `<button type="button" class="bundle-sibling${isCurrent ? ' is-current' : ''}" data-id="${s.id}" title="Click to edit ${escapeHtml(s.productName)}">
+      <span class="bundle-sibling-pos">${posLabel}</span>
+      <span class="bundle-sibling-name">${escapeHtml(s.productName) || '(unnamed)'}</span>
+      <span class="badge badge-${status}">${status}</span>
+    </button>`;
+  }).join('');
+  const remainingNote = remaining > 0
+    ? `<span class="bundle-siblings-remaining">${remaining} slot${remaining === 1 ? '' : 's'} unfilled — use <em>Continue existing bundle</em> in the Add dialog to fill the rest.</span>`
+    : '';
+  return `<div class="bundle-siblings">
+    <div class="bundle-siblings-header">
+      <span class="bundle-siblings-label">Bundle members <strong>${filled} of ${escapeHtml(String(totalSlots))}</strong></span>
+      <button type="button" class="bundle-siblings-close" data-bundle-close="1" title="Close">&times;</button>
+    </div>
+    <div class="bundle-siblings-list">${items}</div>
+    ${remainingNote}
+  </div>`;
+}
+
+function renderBundleSiblingsInline(p) {
+  return renderBundleSiblingsInner(p);
+}
+
+function renderBundleSiblingsRow(p) {
+  const tr = document.createElement('tr');
+  tr.className = 'bundle-siblings-row';
+  // colspan=19: 18 desktop columns + 1 mobile-card-cell. The cell spans the
+  // full table width so the panel reads as detail belonging to the row above.
+  tr.innerHTML = `<td colspan="19" class="bundle-siblings-cell">${renderBundleSiblingsInner(p)}</td>`;
   return tr;
 }
 
@@ -1395,6 +1583,13 @@ function handleContinueBundle(e) {
     if (el) el.value = source[key] ?? '';
   }
   f.elements.bundleStatus.checked = true;
+  // v0.7.13: copy the source's bundleId so this new row joins the same bundle.
+  // If the source somehow lacks a bundleId (pre-migration row that hasn't been
+  // migrated yet), generate a fresh one — and assign it to the source too on
+  // its next save. handleSubmit also defends against missing bundleId.
+  if (f.elements.bundleId) {
+    f.elements.bundleId.value = source.bundleId || newBundleId();
+  }
   // v0.7.5: do NOT autofill startDate. Pre-v0.7.3 we filled today's date here,
   // which fought the inventory concept introduced in v0.7.3 — users who left a
   // bundle row blank to mark it as inventory got today's date written over it
@@ -1432,6 +1627,13 @@ function openDuplicateDialog(id) {
     if (!el) continue;
     if (el.type === 'checkbox') el.checked = !!source[key];
     else el.value = source[key] ?? '';
+  }
+  // v0.7.13: if the source is bundled, the duplicate inherits the same
+  // bundleId so it becomes another sibling rather than starting a separate
+  // bundle. Position is intentionally NOT copied — siblings need unique
+  // positions; the user picks the next number when filling out the dialog.
+  if (source.bundleStatus && source.bundleId && f.elements.bundleId) {
+    f.elements.bundleId.value = source.bundleId;
   }
   // Today's purchaseDate is a sensible default for "I just bought another";
   // user can correct it if they're back-filling history.
@@ -1476,9 +1678,13 @@ async function handleSubmit(e) {
       toast(`Enter which number of the bundle this is (1 to ${bs})`);
       return;
     }
+    // v0.7.13: ensure bundleId is set. The hidden input carries it through
+    // for Continue/Duplicate/Edit; brand-new bundles get a fresh one here.
+    if (!data.bundleId) data.bundleId = newBundleId();
   } else {
     data.bundleSize = '';
     data.bundlePosition = '';
+    data.bundleId = '';
   }
 
   const id = editingId || newId();
@@ -2251,8 +2457,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const moreBtn = e.target.closest('.mc-more-btn');
     const notesChip = e.target.closest('.notes-chip');
     const cellChip = e.target.closest('.cell-chip');
+    const bundleChip = e.target.closest('.bundle-chip');
+    const bundleSibling = e.target.closest('.bundle-sibling');
+    const bundleClose = e.target.closest('.bundle-siblings-close');
     if (cellChip) {
       addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
+      return;
+    }
+    if (bundleChip) {
+      // Toggle the slide-out: clicking the same row's chip collapses;
+      // clicking a different row's chip switches to that row's bundle.
+      const rowId = bundleChip.dataset.rowId;
+      expandedBundleRow = (expandedBundleRow === rowId) ? null : rowId;
+      renderTable();
+      return;
+    }
+    if (bundleClose) {
+      expandedBundleRow = null;
+      renderTable();
+      return;
+    }
+    if (bundleSibling) {
+      openEditDialog(bundleSibling.dataset.id);
       return;
     }
     if (editBtn) openEditDialog(editBtn.dataset.id);

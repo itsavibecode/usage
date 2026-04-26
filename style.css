@@ -531,6 +531,138 @@ body.pretax-mode .products tbody td.cell-with-tax {
 .badge-bundle-origin { background: #d4e0fb; color: var(--primary-hover); font-weight: 600; }
 .badge-bundle-member { background: #eef2fc; color: #4a5a85; }
 
+/* v0.7.13: clickable bundle chip — same look as the .badge-bundle-* spans
+ * but with a button reset and a hover lift. Reuses .badge for base styling. */
+.bundle-chip {
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  transition: filter 0.12s, box-shadow 0.12s;
+}
+.bundle-chip:hover {
+  filter: brightness(0.95);
+  box-shadow: 0 1px 4px rgba(43, 95, 217, 0.18);
+}
+.bundle-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Slide-out sibling panel row — full-width row inserted below the clicked
+ * row in the products table. The TD has colspan="19" so it spans every
+ * column. The visual panel sits inside .bundle-siblings with rounded corners
+ * and a tinted background so it reads as detail, not as another row. */
+.bundle-siblings-row td.bundle-siblings-cell {
+  padding: 0 12px 12px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+.bundle-siblings {
+  background: linear-gradient(180deg, #eef3ff 0%, #f5f7ff 100%);
+  border: 1px solid #d4e0ff;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.bundle-siblings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.bundle-siblings-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+.bundle-siblings-label strong {
+  color: var(--primary);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+.bundle-siblings-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.bundle-siblings-close:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+
+.bundle-siblings-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bundle-sibling {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color 0.12s, background 0.12s;
+}
+.bundle-sibling:hover {
+  border-color: var(--primary);
+  background: #fff;
+}
+.bundle-sibling.is-current {
+  border-color: var(--primary);
+  background: #eef3ff;
+}
+.bundle-sibling-pos {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 12px;
+  min-width: 24px;
+  text-align: center;
+}
+.bundle-sibling-name {
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bundle-siblings-remaining {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.bundle-siblings-remaining em {
+  color: var(--primary);
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* On mobile the slide-out row is hidden by the existing rule that hides all
+ * non-mobile-card-cell tds. Inject the same content inside the mobile card
+ * itself when expanded — see app.js renderMobileCard for that logic.
+ * The .bundle-siblings styling stays identical inside the card. */
+@media (max-width: 720px) {
+  .bundle-siblings-row { display: none; }
+  .mc .bundle-siblings {
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+}
+
 /* "in use" indicator — smaller, on its own line under the duration number */
 .in-use-suffix {
   display: block;
