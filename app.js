@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.23
+/* Usage Tracker — v0.8.0
+ * v0.8.0: Price history per UPC. When two or more products share the same
+ *   UPC (recurring purchases of the same item), a "History" button appears
+ *   on each row → modal with line chart of cost over time + entry table
+ *   showing each purchase and its delta vs the first.
  * v0.7.23: QoL trio — UPC field autofocus on Add, `n` keyboard shortcut to
  *   open the Add dialog, and a small spinning indicator while a UPC lookup
  *   is in flight.
@@ -91,7 +95,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.23';
+const APP_VERSION = '0.8.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -839,6 +843,7 @@ function renderMobileCard(p) {
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
+        ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC">History</button>` : ''}
         <button type="button" class="export-btn" data-id="${p.id}" title="Export 4:3 PNG">PNG</button>
         <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
       </div>
@@ -903,6 +908,7 @@ function renderRow(p) {
     <td class="actions-cell">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
+      ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC across all purchases">History</button>` : ''}
       <button type="button" class="export-btn" data-id="${p.id}" title="Export this product as a 4:3 PNG card">PNG</button>
       <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
     </td>
@@ -1998,6 +2004,145 @@ function confirmDelete(id) {
     cd.close(); cleanup();
   };
   no.onclick = () => { cd.close(); cleanup(); };
+}
+
+/* ---------- v0.8.0 price history per UPC ---------- */
+
+let priceHistoryChart = null;
+
+// Build the time-series for a given UPC. Returns sorted-ascending list of
+// { product, date, cost, allocCost } points. Filters to entries with a
+// usable purchase date and a positive cost. Uses effectiveCost so the
+// pre-tax toggle (v0.7.6) carries through naturally.
+function getPriceHistoryForUpc(upc) {
+  if (!upc) return [];
+  return products
+    .filter(p => p.upc === upc)
+    .map(p => {
+      const d = parseLocalDate(p.purchaseDate || p.startDate);
+      const eff = effectiveCost(p);
+      const alloc = allocatedCost(p);
+      return { product: p, date: d, cost: eff, allocCost: alloc };
+    })
+    .filter(x => x.date && isFinite(x.cost) && x.cost > 0)
+    .sort((a, b) => a.date - b.date);
+}
+
+// How many same-UPC purchase entries exist? Used to decide whether to
+// render the "Price history" button on a row.
+function priceHistoryCount(upc) {
+  if (!upc) return 0;
+  return products.reduce((n, p) => p.upc === upc ? n + 1 : n, 0);
+}
+
+function openPriceHistory(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p || !p.upc) return;
+  const history = getPriceHistoryForUpc(p.upc);
+  if (history.length < 2) {
+    toast('Need at least 2 purchases of the same UPC to chart price history.');
+    return;
+  }
+
+  const dlg = document.getElementById('price-history-dialog');
+  document.getElementById('price-history-title').textContent =
+    `${p.productName || 'Product'} — Price history`;
+
+  const meta = document.getElementById('price-history-meta');
+  const first = history[0];
+  const last = history[history.length - 1];
+  const change = last.cost - first.cost;
+  const changePct = first.cost > 0 ? (change / first.cost) * 100 : 0;
+  const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+  meta.innerHTML = `
+    <div class="ph-meta-grid">
+      <div><span class="ph-meta-label">UPC</span><code>${escapeHtml(p.upc)}</code></div>
+      <div><span class="ph-meta-label">Purchases</span><strong>${history.length}</strong></div>
+      <div><span class="ph-meta-label">First</span>${money(first.cost)} <span class="ph-meta-sub">on ${formatDate(first.date.toISOString().slice(0, 10))}</span></div>
+      <div><span class="ph-meta-label">Latest</span>${money(last.cost)} <span class="ph-meta-sub">on ${formatDate(last.date.toISOString().slice(0, 10))}</span></div>
+      <div class="ph-meta-change ph-change-${direction}">
+        <span class="ph-meta-label">Change</span>
+        <strong>${change > 0 ? '+' : ''}${money(change)}</strong>
+        <span class="ph-meta-sub">(${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%)</span>
+      </div>
+    </div>
+    ${preTaxMode ? '<div class="ph-meta-note">Showing pre-tax prices.</div>' : '<div class="ph-meta-note">Showing prices with tax (where set).</div>'}
+  `;
+
+  // Table body: each entry with delta vs first purchase
+  const tbody = document.getElementById('price-history-table').querySelector('tbody');
+  tbody.innerHTML = history.map(h => {
+    const diff = h.cost - first.cost;
+    const cls = diff > 0 ? 'ph-row-up' : diff < 0 ? 'ph-row-down' : '';
+    const sign = diff > 0 ? '+' : '';
+    const diffText = h === first ? '—' : `${sign}${money(diff)}`;
+    return `<tr class="${cls}">
+      <td>${formatDate(h.date.toISOString().slice(0, 10))}</td>
+      <td class="num">${money(h.cost)}</td>
+      <td class="num ph-diff">${diffText}</td>
+      <td>${escapeHtml(h.product.store) || '—'}</td>
+      <td>${escapeHtml(h.product.buyer) || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  if (!dlg.open) dlg.showModal();
+  // Render chart after dialog is visible so canvas has dimensions
+  requestAnimationFrame(() => renderPriceHistoryChart(history));
+}
+
+function renderPriceHistoryChart(history) {
+  if (priceHistoryChart) {
+    try { priceHistoryChart.destroy(); } catch {}
+    priceHistoryChart = null;
+  }
+  const canvas = document.getElementById('price-history-canvas');
+  if (!canvas) return;
+  const labels = history.map(h => formatDate(h.date.toISOString().slice(0, 10)));
+  const values = history.map(h => round2(h.cost));
+  priceHistoryChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#2b5fd9',
+        backgroundColor: 'rgba(43, 95, 217, 0.08)',
+        borderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#2b5fd9',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        fill: true,
+        tension: 0.15
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => money(ctx.parsed.y) } }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: { callback: v => money(v) },
+          grid: { color: '#eef1f7' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function closePriceHistory() {
+  const dlg = document.getElementById('price-history-dialog');
+  if (dlg.open) dlg.close();
+  if (priceHistoryChart) {
+    try { priceHistoryChart.destroy(); } catch {}
+    priceHistoryChart = null;
+  }
 }
 
 /* ---------- v0.7.16 PNG export ---------- */
@@ -3155,6 +3300,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bundleSibling = e.target.closest('.bundle-sibling');
     const bundleClose = e.target.closest('.bundle-siblings-close');
     const exportBtn = e.target.closest('.export-btn');
+    const historyBtn = e.target.closest('.history-btn');
     if (cellChip) {
       addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
       return;
@@ -3177,6 +3323,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (exportBtn) { exportProductPng(exportBtn.dataset.id); return; }
+    if (historyBtn) { openPriceHistory(historyBtn.dataset.id); return; }
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
@@ -3237,6 +3384,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.7.16: dashboard PNG export buttons
   document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);
   document.getElementById('btn-export-overview')?.addEventListener('click', exportOverviewPng);
+
+  // v0.8.0: price history dialog close handlers
+  document.getElementById('price-history-close')?.addEventListener('click', closePriceHistory);
+  document.getElementById('price-history-done')?.addEventListener('click', closePriceHistory);
+  document.getElementById('price-history-dialog')?.addEventListener('close', () => {
+    if (priceHistoryChart) {
+      try { priceHistoryChart.destroy(); } catch {}
+      priceHistoryChart = null;
+    }
+  });
 
   // v0.7.17: activity log controls
   document.getElementById('activity-pagesize')?.addEventListener('change', e => {

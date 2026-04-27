@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.23
+**Version:** v0.8.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.23)
+## Current status (v0.8.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.8.0 — 2026-04-26
+- **New: Price history per UPC.** Whenever two or more of your products share the same UPC (e.g. recurring purchases of the same toothpaste), a **History** button appears on the row (and on the mobile card) next to Edit / Duplicate / PNG. Click it to see a line chart of cost over time across every purchase of that UPC, plus a table beneath showing each purchase, its store, buyer, and the delta vs the first purchase. Color-coded: rises in red, drops in green. Uses your current pre-tax / with-tax preference (the toggle above the stats bar) and labels which mode it's showing.
+- Helps answer "is this getting more expensive over time?" without scanning the table by hand.
 
 ### v0.7.23 — 2026-04-26
 - **QoL trio.**
