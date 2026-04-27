@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.13.0
+**Version:** v0.13.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.13.0)
+## Current status (v0.13.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.13.1 — 2026-04-27
+- **Fixed: Activity log now syncs across devices.** It was localStorage-only since v0.7.17, so signing in on another device meant a blank activity page even though the products themselves synced. Now stored at `/users/{uid}/activity/{logId}` in Firestore — same per-user isolation as everything else, no security rules change required (existing wildcard match already covers any subcollection). One-time migration on first sign-in after this update copies any localStorage entries into Firestore (and archives the local key to `usage.activity.v1.<uid>.migrated` rather than deleting). The Clear button now wipes the synced log everywhere, with a clearer confirm message reflecting that.
 
 ### v0.13.0 — 2026-04-27
 - **New: Open Graph + Twitter Card meta tags.** When you paste a link to the app into Slack, Discord, iMessage, Twitter/X, etc., the embed now renders a clean branded preview — Usage Tracker name, one-line description, and a 1200×630 SVG image with the wordmark, instead of the bare URL plain-text. `index.html`, `share.html`, and `404.html` each have appropriate tags. Caveat for share links: because the shared product data lives in the URL hash (`#d=...`) which crawlers can't see, the embed always shows generic share-page metadata — not the specific product. A future v0.13.x could add product-specific embeds via a parallel `?title=...&img=...` query that crawlers do see.

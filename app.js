@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.13.0
+/* Usage Tracker — v0.13.1
+ * v0.13.1: Activity log moved from localStorage to Firestore so it syncs
+ *   across devices (was per-browser before). One-time migration of legacy
+ *   localStorage entries on first run after this version. Cleared via the
+ *   Activity page's Clear button now wipes the synced log everywhere.
  * v0.13.0: Open Graph + Twitter Card meta tags so links render as branded
  *   embeds in Slack, Discord, iMessage, Twitter/X, etc. New og-image.svg
  *   at standard 1200x630. share.html and 404.html got tags too.
@@ -116,7 +120,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.13.0';
+const APP_VERSION = '0.13.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -445,6 +449,10 @@ function subscribeData(uid) {
     migrateBundleIds(uid);
     // v0.7.17: backfill createdAt on legacy products. Same pattern.
     migrateCreatedAt(uid);
+    // v0.13.1: load activity from Firestore + migrate any legacy
+    // localStorage entries on first run after this version. Guarded by
+    // activityLoaded so it only runs once per session.
+    if (!activityLoaded) initActivityForSession(uid);
   }, err => {
     console.error('Products subscription error:', err);
     toast('Sync error: ' + err.message);
@@ -477,28 +485,59 @@ function unsubscribeData() {
   // the same browser don't share L1 lookups (Firestore L2 is already
   // user-scoped via path, but this Map isn't).
   upcCache.clear();
+  // v0.13.1: clear activity cache so a different user signing in doesn't
+  // briefly see the prior user's entries before fetch resolves.
+  activityEntries = [];
+  activityLoaded = false;
 }
 
-// v0.7.17 activity log helpers ----------------------------------------------
+// v0.13.1 activity log — Firestore-backed (was localStorage in v0.7.17–v0.13.0).
+// Stored at /users/{uid}/activity/{logId}. The existing firestore.rules
+// wildcard `match /users/{userId}/{document=**}` already covers this path.
+// Per-user, syncs across devices, follows the same lifecycle as products.
+//
+// Legacy localStorage entries (`usage.activity.v1.<uid>`) are migrated once
+// per user on the first snapshot of this version, then the localStorage key
+// is left in place as a safety archive (NOT deleted) — same conservative
+// pattern the legacy products migration used.
 
 function activityKey() {
   return currentUser ? ACTIVITY_KEY_PREFIX + currentUser.uid : null;
 }
 
-function loadActivity() {
-  const k = activityKey();
-  if (!k) return [];
-  try {
-    const raw = localStorage.getItem(k);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+function activityColl(uid = currentUser?.uid) {
+  return collection(db, 'users', uid, 'activity');
 }
 
-function logActivity(action, p, summary = '') {
-  const k = activityKey();
-  if (!k) return;
+// In-memory cache of activity entries so the page render stays sync. Refreshed
+// after each logActivity write and on view switch / page-size change.
+let activityEntries = [];
+let activityLoaded = false;
+
+async function fetchActivityFromFirestore() {
+  if (!currentUser) { activityEntries = []; return; }
+  try {
+    const snap = await getDocs(activityColl());
+    const list = [];
+    snap.forEach(d => list.push({ _id: d.id, ...d.data() }));
+    list.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || ''))); // newest first
+    activityEntries = list;
+    activityLoaded = true;
+  } catch (e) {
+    console.warn('Activity fetch failed:', e);
+    activityEntries = [];
+  }
+}
+
+// Sync accessor used by renderActivity (which is called from various paths
+// that aren't async). Returns whatever's in the cache. The cache is filled
+// initially by `fetchActivityFromFirestore` after sign-in / view switch.
+function loadActivity() {
+  return activityEntries;
+}
+
+async function logActivity(action, p, summary = '') {
+  if (!currentUser) return;
   const entry = {
     ts: new Date().toISOString(),
     action,
@@ -507,15 +546,80 @@ function logActivity(action, p, summary = '') {
     productType: p?.productType || '',
     summary
   };
-  const list = loadActivity();
-  list.unshift(entry); // newest first
-  if (list.length > ACTIVITY_MAX) list.length = ACTIVITY_MAX;
+  // Write to Firestore (auto-id). doc(collection, ...) without id picks one.
   try {
-    localStorage.setItem(k, JSON.stringify(list));
-  } catch {
-    // Storage quota or access denied — fail silently; activity log is best-effort.
+    const ref = doc(activityColl());
+    await setDoc(ref, entry);
+    // Update in-memory cache so the activity page reflects the write
+    // immediately, without a roundtrip read.
+    activityEntries.unshift({ _id: ref.id, ...entry });
+    if (activityEntries.length > ACTIVITY_MAX) activityEntries.length = ACTIVITY_MAX;
+  } catch (e) {
+    console.warn('Activity write failed:', e);
+    // Fail silently — activity log is best-effort, not critical to the save.
+    return;
   }
   // If the user is currently viewing the activity page, refresh it.
+  if (currentView === 'activity') renderActivity();
+}
+
+// v0.13.1 — one-time migration of localStorage activity entries to Firestore.
+// Runs idempotently (per-uid flag) the first time a user signs in after this
+// version. Archives the legacy localStorage key as `.migrated` rather than
+// deleting outright, matching the same conservative pattern used by the
+// legacy products migration. Subsequent sessions short-circuit on the flag.
+const ACTIVITY_MIGRATION_KEY = 'usage.activityToFirestore.v1';
+
+async function migrateActivityFromLocalStorage(uid) {
+  const flagKey = `${ACTIVITY_MIGRATION_KEY}.${uid}`;
+  try { if (localStorage.getItem(flagKey) === '1') return; } catch {}
+  const localKey = ACTIVITY_KEY_PREFIX + uid;
+  let legacy = null;
+  try {
+    const raw = localStorage.getItem(localKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) legacy = parsed;
+    }
+  } catch {}
+  if (!legacy) {
+    // Nothing to migrate; set flag so we don't re-scan every session.
+    try { localStorage.setItem(flagKey, '1'); } catch {}
+    return;
+  }
+  try {
+    for (const entry of legacy) {
+      const ref = doc(activityColl(uid));
+      await setDoc(ref, {
+        ts: entry.ts || new Date(0).toISOString(),
+        action: entry.action || 'unknown',
+        productId: entry.productId || '',
+        productName: entry.productName || '(unnamed)',
+        productType: entry.productType || '',
+        summary: entry.summary || ''
+      });
+    }
+    try {
+      localStorage.setItem(flagKey, '1');
+      localStorage.setItem(localKey + '.migrated', localStorage.getItem(localKey));
+      localStorage.removeItem(localKey);
+    } catch {}
+    if (legacy.length > 0) {
+      toast(`Activity log moved to your account: ${legacy.length} entr${legacy.length === 1 ? 'y' : 'ies'}.`);
+    }
+  } catch (e) {
+    console.error('Activity migration failed:', e);
+    // Don't set flag — retry next session.
+  }
+}
+
+// Kicks off both migration (if needed) and initial fetch into the cache.
+// Called from the products onSnapshot handler so it runs once after sign-in.
+// Re-renders the activity view if it's currently visible, so the page swaps
+// from "Loading…" to populated content as soon as data arrives.
+async function initActivityForSession(uid) {
+  await migrateActivityFromLocalStorage(uid);
+  await fetchActivityFromFirestore();
   if (currentView === 'activity') renderActivity();
 }
 
@@ -1790,6 +1894,14 @@ function renderActivity() {
   if (!list || !empty || !sel) return;
   // Sync select to persisted size
   sel.value = String(activityPageSize);
+
+  // v0.13.1: distinguish "cache not yet loaded" from "no entries yet". The
+  // first happens before initActivityForSession resolves; the second after.
+  if (!activityLoaded && currentUser) {
+    list.innerHTML = '<p class="loading-state">Loading activity…</p>';
+    empty.hidden = true;
+    return;
+  }
 
   const all = loadActivity();
   if (all.length === 0) {
@@ -3733,12 +3845,24 @@ document.addEventListener('DOMContentLoaded', () => {
       renderActivity();
     }
   });
-  document.getElementById('btn-clear-activity')?.addEventListener('click', () => {
-    if (!confirm('Clear all activity entries from this browser? This cannot be undone.')) return;
-    const k = activityKey();
-    if (k) try { localStorage.removeItem(k); } catch {}
-    renderActivity();
-    toast('Activity log cleared');
+  document.getElementById('btn-clear-activity')?.addEventListener('click', async () => {
+    if (!currentUser) return;
+    if (!confirm('Clear all activity entries from your account? This cannot be undone and affects every device you sign in with.')) return;
+    const btn = document.getElementById('btn-clear-activity');
+    if (btn) btn.disabled = true;
+    try {
+      const snap = await getDocs(activityColl());
+      const deletes = [];
+      snap.forEach(d => deletes.push(deleteDoc(doc(db, 'users', currentUser.uid, 'activity', d.id))));
+      await Promise.all(deletes);
+      activityEntries = [];
+      renderActivity();
+      toast('Activity log cleared');
+    } catch (e) {
+      toast('Clear failed: ' + e.message);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
   // Click-through to product on activity rows
   document.getElementById('activity-list')?.addEventListener('click', e => {
