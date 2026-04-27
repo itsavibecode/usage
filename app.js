@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.11.0
+/* Usage Tracker — v0.12.0
+ * v0.12.0: Multi-currency display. User picks one of 15 common currencies in
+ *   the display-controls bar; all $ rendering throughout the app routes
+ *   through Intl.NumberFormat with that currency code. Cost-input prefix
+ *   updates to the chosen symbol too. Underlying numbers don't convert —
+ *   it's a display preference, suitable for personal trackers in one
+ *   currency at a time.
  * v0.11.0: Read-only share link. New standalone share.html page renders
  *   a base64-encoded product payload as a clean public card. Share button
  *   per row + mobile card opens a dialog with the link + copy-to-clipboard.
@@ -107,7 +113,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.12.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -292,17 +298,67 @@ function isFinished(p) { return !!p.endDate; }
 
 /* ---------- formatting ---------- */
 
-const usdFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency', currency: 'USD',
-  minimumFractionDigits: 2, maximumFractionDigits: 2
-});
-const usdFineFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency', currency: 'USD',
-  minimumFractionDigits: 2, maximumFractionDigits: 4
-});
+// v0.12.0 multi-currency. User picks one currency for display; all $/€/£
+// rendering goes through Intl.NumberFormat with that ISO code. Underlying
+// stored numbers don't change — only the formatting symbol + locale rules.
+// Persisted in localStorage. Existing data is assumed to be in whichever
+// currency is active when it was entered (we don't store per-product
+// currency in v0.12.0; that's a future extension if the user travels often).
+const CURRENCY_KEY = 'usage.currency.v1';
+const SUPPORTED_CURRENCIES = [
+  { code: 'USD', label: 'US Dollar' },
+  { code: 'EUR', label: 'Euro' },
+  { code: 'GBP', label: 'British Pound' },
+  { code: 'CAD', label: 'Canadian Dollar' },
+  { code: 'AUD', label: 'Australian Dollar' },
+  { code: 'JPY', label: 'Japanese Yen' },
+  { code: 'INR', label: 'Indian Rupee' },
+  { code: 'MXN', label: 'Mexican Peso' },
+  { code: 'CHF', label: 'Swiss Franc' },
+  { code: 'CNY', label: 'Chinese Yuan' },
+  { code: 'BRL', label: 'Brazilian Real' },
+  { code: 'KRW', label: 'South Korean Won' },
+  { code: 'NZD', label: 'New Zealand Dollar' },
+  { code: 'SEK', label: 'Swedish Krona' },
+  { code: 'NOK', label: 'Norwegian Krone' }
+];
+let userCurrency = (() => {
+  try {
+    const v = localStorage.getItem(CURRENCY_KEY);
+    if (v && SUPPORTED_CURRENCIES.some(c => c.code === v)) return v;
+  } catch {}
+  return 'USD';
+})();
 
-const money = n => (n == null || !isFinite(Number(n))) ? '—' : usdFormatter.format(Number(n));
-const moneyFine = n => (n == null || !isFinite(Number(n))) ? '—' : usdFineFormatter.format(Number(n));
+// Cached formatters — rebuilt when currency changes. Map keyed by precision
+// since the dashboard uses both 2-decimal and 4-decimal variants.
+let _moneyFormatters = { code: '', coarse: null, fine: null };
+function getMoneyFormatters() {
+  if (_moneyFormatters.code === userCurrency) return _moneyFormatters;
+  // For zero-decimal currencies (JPY, KRW), Intl ignores minimumFractionDigits
+  // by default — that's fine, the formatter renders ¥1234 / ₩1234.
+  _moneyFormatters = {
+    code: userCurrency,
+    coarse: new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: userCurrency,
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    }),
+    fine: new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: userCurrency,
+      minimumFractionDigits: 2, maximumFractionDigits: 4
+    })
+  };
+  return _moneyFormatters;
+}
+
+const money = n => {
+  if (n == null || !isFinite(Number(n))) return '—';
+  return getMoneyFormatters().coarse.format(Number(n));
+};
+const moneyFine = n => {
+  if (n == null || !isFinite(Number(n))) return '—';
+  return getMoneyFormatters().fine.format(Number(n));
+};
 
 function formatDate(str) {
   const d = parseLocalDate(str);
@@ -1638,6 +1694,49 @@ function renderChartLongestRunning() {
 // triggered separately by the caller — this is purely presentational.
 function applyPreTaxMode() {
   document.body.classList.toggle('pretax-mode', preTaxMode);
+}
+
+// v0.12.0: derive the currency symbol from the active currency for use in
+// the dialog's currency-prefix decoration. Intl.NumberFormat → formatToParts
+// returns the symbol for the user's locale (so "$" for USD, "€" for EUR,
+// "¥" for JPY, etc., respecting where the symbol normally appears).
+function currentCurrencySymbol() {
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: userCurrency
+    }).formatToParts(0);
+    const sym = parts.find(p => p.type === 'currency');
+    return sym ? sym.value : userCurrency;
+  } catch {
+    return userCurrency;
+  }
+}
+
+function applyCurrencySymbol() {
+  const sym = currentCurrencySymbol();
+  for (const el of document.querySelectorAll('[data-currency-symbol]')) {
+    el.textContent = sym;
+  }
+}
+
+function populateCurrencySelect() {
+  const sel = document.getElementById('currency-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (const c of SUPPORTED_CURRENCIES) {
+    const sym = (() => {
+      try {
+        const parts = new Intl.NumberFormat(undefined, {
+          style: 'currency', currency: c.code
+        }).formatToParts(0);
+        const s = parts.find(p => p.type === 'currency');
+        return s ? s.value : c.code;
+      } catch { return c.code; }
+    })();
+    const opt = new Option(`${c.code} (${sym}) — ${c.label}`, c.code);
+    sel.appendChild(opt);
+  }
+  sel.value = userCurrency;
 }
 
 function setFilter(filter) {
@@ -3652,6 +3751,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const chip = e.target.closest('.filter-chip');
     if (chip) removeFilter(chip.dataset.clearCol);
   });
+
+  // v0.12.0: currency selector. Populate with supported codes, sync to
+  // persisted user choice, wire change handler that re-renders everything
+  // monetary (which is most things).
+  populateCurrencySelect();
+  applyCurrencySymbol();
+  const currencySel = document.getElementById('currency-select');
+  if (currencySel) {
+    currencySel.addEventListener('change', () => {
+      const next = currencySel.value;
+      if (!SUPPORTED_CURRENCIES.some(c => c.code === next)) return;
+      userCurrency = next;
+      try { localStorage.setItem(CURRENCY_KEY, next); } catch {}
+      _moneyFormatters = { code: '', coarse: null, fine: null }; // invalidate
+      applyCurrencySymbol();
+      render();
+      toast(`Currency set to ${next}`);
+    });
+  }
 
   // Pre-tax display toggle. Sync DOM to persisted state, then wire change.
   const preTaxToggle = document.getElementById('pretax-toggle');

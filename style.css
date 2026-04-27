@@ -319,7 +319,43 @@ main {
 .display-controls {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* v0.12.0 currency selector. Sits next to the pre-tax toggle. */
+.currency-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.currency-selector-label {
+  font-weight: 500;
+}
+#currency-select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  min-height: 30px;
+  max-width: 220px;
+}
+#currency-select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  border-color: var(--primary);
+}
+
+@media (max-width: 720px) {
+  .display-controls { justify-content: flex-start; }
+  #currency-select { max-width: 180px; }
 }
 
 .pretax-toggle {

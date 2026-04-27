@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.11.0
+**Version:** v0.12.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.11.0)
+## Current status (v0.12.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.12.0 — 2026-04-26
+- **New: Multi-currency display.** A currency selector appears in the display-controls bar above the stats with 15 common options — USD, EUR, GBP, CAD, AUD, JPY, INR, MXN, CHF, CNY, BRL, KRW, NZD, SEK, NOK. Pick one and every dollar value across the table, stats, dashboard, charts, mobile cards, and exports renders in that currency, using your browser's locale conventions for symbol placement and decimals (so `$1,234.56` becomes `1.234,56 €` for a European visitor selecting EUR, `¥1,234` for JPY's no-decimal rendering, etc.). The cost-input prefix in the Add/Edit dialog updates to match. Choice persists per browser. Note: this is a display setting only — underlying stored numbers don't convert. If you bought toothpaste for $3.99 USD and switch to EUR, it'll show as €3.99 (not converted). Suitable for users who track in one currency at a time, including travelers who switch when they relocate.
 
 ### v0.11.0 — 2026-04-26
 - **New: Read-only share links.** Every row and mobile card now has a **Share** button. Click it to get a public URL that anyone can open to see a clean read-only card view of just that product — its image, name, type, status, dates, duration, size, cost, store, bundle position, and UPC. The recipient can't edit anything, can't see your other products, and doesn't need a Google account. The shared data lives entirely in the URL itself (base64-encoded after `share.html#d=...`), so nothing is stored server-side and the link can't outlive your control of it. Sensitive fields (buyer, card-last-4, notes, internal IDs) are deliberately NOT included. The dialog has a "Copy link" button (plus an "Open in new tab" button to preview what the recipient will see).

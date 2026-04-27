@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.11.0">
+  <meta name="version" content="0.12.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.11.0</span>
+        <span class="version" id="version">v0.12.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -64,12 +64,17 @@
   <main id="main-wrap" hidden>
     <section class="trends-panel" id="trends-panel" aria-live="polite" hidden></section>
 
-    <!-- v0.11.0: Reorder reminders. For each currently-active product whose
+    <!-- v0.12.0: Reorder reminders. For each currently-active product whose
          duration is approaching or past the average lifespan of its same-type
          finished siblings, surface a small alert. Hidden when none apply. -->
     <section class="reminders-panel" id="reminders-panel" aria-label="Reorder reminders" hidden></section>
 
     <div class="display-controls" aria-label="Display controls">
+      <!-- v0.12.0: currency selector -->
+      <label class="currency-selector" title="Display all costs in this currency">
+        <span class="currency-selector-label">Currency</span>
+        <select id="currency-select"></select>
+      </label>
       <label class="pretax-toggle" title="Show all costs with or without tax">
         <input type="checkbox" id="pretax-toggle">
         <span class="pretax-track" aria-hidden="true"><span class="pretax-thumb"></span></span>
@@ -235,7 +240,7 @@
             </button>
           </div>
           <span class="upc-status" id="upc-status" aria-live="polite"></span>
-          <!-- v0.11.0: Amazon search link, only shown when UPC has 8+ digits.
+          <!-- v0.12.0: Amazon search link, only shown when UPC has 8+ digits.
                Opens amazon.com/s?k={upc} in a new tab so the user can check
                the current market price for this item. -->
           <a id="upc-check-amazon" class="upc-check-link" href="#" target="_blank" rel="noopener" hidden>Check current price on Amazon &#x2197;</a>
@@ -293,7 +298,7 @@
         <label class="field">
           <span>Cost (pre-tax) <em>*</em></span>
           <div class="currency-wrap">
-            <span class="currency-prefix">$</span>
+            <span class="currency-prefix" data-currency-symbol>$</span>
             <input name="cost" type="number" step="0.01" min="0" required placeholder="0.00">
           </div>
         </label>
@@ -301,7 +306,7 @@
         <label class="field">
           <span>Cost with tax</span>
           <div class="currency-wrap">
-            <span class="currency-prefix">$</span>
+            <span class="currency-prefix" data-currency-symbol>$</span>
             <input name="costWithTax" type="number" step="0.01" min="0" placeholder="0.00">
           </div>
         </label>
@@ -341,11 +346,11 @@
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
-        <!-- v0.11.0: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+        <!-- v0.12.0: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
              when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
              bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
         <input name="bundleId" type="hidden">
-        <!-- v0.11.0: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+        <!-- v0.12.0: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
              Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
         <input name="imageUrl" type="hidden">
 
@@ -371,7 +376,7 @@
     </div>
   </dialog>
 
-  <!-- v0.11.0: Share dialog. Read-only share-link generator. Encodes a
+  <!-- v0.12.0: Share dialog. Read-only share-link generator. Encodes a
        curated subset of the product into a base64 URL hash that points at
        share.html. Self-contained recipient page; no auth required to view. -->
   <dialog id="share-dialog" class="share-dialog">
@@ -393,7 +398,7 @@
     </footer>
   </dialog>
 
-  <!-- v0.11.0: Price history per UPC. Shows a line chart of cost over time
+  <!-- v0.12.0: Price history per UPC. Shows a line chart of cost over time
        for products sharing the same UPC, plus a small entry table beneath. -->
   <dialog id="price-history-dialog" class="price-history-dialog">
     <header class="dialog-header">
