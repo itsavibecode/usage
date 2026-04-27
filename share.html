@@ -3,9 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.12.0">
+  <meta name="version" content="0.13.0">
   <title>Shared product · Usage Tracker</title>
+  <meta name="description" content="A read-only product card shared from Usage Tracker.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- v0.13.0: Open Graph + Twitter Cards. Note: the actual product data
+       lives in the URL hash (#d=...) which crawlers can't read, so embeds
+       always show generic share-page metadata, not the specific product
+       being shared. A future v0.13.x could add product-specific embeds via
+       a parallel ?title=...&img=... query that crawlers see. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Usage Tracker">
+  <meta property="og:title" content="Shared product · Usage Tracker">
+  <meta property="og:description" content="A read-only product card shared from Usage Tracker. Open the link to see what they tracked.">
+  <meta property="og:image" content="https://itsavibecode.github.io/usage/og-image.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Usage Tracker — personal product usage tracker">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Shared product · Usage Tracker">
+  <meta name="twitter:description" content="A read-only product card shared from Usage Tracker.">
+  <meta name="twitter:image" content="https://itsavibecode.github.io/usage/og-image.svg">
   <style>
     /* Self-contained styles — no dependency on style.css. The share page
        loads from a clean URL and shouldn't rely on the main bundle (which

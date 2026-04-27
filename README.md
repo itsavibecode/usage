@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.12.0
+**Version:** v0.13.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.12.0)
+## Current status (v0.13.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.13.0 — 2026-04-27
+- **New: Open Graph + Twitter Card meta tags.** When you paste a link to the app into Slack, Discord, iMessage, Twitter/X, etc., the embed now renders a clean branded preview — Usage Tracker name, one-line description, and a 1200×630 SVG image with the wordmark, instead of the bare URL plain-text. `index.html`, `share.html`, and `404.html` each have appropriate tags. Caveat for share links: because the shared product data lives in the URL hash (`#d=...`) which crawlers can't see, the embed always shows generic share-page metadata — not the specific product. A future v0.13.x could add product-specific embeds via a parallel `?title=...&img=...` query that crawlers do see.
+- The OG image is an SVG (`og-image.svg`); platforms that require raster (notably Twitter/X) will fall back to no image but still render the title/description text. Adding a parallel `og-image.png` for full coverage is a follow-up — easiest path is to screenshot the SVG at 1200×630 in a browser, save as PNG, commit, and add a second `og:image` tag.
 
 ### v0.12.0 — 2026-04-26
 - **New: Multi-currency display.** A currency selector appears in the display-controls bar above the stats with 15 common options — USD, EUR, GBP, CAD, AUD, JPY, INR, MXN, CHF, CNY, BRL, KRW, NZD, SEK, NOK. Pick one and every dollar value across the table, stats, dashboard, charts, mobile cards, and exports renders in that currency, using your browser's locale conventions for symbol placement and decimals (so `$1,234.56` becomes `1.234,56 €` for a European visitor selecting EUR, `¥1,234` for JPY's no-decimal rendering, etc.). The cost-input prefix in the Add/Edit dialog updates to match. Choice persists per browser. Note: this is a display setting only — underlying stored numbers don't convert. If you bought toothpaste for $3.99 USD and switch to EUR, it'll show as €3.99 (not converted). Suitable for users who track in one currency at a time, including travelers who switch when they relocate.

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- v0.13.0 — Open Graph share image for Usage Tracker.
+     1200x630 is the standard OG/Twitter Cards aspect ratio.
+     SVG works for Discord, Telegram, and OG processors that support it;
+     platforms that require raster (Twitter/X, Facebook) will fall back to
+     no image but still render the title/description text from the meta
+     tags. A follow-up could be to screenshot this at 1200x630 and commit
+     a parallel og-image.png for full coverage. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#1a2238"/>
+  <!-- subtle accent stripe along the left edge -->
+  <rect x="0" y="0" width="12" height="630" fill="#2b5fd9"/>
+  <!-- icon: simple square with rounded corners + checkmark/strokes evoking the favicon -->
+  <g transform="translate(80, 100)">
+    <rect width="120" height="120" rx="20" fill="#2b5fd9"/>
+    <rect x="28" y="28" width="64" height="10" rx="2" fill="#ffffff" opacity="0.95"/>
+    <rect x="28" y="48" width="44" height="10" rx="2" fill="#ffffff" opacity="0.75"/>
+    <rect x="28" y="68" width="56" height="10" rx="2" fill="#ffffff" opacity="0.85"/>
+    <rect x="28" y="88" width="36" height="10" rx="2" fill="#ffffff" opacity="0.65"/>
+  </g>
+  <!-- wordmark -->
+  <text x="80" y="380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="100" font-weight="700" fill="#ffffff" letter-spacing="-2">Usage Tracker</text>
+  <!-- tagline -->
+  <text x="80" y="430" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="32" font-weight="400" fill="#bcd0f5">Personal product usage tracker</text>
+  <!-- secondary line -->
+  <text x="80" y="478" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="400" fill="#7a9ad9">Log everyday products &#8226; see $/day cost &#8226; track lifespans</text>
+  <!-- domain in bottom-right -->
+  <text x="1120" y="580" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="500" fill="#ffffff" opacity="0.6">itsavibecode.github.io/usage</text>
+</svg>

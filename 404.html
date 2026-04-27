@@ -3,9 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.12.0">
+  <meta name="version" content="0.13.0">
   <title>Page not found · Usage Tracker</title>
+  <meta name="description" content="That URL on Usage Tracker doesn't exist — the link may be broken, or the page may have moved.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <!-- v0.13.0: minimal OG tags so a broken link still produces a sane embed -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Usage Tracker">
+  <meta property="og:title" content="Page not found · Usage Tracker">
+  <meta property="og:description" content="That URL on Usage Tracker doesn't exist. Visit the main app to start tracking your own products.">
+  <meta property="og:image" content="https://itsavibecode.github.io/usage/og-image.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Page not found · Usage Tracker">
+  <meta name="twitter:description" content="That URL on Usage Tracker doesn't exist.">
+  <meta name="twitter:image" content="https://itsavibecode.github.io/usage/og-image.svg">
   <style>
     /* Self-contained styles — no dependency on style.css so this page renders
        cleanly even if the rest of the build breaks. Mirrors the production
@@ -126,7 +137,7 @@
       <a href="/usage/" class="btn">Back to Usage Tracker</a>
       <div class="footer">
         <span class="brand">Usage Tracker</span>
-        <span class="version">v0.12.0</span>
+        <span class="version">v0.13.0</span>
       </div>
     </section>
   </main>

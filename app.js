@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.12.0
+/* Usage Tracker — v0.13.0
+ * v0.13.0: Open Graph + Twitter Card meta tags so links render as branded
+ *   embeds in Slack, Discord, iMessage, Twitter/X, etc. New og-image.svg
+ *   at standard 1200x630. share.html and 404.html got tags too.
  * v0.12.0: Multi-currency display. User picks one of 15 common currencies in
  *   the display-controls bar; all $ rendering throughout the app routes
  *   through Intl.NumberFormat with that currency code. Cost-input prefix
@@ -113,7 +116,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.12.0';
+const APP_VERSION = '0.13.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
