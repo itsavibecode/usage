@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.7.22
+/* Usage Tracker — v0.7.23
+ * v0.7.23: QoL trio — UPC field autofocus on Add, `n` keyboard shortcut to
+ *   open the Add dialog, and a small spinning indicator while a UPC lookup
+ *   is in flight.
  * v0.7.22: Mobile filter chips — Type, Buyer, and Card cells in mobile cards
  *   are now tappable filter chips (parity with desktop). Closes the deferred
  *   item from v0.7.10.
@@ -88,7 +91,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.22';
+const APP_VERSION = '0.7.23';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1755,6 +1758,14 @@ function openAddDialog() {
   setBundleSizeVisibility();
   setUpcStatus('');
   dialog().showModal();
+  // v0.7.23: autofocus the UPC field on Add. The dialog opens for the
+  // primary path (scan or paste a UPC), so the user shouldn't need an extra
+  // tap to start typing. requestAnimationFrame because <dialog> needs a
+  // tick to settle before focus() takes effect on iOS Safari.
+  requestAnimationFrame(() => {
+    const upc = f.elements.upc;
+    if (upc) try { upc.focus(); } catch {}
+  });
 }
 
 function openEditDialog(id) {
@@ -3066,6 +3077,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add').addEventListener('click', openAddDialog);
   document.getElementById('dialog-close').addEventListener('click', closeDialog);
   document.getElementById('dialog-cancel').addEventListener('click', closeDialog);
+
+  // v0.7.23: keyboard shortcut — `n` opens the Add dialog. Only fires when
+  // no text input is focused (so typing "n" in a search/text field stays
+  // normal text), and not while modifier keys are held (Ctrl-N opens a new
+  // browser window — don't hijack that). Disabled while any dialog is open
+  // (the user is busy with a flow).
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'n' && e.key !== 'N') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if (document.querySelector('dialog[open]')) return;
+    if (!currentUser) return; // not signed in — Add isn't relevant yet
+    e.preventDefault();
+    openAddDialog();
+  });
 
   const f = form();
   f.addEventListener('submit', handleSubmit);

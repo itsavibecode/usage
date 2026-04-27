@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.22
+**Version:** v0.7.23
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.22)
+## Current status (v0.7.23)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.23 — 2026-04-26
+- **QoL trio.**
+  - **UPC field autofocuses when Add dialog opens** — start typing or scanning immediately, no extra tap.
+  - **`n` keyboard shortcut opens Add product** — works anywhere on the page when no input/dialog has focus, no modifier-key conflicts (Ctrl-N still opens a new browser window).
+  - **Spinner during UPC lookup** — small spinning ring in the status text while the request is in flight, so you know something is happening (especially useful with the Apps Script proxy hop).
 
 ### v0.7.22 — 2026-04-26
 - **Mobile filter chips.** On desktop, tapping a Type / Buyer / Card cell in the table has filtered the view since v0.7.10. Mobile cards previously rendered those values as plain text in the *Where* line, so the same filter shortcut wasn't available. Now: Type renders as a tappable chip in each card's head, and Buyer + Card render as inline chips in the *Where* line — same look and feel as the desktop chips, same active-filter bar above the cards. Closes the deferred mobile-parity item from v0.7.10.
