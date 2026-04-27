@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.19
+**Version:** v0.7.20
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.19)
+## Current status (v0.7.20)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.20 — 2026-04-26
+- **Fixed: UPC lookup actually works now.** Since v0.6.0 the auto-fill from UPCitemdb has been silently broken — UPCitemdb's free trial endpoint sends `Access-Control-Allow-Origin: https://www.upcitemdb.com`, so every fetch from `itsavibecode.github.io` was rejected by the browser before our code ever saw a response. The catch block tucked a tiny "Lookup failed — check connection" message under the field; easy to miss. Routed through a Google Apps Script web app (server-to-server, no CORS) so the request now actually reaches UPCitemdb and returns. The trial database is still rate-limited (100/day per Google Apps Script IP, shared across many users), so EXCEED_LIMIT failures still happen — but they're now clearly surfaced with the message *"UPC database busy — try again in a minute, or enter manually."*
+- **More visible UPC status feedback.** The status text under the UPC field bumped from 12px muted-grey to 13px medium-weight, and error / OK states now show as tinted pills (red and green respectively) instead of inline-color-only text. Less easy to miss when the lookup fails or succeeds.
 
 ### v0.7.19 — 2026-04-26
 - **New: custom 404 page.** Until now, anyone hitting a typo'd or stale URL under `itsavibecode.github.io/usage/...` saw GitHub's generic black-bar "There isn't a GitHub Pages site here" message — looked like the site itself was broken. Replaced with a clean self-contained `404.html` that matches the rest of the site (favicon, primary blue, system fonts, version footer) and offers a one-click button back to the working app. Standalone — no app.js, Firebase, or auth dependency, so it renders even for signed-out visitors and even if the main bundle has issues.

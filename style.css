@@ -1129,15 +1129,36 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 }
 
 .upc-status {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
-  min-height: 16px;
-  margin-top: 2px;
+  min-height: 18px;
+  margin-top: 4px;
+  font-weight: 500;
 }
-.upc-status.is-busy { color: var(--primary); }
-.upc-status.is-error { color: var(--danger); }
-.upc-status.is-ok { color: var(--success); }
-
+/* v0.7.20: error and busy states get a tinted pill so they catch the eye —
+ * previous 12px muted-grey was easy to miss when the UPC lookup failed,
+ * and "I haven't had success" is the wrong reaction we want. */
+.upc-status.is-error {
+  background: #fbeaea;
+  border: 1px solid #f4c7c7;
+  color: var(--danger);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 6px;
+}
+.upc-status.is-busy {
+  color: var(--primary);
+  font-weight: 500;
+}
+.upc-status.is-ok {
+  background: #e3f5ec;
+  color: var(--success);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 6px;
+}
 /* UPC match confirmation dialog */
 .upc-match-dialog { max-width: 460px; }
 .upc-match-body { padding: 16px 20px 12px; }

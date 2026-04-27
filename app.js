@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.7.19
+/* Usage Tracker — v0.7.20
+ * v0.7.20: UPC lookup actually works now. UPCitemdb's /trial endpoint sends
+ *   `Access-Control-Allow-Origin: https://www.upcitemdb.com`, so every fetch
+ *   from this site was being browser-blocked silently — that's why "I haven't
+ *   had success with it at all" was the user's experience. Routes through a
+ *   Google Apps Script web app (server-side, no CORS) the user deployed.
+ *   Proper EXCEED_LIMIT handling + more visible error pills.
  * v0.7.19: Custom 404 page (standalone 404.html). GitHub Pages auto-serves
  *   it for any unknown URL; previously visitors saw GitHub's generic black
  *   error page.
@@ -75,7 +81,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.19';
+const APP_VERSION = '0.7.20';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -2602,12 +2608,28 @@ function describeCameraError(e) {
   return 'Could not start camera: ' + ((e && e.message) || e);
 }
 
-/* ---------- UPC database lookup (UPCitemdb trial) ---------- */
-// Free tier: 100 requests/day/IP. CORS-enabled. Response shape:
-//   { code: "OK", total: N, items: [{ ean, upc, title, brand, category, size, offers: [...] }] }
-// We cache hits in module state so repeated UPC scans within a session don't burn requests.
+/* ---------- UPC database lookup (UPCitemdb trial via Apps Script proxy) ----------
+ * UPCitemdb's free `/prod/trial/lookup` endpoint serves
+ *   `Access-Control-Allow-Origin: https://www.upcitemdb.com`
+ * which means browsers refuse every fetch made from any other origin (including
+ * itsavibecode.github.io). v0.7.20 routes the call through a Google Apps Script
+ * Web App the user deployed; Apps Script makes the request server-to-server (no
+ * CORS), wraps the JSON, and returns it with a permissive `Access-Control-Allow-
+ * Origin: *` so the browser is happy.
+ *
+ * Response shape from proxy is the same as direct UPCitemdb:
+ *   { code: "OK", total: N, items: [{ ean, upc, title, brand, category, size, ... }] }
+ *   { code: "EXCEED_LIMIT", message: "Rate limit exceeded" }
+ *   { code: "INVALID_QUERY" }   // not enough digits etc.
+ *
+ * Important: UPCitemdb rate-limits the trial endpoint per IP. Apps Script
+ * shares its IPs across thousands of users, so the 100/day quota for whichever
+ * Google IP we land on is often already burned by other users. Lookups fail
+ * with EXCEED_LIMIT in those windows — we surface that clearly. The
+ * upcCache below also caches OK results so repeats within a session are free.
+ */
 
-const UPCITEMDB_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
+const UPCITEMDB_URL = 'https://script.google.com/macros/s/AKfycbxYQmtqVQIrXZa1w14pgCkfu54xJDQxH2PxlLVfJzVPAisVCU8hhxp0903701AmdaAp/exec';
 const upcCache = new Map(); // upc -> item (or null if no match)
 let pendingUpcLookup = null;
 let pendingUpcCode = null; // the UPC whose confirm dialog is currently open
@@ -2635,23 +2657,46 @@ async function lookupUpc(rawCode) {
     const res = await fetch(`${UPCITEMDB_URL}?upc=${encodeURIComponent(code)}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
+      // Note: the Apps Script proxy is open access ("Anyone, even anonymous"),
+      // so no auth header is needed. Apps Script returns a 302 redirect to
+      // the actual response; fetch() follows it transparently.
     });
     if (!res.ok) {
-      // 429 = trial rate-limit; other non-OK = generic network issue
-      if (res.status === 429) {
-        setUpcStatus('UPC lookup limit reached for today — enter details manually.', 'error');
+      setUpcStatus(`Lookup failed (HTTP ${res.status}). Enter details manually.`, 'error');
+      return null;
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      // Apps Script can occasionally return an HTML error page instead of JSON
+      // (auth issues, deployment misconfiguration). Surface that as a
+      // recognizable error rather than a confusing parse failure.
+      setUpcStatus('Lookup proxy returned an unexpected response. Enter manually.', 'error');
+      return null;
+    }
+    // v0.7.20: handle UPCitemdb error codes the proxy passes through.
+    // EXCEED_LIMIT is the dominant case in practice — the trial endpoint's
+    // 100/day quota is per-IP, and Apps Script's IPs are shared with other
+    // users. Often we land on an IP whose quota is already spent.
+    if (data && data.code && data.code !== 'OK') {
+      if (data.code === 'EXCEED_LIMIT') {
+        setUpcStatus('UPC database busy — try again in a minute, or enter manually.', 'error');
+      } else if (data.code === 'INVALID_QUERY') {
+        setUpcStatus('UPC format not accepted by database — check the digits.', 'error');
       } else {
-        setUpcStatus(`Lookup failed (${res.status}).`, 'error');
+        setUpcStatus(`Lookup error: ${data.message || data.code}. Enter manually.`, 'error');
       }
       return null;
     }
-    const data = await res.json();
     const item = (data.items && data.items[0]) || null;
     upcCache.set(code, item);
     return item;
   } catch (e) {
     console.error('UPC lookup failed:', e);
-    setUpcStatus('Lookup failed — check connection.', 'error');
+    // Most common cause now (post-proxy): network blip, Apps Script transient
+    // 5xx, or proxy URL deployment was rotated.
+    setUpcStatus('Lookup failed — check connection or try again.', 'error');
     return null;
   }
 }
