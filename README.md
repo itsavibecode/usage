@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.8.0
+**Version:** v0.9.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.8.0)
+## Current status (v0.9.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.9.0 — 2026-04-26
+- **New: "Check current price on Amazon" link.** When you've entered a UPC of 8+ digits in the Add or Edit dialog, a small chip-link appears below the UPC field. Click it and Amazon's search page for that UPC opens in a new tab — useful for sanity-checking your purchase price against current market when adding or editing a product. Closes the v0.9.0 roadmap item (manual market-price tracking field is intentionally not included; the link gives 90% of the value with no extra data shape).
 
 ### v0.8.0 — 2026-04-26
 - **New: Price history per UPC.** Whenever two or more of your products share the same UPC (e.g. recurring purchases of the same toothpaste), a **History** button appears on the row (and on the mobile card) next to Edit / Duplicate / PNG. Click it to see a line chart of cost over time across every purchase of that UPC, plus a table beneath showing each purchase, its store, buyer, and the delta vs the first purchase. Color-coded: rises in red, drops in green. Uses your current pre-tax / with-tax preference (the toggle above the stats bar) and labels which mode it's showing.

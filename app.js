@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.8.0
+/* Usage Tracker — v0.9.0
+ * v0.9.0: "Check current price on Amazon" link below the UPC field in the
+ *   Add/Edit dialog. Opens amazon.com/s?k={upc} in a new tab. Visible only
+ *   when the UPC is at least 8 digits.
  * v0.8.0: Price history per UPC. When two or more products share the same
  *   UPC (recurring purchases of the same item), a "History" button appears
  *   on each row → modal with line chart of cost over time + entry table
@@ -95,7 +98,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.9.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1763,6 +1766,7 @@ function openAddDialog() {
   f.elements.purchaseDate.value = today;
   setBundleSizeVisibility();
   setUpcStatus('');
+  syncAmazonCheckLink(''); // v0.9.0 — hide the Amazon link until UPC is entered
   dialog().showModal();
   // v0.7.23: autofocus the UPC field on Add. The dialog opens for the
   // primary path (scan or paste a UPC), so the user shouldn't need an extra
@@ -1792,6 +1796,7 @@ function openEditDialog(id) {
   }
   setBundleSizeVisibility();
   setUpcStatus('');
+  syncAmazonCheckLink(p.upc); // v0.9.0 — show Amazon link if existing UPC is set
   dialog().showModal();
 }
 
@@ -2745,6 +2750,9 @@ function handleScanResult(text) {
   if (upcInput) {
     upcInput.value = text;
     upcInput.dispatchEvent(new Event('input', { bubbles: true }));
+    // The 'input' event listener already calls syncAmazonCheckLink(),
+    // but explicit here too for clarity in case the listener was bypassed.
+    syncAmazonCheckLink(text);
   }
   toast('Scanned UPC: ' + text);
   // Fire-and-forget — lookup will drive the confirm dialog when it resolves
@@ -2821,6 +2829,23 @@ function setUpcStatus(text, kind = '') {
   el.textContent = text || '';
   el.classList.remove('is-busy', 'is-error', 'is-ok');
   if (kind) el.classList.add(`is-${kind}`);
+}
+
+// v0.9.0 — Amazon search link below the UPC field. Updates href to the
+// current UPC's amazon.com search URL and toggles visibility based on
+// whether the UPC is long enough to be plausible. Called from the UPC
+// input listener and on dialog open / lookup acceptance.
+function syncAmazonCheckLink(rawUpc) {
+  const a = document.getElementById('upc-check-amazon');
+  if (!a) return;
+  const code = normalizeUpc(rawUpc);
+  if (code.length < 8) {
+    a.hidden = true;
+    a.href = '#';
+    return;
+  }
+  a.hidden = false;
+  a.href = `https://www.amazon.com/s?k=${encodeURIComponent(code)}`;
 }
 
 function normalizeUpc(code) {
@@ -3263,6 +3288,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (normalizeUpc(f.elements.upc.value) !== lastLookedUpUpc) {
       setUpcStatus('');
     }
+    // v0.9.0: keep the Amazon check link in sync with the current UPC value.
+    syncAmazonCheckLink(f.elements.upc.value);
   });
 
   document.getElementById('upc-match-yes').addEventListener('click', acceptUpcMatch);

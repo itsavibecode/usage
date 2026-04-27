@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.8.0">
+  <meta name="version" content="0.9.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.8.0</span>
+        <span class="version" id="version">v0.9.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -230,6 +230,10 @@
             </button>
           </div>
           <span class="upc-status" id="upc-status" aria-live="polite"></span>
+          <!-- v0.9.0: Amazon search link, only shown when UPC has 8+ digits.
+               Opens amazon.com/s?k={upc} in a new tab so the user can check
+               the current market price for this item. -->
+          <a id="upc-check-amazon" class="upc-check-link" href="#" target="_blank" rel="noopener" hidden>Check current price on Amazon &#x2197;</a>
         </label>
 
         <label class="field">
@@ -332,11 +336,11 @@
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
-        <!-- v0.8.0: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+        <!-- v0.9.0: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
              when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
              bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
         <input name="bundleId" type="hidden">
-        <!-- v0.8.0: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+        <!-- v0.9.0: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
              Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
         <input name="imageUrl" type="hidden">
 
@@ -362,7 +366,7 @@
     </div>
   </dialog>
 
-  <!-- v0.8.0: Price history per UPC. Shows a line chart of cost over time
+  <!-- v0.9.0: Price history per UPC. Shows a line chart of cost over time
        for products sharing the same UPC, plus a small entry table beneath. -->
   <dialog id="price-history-dialog" class="price-history-dialog">
     <header class="dialog-header">
