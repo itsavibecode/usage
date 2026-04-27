@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.9.0
+/* Usage Tracker — v0.10.0
+ * v0.10.0: Reorder reminders panel. Surfaces active products approaching or
+ *   past their type's average finished lifespan. Capped at 5 most-urgent;
+ *   click to open the product for editing.
  * v0.9.0: "Check current price on Amazon" link below the UPC field in the
  *   Add/Edit dialog. Opens amazon.com/s?k={upc} in a new tab. Visible only
  *   when the UPC is at least 8 digits.
@@ -98,7 +101,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.10.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -720,6 +723,7 @@ function renderActiveFilterBar() {
 
 function render() {
   renderTrendsPanel();
+  renderReorderReminders();
   renderTable();
   renderStats();
   renderDashboard();
@@ -1415,6 +1419,86 @@ function renderTrendsPanel() {
   const tagLabel = insight.kind === 'real' ? 'Trend' : 'Did you know';
   const tagClass = insight.kind === 'real' ? 'trends-tag' : 'trends-tag trends-tag-cold';
   panel.innerHTML = `<span class="${tagClass}">${tagLabel}</span><span class="trends-text">${escapeHtml(insight.text)}</span>`;
+}
+
+/* v0.10.0 — Reorder reminders. For each active product, look at the average
+ * lifespan of all finished products of the same productType. When the active
+ * one is at or past ~85% of that average, surface it. Sorted by progress
+ * descending so the most urgent show first; capped at 5 to keep the panel
+ * compact. Hides entirely when no products meet the threshold. */
+const REMINDER_THRESHOLD = 0.85;
+const REMINDER_MAX = 5;
+
+function computeReorderReminders() {
+  // Build a map of productType → mean finished lifespan (in days). Skip types
+  // with too few finished examples to be meaningful.
+  const lifespans = new Map(); // type → [duration, ...]
+  for (const p of products) {
+    if (!isFinished(p)) continue;
+    const d = calcDuration(p);
+    if (d == null || !isFinite(d) || d <= 0) continue;
+    const k = p.productType || '';
+    if (!k) continue;
+    if (!lifespans.has(k)) lifespans.set(k, []);
+    lifespans.get(k).push(d);
+  }
+  const meanLifespan = new Map();
+  for (const [k, arr] of lifespans) {
+    if (arr.length < 2) continue; // need at least 2 finished examples
+    const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
+    meanLifespan.set(k, mean);
+  }
+
+  const reminders = [];
+  for (const p of products) {
+    if (!isActive(p)) continue;
+    const k = p.productType || '';
+    const mean = meanLifespan.get(k);
+    if (mean == null) continue;
+    const dur = calcDuration(p);
+    if (dur == null) continue;
+    const ratio = dur / mean;
+    if (ratio < REMINDER_THRESHOLD) continue;
+    reminders.push({
+      product: p,
+      currentDays: dur,
+      meanDays: Math.round(mean),
+      ratio,
+      pastDue: ratio >= 1
+    });
+  }
+  reminders.sort((a, b) => b.ratio - a.ratio);
+  return reminders.slice(0, REMINDER_MAX);
+}
+
+function renderReorderReminders() {
+  const panel = document.getElementById('reminders-panel');
+  if (!panel) return;
+  const reminders = computeReorderReminders();
+  if (reminders.length === 0) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+  const items = reminders.map(r => {
+    const remaining = r.meanDays - r.currentDays;
+    const status = r.pastDue
+      ? `<span class="reminder-status reminder-status-past">${Math.abs(remaining)}d past avg</span>`
+      : `<span class="reminder-status">~${remaining}d left</span>`;
+    return `<button type="button" class="reminder-item" data-id="${r.product.id}" title="Click to open ${escapeHtml(r.product.productName)}">
+      <span class="reminder-name">${escapeHtml(r.product.productName)}</span>
+      <span class="reminder-progress">${r.currentDays}d of ~${r.meanDays}d avg</span>
+      ${status}
+    </button>`;
+  }).join('');
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="reminders-head">
+      <span class="reminders-tag">Reorder soon</span>
+      <span class="reminders-sub">Based on your past lifespan averages</span>
+    </div>
+    <div class="reminders-list">${items}</div>
+  `;
 }
 
 // v0.7.11 charts ---------------------------------------------------------
@@ -3411,6 +3495,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.7.16: dashboard PNG export buttons
   document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);
   document.getElementById('btn-export-overview')?.addEventListener('click', exportOverviewPng);
+
+  // v0.10.0: reorder reminder clicks → open the product for editing
+  document.getElementById('reminders-panel')?.addEventListener('click', e => {
+    const item = e.target.closest('.reminder-item');
+    if (item) openEditDialog(item.dataset.id);
+  });
 
   // v0.8.0: price history dialog close handlers
   document.getElementById('price-history-close')?.addEventListener('click', closePriceHistory);

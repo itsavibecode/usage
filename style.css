@@ -166,6 +166,106 @@ main {
   max-width: 100%;
 }
 
+/* v0.10.0 — Reorder reminders panel. Sits below the trends panel and above
+ * the display-controls. Each reminder is a clickable button (opens the
+ * product's Edit dialog). Pill-status indicates how close to / past the
+ * average lifespan the user is. */
+.reminders-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #fff8e6 0%, #fffaf0 100%);
+  border: 1px solid #f4d990;
+  border-radius: var(--radius);
+}
+.reminders-panel[hidden] { display: none; }
+.reminders-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.reminders-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d98f2b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.reminders-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.reminder-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid #ecd9a9;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color 0.12s, background 0.12s;
+}
+.reminder-item:hover {
+  border-color: #d98f2b;
+  background: #fffdf6;
+}
+.reminder-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reminder-progress {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.reminder-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fff3d6;
+  color: #8a5a00;
+  white-space: nowrap;
+}
+.reminder-status-past {
+  background: #fbeaea;
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .reminder-item {
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+  }
+  .reminder-progress {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+}
+
 /* v0.7.12 trends panel — sits above everything in the main view. Shows one
  * "insight" or "did you know" line. Hidden when there are no products and
  * when no real insight or cold-start fact applies. Computed once per page
