@@ -1276,6 +1276,55 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   display: inline-block;
   margin-top: 6px;
 }
+/* v0.11.0 — Share dialog. Compact; just an explanation, the URL, and
+ * copy / open buttons. */
+.share-dialog { max-width: 480px; }
+.share-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.share-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.share-url-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.share-url-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+#share-url-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--surface-alt);
+  color: var(--text);
+}
+#share-url-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  border-color: var(--primary);
+}
+.share-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--success);
+  min-height: 18px;
+}
+
 /* v0.8.0 — Price history dialog. Wider than the others to fit the chart
  * + entry table comfortably. The chart canvas has a fixed height so the
  * Chart.js render target measures consistently. */

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.10.1">
+  <meta name="version" content="0.11.0">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.10.1</span>
+        <span class="version" id="version">v0.11.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -64,7 +64,7 @@
   <main id="main-wrap" hidden>
     <section class="trends-panel" id="trends-panel" aria-live="polite" hidden></section>
 
-    <!-- v0.10.1: Reorder reminders. For each currently-active product whose
+    <!-- v0.11.0: Reorder reminders. For each currently-active product whose
          duration is approaching or past the average lifespan of its same-type
          finished siblings, surface a small alert. Hidden when none apply. -->
     <section class="reminders-panel" id="reminders-panel" aria-label="Reorder reminders" hidden></section>
@@ -235,7 +235,7 @@
             </button>
           </div>
           <span class="upc-status" id="upc-status" aria-live="polite"></span>
-          <!-- v0.10.1: Amazon search link, only shown when UPC has 8+ digits.
+          <!-- v0.11.0: Amazon search link, only shown when UPC has 8+ digits.
                Opens amazon.com/s?k={upc} in a new tab so the user can check
                the current market price for this item. -->
           <a id="upc-check-amazon" class="upc-check-link" href="#" target="_blank" rel="noopener" hidden>Check current price on Amazon &#x2197;</a>
@@ -341,11 +341,11 @@
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
-        <!-- v0.10.1: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+        <!-- v0.11.0: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
              when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
              bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
         <input name="bundleId" type="hidden">
-        <!-- v0.10.1: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+        <!-- v0.11.0: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
              Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
         <input name="imageUrl" type="hidden">
 
@@ -371,7 +371,29 @@
     </div>
   </dialog>
 
-  <!-- v0.10.1: Price history per UPC. Shows a line chart of cost over time
+  <!-- v0.11.0: Share dialog. Read-only share-link generator. Encodes a
+       curated subset of the product into a base64 URL hash that points at
+       share.html. Self-contained recipient page; no auth required to view. -->
+  <dialog id="share-dialog" class="share-dialog">
+    <header class="dialog-header">
+      <h2>Share product</h2>
+      <button type="button" class="icon-btn" id="share-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="share-body">
+      <p class="share-lead">Anyone with this link can see this product as a read-only card. They can't edit it, and your other products stay private.</p>
+      <label class="share-url-wrap">
+        <span class="share-url-label">Share link</span>
+        <input type="text" id="share-url-input" readonly>
+      </label>
+      <p class="share-hint" id="share-hint" aria-live="polite"></p>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="share-open">Open in new tab</button>
+      <button type="button" class="btn btn-primary" id="share-copy">Copy link</button>
+    </footer>
+  </dialog>
+
+  <!-- v0.11.0: Price history per UPC. Shows a line chart of cost over time
        for products sharing the same UPC, plus a small entry table beneath. -->
   <dialog id="price-history-dialog" class="price-history-dialog">
     <header class="dialog-header">

@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.10.1
+/* Usage Tracker — v0.11.0
+ * v0.11.0: Read-only share link. New standalone share.html page renders
+ *   a base64-encoded product payload as a clean public card. Share button
+ *   per row + mobile card opens a dialog with the link + copy-to-clipboard.
  * v0.10.1: Amazon search now uses productName when available (UPC indexing
  *   on Amazon is too sparse to be reliable). Falls back to UPC only when
  *   no name has been entered.
@@ -104,7 +107,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.10.1';
+const APP_VERSION = '0.11.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -854,6 +857,7 @@ function renderMobileCard(p) {
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
         ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC">History</button>` : ''}
+        <button type="button" class="share-btn" data-id="${p.id}" title="Get a read-only share link">Share</button>
         <button type="button" class="export-btn" data-id="${p.id}" title="Export 4:3 PNG">PNG</button>
         <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
       </div>
@@ -919,6 +923,7 @@ function renderRow(p) {
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
       ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC across all purchases">History</button>` : ''}
+      <button type="button" class="share-btn" data-id="${p.id}" title="Get a read-only share link for this product">Share</button>
       <button type="button" class="export-btn" data-id="${p.id}" title="Export this product as a 4:3 PNG card">PNG</button>
       <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
     </td>
@@ -2096,6 +2101,83 @@ function confirmDelete(id) {
     cd.close(); cleanup();
   };
   no.onclick = () => { cd.close(); cleanup(); };
+}
+
+/* ---------- v0.11.0 read-only share link ---------- */
+
+// Curated subset of product fields to include in the share payload. Skip
+// PII (buyer, cardLast4) and internal-only fields (id, bundleId, createdAt,
+// notes — could be private). Skip costWithTax — keep it simple.
+const SHARE_FIELDS = [
+  'productType', 'productName', 'size', 'unit',
+  'startDate', 'endDate', 'cost', 'store',
+  'upc', 'imageUrl',
+  'bundleStatus', 'bundleSize', 'bundlePosition'
+];
+
+function encodeShareData(p) {
+  const payload = {};
+  for (const k of SHARE_FIELDS) {
+    if (p[k] !== undefined && p[k] !== '' && p[k] !== null) payload[k] = p[k];
+  }
+  // UTF-8 safe base64. Use base64url variants (- _) instead of (+ /) so the
+  // string is URL-safe without further escaping.
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function buildShareUrl(p) {
+  const code = encodeShareData(p);
+  // Use a relative path to share.html so the link works whether served from
+  // GitHub Pages (https://itsavibecode.github.io/usage/) or a local file.
+  // location.origin + pathname's directory + 'share.html#d=...'
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  return `${base}share.html#d=${code}`;
+}
+
+function openShareDialog(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  const url = buildShareUrl(p);
+  const dlg = document.getElementById('share-dialog');
+  const input = document.getElementById('share-url-input');
+  const hint = document.getElementById('share-hint');
+  if (!dlg || !input || !hint) return;
+  input.value = url;
+  hint.textContent = '';
+  dlg._shareUrl = url;
+  if (!dlg.open) dlg.showModal();
+  // Select the URL so the user can quickly Cmd/Ctrl-C as a fallback.
+  requestAnimationFrame(() => { try { input.select(); } catch {} });
+}
+
+function closeShareDialog() {
+  const dlg = document.getElementById('share-dialog');
+  if (dlg && dlg.open) dlg.close();
+}
+
+async function copyShareLink() {
+  const dlg = document.getElementById('share-dialog');
+  const hint = document.getElementById('share-hint');
+  const url = dlg?._shareUrl;
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    hint.textContent = 'Link copied to clipboard.';
+  } catch {
+    // Clipboard API can fail on iOS in some contexts. The input is already
+    // selected as a fallback; user can hit Cmd-C / long-press → Copy.
+    hint.textContent = 'Couldn\'t auto-copy — the link is selected, copy manually.';
+  }
+}
+
+function openShareInNewTab() {
+  const dlg = document.getElementById('share-dialog');
+  const url = dlg?._shareUrl;
+  if (url) window.open(url, '_blank', 'noopener');
 }
 
 /* ---------- v0.8.0 price history per UPC ---------- */
@@ -3433,6 +3515,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bundleClose = e.target.closest('.bundle-siblings-close');
     const exportBtn = e.target.closest('.export-btn');
     const historyBtn = e.target.closest('.history-btn');
+    const shareBtn = e.target.closest('.share-btn');
     if (cellChip) {
       addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
       return;
@@ -3456,6 +3539,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (exportBtn) { exportProductPng(exportBtn.dataset.id); return; }
     if (historyBtn) { openPriceHistory(historyBtn.dataset.id); return; }
+    if (shareBtn) { openShareDialog(shareBtn.dataset.id); return; }
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
@@ -3522,6 +3606,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = e.target.closest('.reminder-item');
     if (item) openEditDialog(item.dataset.id);
   });
+
+  // v0.11.0: share dialog handlers
+  document.getElementById('share-close')?.addEventListener('click', closeShareDialog);
+  document.getElementById('share-copy')?.addEventListener('click', copyShareLink);
+  document.getElementById('share-open')?.addEventListener('click', openShareInNewTab);
 
   // v0.8.0: price history dialog close handlers
   document.getElementById('price-history-close')?.addEventListener('click', closePriceHistory);
