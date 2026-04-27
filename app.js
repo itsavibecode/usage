@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.7.21
+/* Usage Tracker — v0.7.22
+ * v0.7.22: Mobile filter chips — Type, Buyer, and Card cells in mobile cards
+ *   are now tappable filter chips (parity with desktop). Closes the deferred
+ *   item from v0.7.10.
  * v0.7.21: Persistent UPC cache in Firestore at /users/{uid}/upcCache/{upc} —
  *   once we've ever resolved a UPC, we never hit a live API for it again.
  *   Misses are cached too so dead UPCs don't keep burning quota. OpenFoodFacts
@@ -85,7 +88,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.21';
+const APP_VERSION = '0.7.22';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -782,12 +785,16 @@ function renderMobileCard(p) {
   const costPerDay = calcCostPerDay(p);
   const perDayStr = costPerDay != null ? ` &middot; ${moneyFine(costPerDay)}/day` : '';
 
-  const meta = [
-    p.size && p.unit ? `${escapeHtml(p.size)} ${escapeHtml(p.unit)}` : null,
-    p.store ? escapeHtml(p.store) : null,
-    p.buyer ? escapeHtml(p.buyer) : null,
-    p.cardLast4 ? '&bull;&bull; ' + escapeHtml(p.cardLast4) : null
-  ].filter(Boolean).join(' &middot; ');
+  // v0.7.22: Buyer and Card render as `.cell-chip` filter buttons on mobile,
+  // matching the desktop table behavior. Size and store stay as plain text —
+  // they aren't filterable columns. Existing click delegation in
+  // attachTableHandlers picks up `.cell-chip` clicks regardless of viewport.
+  const metaParts = [];
+  if (p.size && p.unit) metaParts.push(`<span class="mc-meta-text">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</span>`);
+  if (p.store) metaParts.push(`<span class="mc-meta-text">${escapeHtml(p.store)}</span>`);
+  if (p.buyer) metaParts.push(`<button type="button" class="cell-chip mc-meta-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button>`);
+  if (p.cardLast4) metaParts.push(`<button type="button" class="cell-chip mc-meta-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card &bull;&bull;&bull;&bull; ${escapeHtml(p.cardLast4)}">&bull;&bull; ${escapeHtml(p.cardLast4)}</button>`);
+  const meta = metaParts.join(' <span class="mc-meta-sep">&middot;</span> ');
 
   // v0.7.13: clickable bundle chip on mobile too, opens the same sibling
   // slide-out (rendered inline inside the card when expanded).
@@ -813,7 +820,7 @@ function renderMobileCard(p) {
     <div class="mc${expanded ? ' mc-expanded' : ''}">
       <div class="mc-head">
         ${p.imageUrl ? `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-        <span class="mc-type">${escapeHtml(p.productType)}</span>
+        ${p.productType ? `<button type="button" class="cell-chip mc-type-chip" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '<span class="mc-type">—</span>'}
         <span class="mc-status">${endLabel}</span>
       </div>
       <button type="button" class="mc-name name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button>

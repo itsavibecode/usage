@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.21
+**Version:** v0.7.22
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.21)
+## Current status (v0.7.22)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.22 — 2026-04-26
+- **Mobile filter chips.** On desktop, tapping a Type / Buyer / Card cell in the table has filtered the view since v0.7.10. Mobile cards previously rendered those values as plain text in the *Where* line, so the same filter shortcut wasn't available. Now: Type renders as a tappable chip in each card's head, and Buyer + Card render as inline chips in the *Where* line — same look and feel as the desktop chips, same active-filter bar above the cards. Closes the deferred mobile-parity item from v0.7.10.
 
 ### v0.7.21 — 2026-04-26
 - **New: persistent UPC cache.** Every successful UPCitemdb / OpenFoodFacts lookup is now saved to `/users/{uid}/upcCache/{upc}` in Firestore. Subsequent lookups of the same UPC — on any device, in any session — skip the live API entirely. **You'll never burn quota for the same product twice.** Even cache *misses* are stored (with `source: 'miss'`) so dead UPCs don't keep retrying when the rate limit resets.

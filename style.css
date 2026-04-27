@@ -1714,6 +1714,31 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
     font-variant-numeric: tabular-nums;
     word-break: break-word;
   }
+
+  /* v0.7.22: clickable filter chips inside mobile cards. The Type chip in
+   * the head replaces the muted-uppercase text; chips inline in the Where
+   * row replace plain Buyer/Card text. Visually small + pill-shaped so they
+   * read as tappable without dominating the layout. */
+  .mc-type-chip {
+    font-size: 11px;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .mc-meta-chip {
+    font-size: 12px;
+    padding: 1px 8px;
+    vertical-align: baseline;
+  }
+  .mc-meta-text {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .mc-meta-sep {
+    color: var(--text-muted);
+    margin: 0 2px;
+  }
   .mc-row-notes dd { color: var(--text-muted); font-size: 12px; }
   .mc-actions {
     display: flex;
