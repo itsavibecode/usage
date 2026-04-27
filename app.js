@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.10.0
+/* Usage Tracker — v0.10.1
+ * v0.10.1: Amazon search now uses productName when available (UPC indexing
+ *   on Amazon is too sparse to be reliable). Falls back to UPC only when
+ *   no name has been entered.
  * v0.10.0: Reorder reminders panel. Surfaces active products approaching or
  *   past their type's average finished lifespan. Capped at 5 most-urgent;
  *   click to open the product for editing.
@@ -101,7 +104,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.10.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -2915,10 +2918,15 @@ function setUpcStatus(text, kind = '') {
   if (kind) el.classList.add(`is-${kind}`);
 }
 
-// v0.9.0 — Amazon search link below the UPC field. Updates href to the
-// current UPC's amazon.com search URL and toggles visibility based on
-// whether the UPC is long enough to be plausible. Called from the UPC
-// input listener and on dialog open / lookup acceptance.
+// v0.9.0 — Amazon search link below the UPC field. Hidden until the UPC
+// reaches 8+ digits, then becomes a link to amazon.com search.
+//
+// v0.10.1 — Amazon's UPC indexing is sparse: searching by raw UPC alone
+// often returns "no results" even for products that DO sell on Amazon,
+// because the UPC isn't part of every listing's searchable text. The
+// product *name* is far more reliable — Amazon's relevance search is
+// built for natural language. We now prefer productName when the form
+// has one, and fall back to UPC only if the name field is empty.
 function syncAmazonCheckLink(rawUpc) {
   const a = document.getElementById('upc-check-amazon');
   if (!a) return;
@@ -2928,8 +2936,17 @@ function syncAmazonCheckLink(rawUpc) {
     a.href = '#';
     return;
   }
+  // Prefer productName if available — much higher hit rate on Amazon than
+  // raw UPC. The form may already have a name from UPC lookup auto-fill,
+  // from continue-bundle, from edit-existing, or from manual entry.
+  let query = code;
+  try {
+    const f = form();
+    const name = (f.elements.productName?.value || '').trim();
+    if (name) query = name;
+  } catch {}
   a.hidden = false;
-  a.href = `https://www.amazon.com/s?k=${encodeURIComponent(code)}`;
+  a.href = `https://www.amazon.com/s?k=${encodeURIComponent(query)}`;
 }
 
 function normalizeUpc(code) {
@@ -3351,6 +3368,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const f = form();
   f.addEventListener('submit', handleSubmit);
   f.elements.bundleStatus.addEventListener('change', setBundleSizeVisibility);
+  // v0.10.1: keep the Amazon link in sync as the productName is edited —
+  // the link prefers name over UPC, so updating as the user types gives a
+  // more accurate search the moment they hit it.
+  f.elements.productName.addEventListener('input', () => syncAmazonCheckLink(f.elements.upc.value));
   f.elements.bundleSize.addEventListener('input', updateBundlePositionMax);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);

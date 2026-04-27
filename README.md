@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.10.0
+**Version:** v0.10.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.10.0)
+## Current status (v0.10.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.10.1 — 2026-04-26
+- **Fixed: Amazon "Check current price" link returning no results.** Amazon's search-by-UPC indexing is sparse — many products that DO sell on Amazon don't have their UPC in the indexed metadata, so a search for the bare UPC misses. The link now uses the **product name** when one's been entered (the most reliable Amazon search input), falling back to UPC only when the name field is blank. The link's `href` updates as you type the name so the search is always current.
 
 ### v0.10.0 — 2026-04-26
 - **New: Reorder reminders.** When you have at least two finished products of a given type, the app learns your average lifespan for that category. Whenever an active product gets within 15% of (or past) that average, it shows up in a small panel above the stats bar with a one-click link to its Edit dialog. *"Crest 3D White: 28d of ~32d avg, ~4d left."* Once you mark it finished and start a new one, the reminder clears. Top 5 most-urgent shown so the panel stays compact.
