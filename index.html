@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.7.20">
+  <meta name="version" content="0.7.21">
   <title>Usage Tracker</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.7.20</span>
+        <span class="version" id="version">v0.7.21</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -332,11 +332,11 @@
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
 
-        <!-- v0.7.20: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+        <!-- v0.7.21: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
              when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
              bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
         <input name="bundleId" type="hidden">
-        <!-- v0.7.20: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+        <!-- v0.7.21: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
              Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
         <input name="imageUrl" type="hidden">
 

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.7.20
+**Version:** v0.7.21
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.7.20)
+## Current status (v0.7.21)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.7.21 — 2026-04-26
+- **New: persistent UPC cache.** Every successful UPCitemdb / OpenFoodFacts lookup is now saved to `/users/{uid}/upcCache/{upc}` in Firestore. Subsequent lookups of the same UPC — on any device, in any session — skip the live API entirely. **You'll never burn quota for the same product twice.** Even cache *misses* are stored (with `source: 'miss'`) so dead UPCs don't keep retrying when the rate limit resets.
+- **New: OpenFoodFacts as a backup database.** When UPCitemdb misses, returns `EXCEED_LIMIT`, or has a network blip, the app now tries OpenFoodFacts as a second source. Their database is open, free, has wide-open CORS, and has grown to include personal-care products (toothpaste, soap, shampoo, deodorant) alongside food. Coverage isn't as broad as paid databases, but combining UPCitemdb + OFF significantly raises the hit rate. The cached doc records which source provided the data so we can debug coverage later.
 
 ### v0.7.20 — 2026-04-26
 - **Fixed: UPC lookup actually works now.** Since v0.6.0 the auto-fill from UPCitemdb has been silently broken — UPCitemdb's free trial endpoint sends `Access-Control-Allow-Origin: https://www.upcitemdb.com`, so every fetch from `itsavibecode.github.io` was rejected by the browser before our code ever saw a response. The catch block tucked a tiny "Lookup failed — check connection" message under the field; easy to miss. Routed through a Google Apps Script web app (server-to-server, no CORS) so the request now actually reaches UPCitemdb and returns. The trial database is still rate-limited (100/day per Google Apps Script IP, shared across many users), so EXCEED_LIMIT failures still happen — but they're now clearly surfaced with the message *"UPC database busy — try again in a minute, or enter manually."*

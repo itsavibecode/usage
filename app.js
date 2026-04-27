@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.7.20
+/* Usage Tracker — v0.7.21
+ * v0.7.21: Persistent UPC cache in Firestore at /users/{uid}/upcCache/{upc} —
+ *   once we've ever resolved a UPC, we never hit a live API for it again.
+ *   Misses are cached too so dead UPCs don't keep burning quota. OpenFoodFacts
+ *   added as a fallback source when UPCitemdb misses or hits EXCEED_LIMIT.
  * v0.7.20: UPC lookup actually works now. UPCitemdb's /trial endpoint sends
  *   `Access-Control-Allow-Origin: https://www.upcitemdb.com`, so every fetch
  *   from this site was being browser-blocked silently — that's why "I haven't
@@ -76,12 +80,12 @@ import {
   onAuthStateChanged, signInWithPopup, signOut
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 import {
-  collection, doc, onSnapshot, setDoc, deleteDoc, getDocs
+  collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDoc
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.7.20';
+const APP_VERSION = '0.7.21';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -388,6 +392,10 @@ function unsubscribeData() {
   // doesn't briefly see a stale expanded row id from the previous session.
   expandedBundleRow = null;
   expandedCards.clear();
+  // v0.7.21: clear the in-memory UPC cache so different users signing in on
+  // the same browser don't share L1 lookups (Firestore L2 is already
+  // user-scoped via path, but this Map isn't).
+  upcCache.clear();
 }
 
 // v0.7.17 activity log helpers ----------------------------------------------
@@ -2630,6 +2638,16 @@ function describeCameraError(e) {
  */
 
 const UPCITEMDB_URL = 'https://script.google.com/macros/s/AKfycbxYQmtqVQIrXZa1w14pgCkfu54xJDQxH2PxlLVfJzVPAisVCU8hhxp0903701AmdaAp/exec';
+
+// v0.7.21: OpenFoodFacts fallback. Free, open data, browser-friendly CORS
+// (Access-Control-Allow-Origin: *). Coverage skews food/beverage but they
+// have grown to include personal-care products (toothpaste, soap, shampoo,
+// deodorant) over the years. Reasonable last-resort when UPCitemdb misses
+// or returns EXCEED_LIMIT. The `fields` query trims their response from
+// ~140KB to a few hundred bytes — they're generous about server load but
+// no point in shipping all the metadata over the wire.
+const OPENFOODFACTS_URL = 'https://world.openfoodfacts.org/api/v2/product';
+const OPENFOODFACTS_FIELDS = 'code,product_name,product_name_en,brands,quantity,image_url,categories,categories_tags';
 const upcCache = new Map(); // upc -> item (or null if no match)
 let pendingUpcLookup = null;
 let pendingUpcCode = null; // the UPC whose confirm dialog is currently open
@@ -2646,59 +2664,163 @@ function normalizeUpc(code) {
   return String(code || '').replace(/\D/g, '');
 }
 
-async function lookupUpc(rawCode) {
-  const code = normalizeUpc(rawCode);
-  if (code.length < 8) return null;
+/* v0.7.21: three-tier UPC lookup pipeline with persistent caching.
+ *
+ *   1. L1 in-memory `upcCache` Map — same-session repeat lookups are free.
+ *   2. L2 Firestore `/users/{uid}/upcCache/{upc}` — cross-session, cross-device
+ *      cache. Once we've ever resolved a UPC, we never hit a live API for it
+ *      again unless the user signs out / clears their data.
+ *   3. L3 live API chain — UPCitemdb (via Apps Script proxy) first, with
+ *      OpenFoodFacts as a fallback when UPCitemdb misses or rate-limits.
+ *      First successful lookup wins; result is written to both caches.
+ *
+ * The cached doc shape carries enough metadata to debug / re-source later:
+ *   { upc, source: 'upcitemdb' | 'openfoodfacts' | 'miss', cachedAt, item }
+ * `source: 'miss'` is also cached so we don't re-pound APIs for known dead UPCs.
+ */
 
-  if (upcCache.has(code)) return upcCache.get(code);
+function upcCacheDoc(code, uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'upcCache', code);
+}
 
-  setUpcStatus('Looking up product…', 'busy');
+async function readPersistedUpc(code) {
+  if (!currentUser) return null;
+  try {
+    const snap = await getDoc(upcCacheDoc(code));
+    if (!snap.exists()) return null;
+    return snap.data() || null;
+  } catch (e) {
+    console.warn('UPC cache read failed:', e);
+    return null;
+  }
+}
+
+async function writePersistedUpc(code, source, item) {
+  if (!currentUser) return;
+  try {
+    await setDoc(upcCacheDoc(code), {
+      upc: code,
+      source,
+      cachedAt: new Date().toISOString(),
+      item: item || null
+    });
+  } catch (e) {
+    // Non-fatal — fall back to in-memory cache for the rest of this session.
+    console.warn('UPC cache write failed:', e);
+  }
+}
+
+// Live UPCitemdb call via the Apps Script proxy. Returns:
+//   { item: <usable item> }   on success
+//   { error: 'EXCEED_LIMIT' | 'INVALID_QUERY' | 'NETWORK' | 'PARSE' | 'HTTP' }  on failure
+//   { item: null }            on success-but-no-match
+async function callUpcItemDb(code) {
   try {
     const res = await fetch(`${UPCITEMDB_URL}?upc=${encodeURIComponent(code)}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
-      // Note: the Apps Script proxy is open access ("Anyone, even anonymous"),
-      // so no auth header is needed. Apps Script returns a 302 redirect to
-      // the actual response; fetch() follows it transparently.
     });
-    if (!res.ok) {
-      setUpcStatus(`Lookup failed (HTTP ${res.status}). Enter details manually.`, 'error');
-      return null;
-    }
+    if (!res.ok) return { error: 'HTTP', status: res.status };
     let data;
-    try {
-      data = await res.json();
-    } catch {
-      // Apps Script can occasionally return an HTML error page instead of JSON
-      // (auth issues, deployment misconfiguration). Surface that as a
-      // recognizable error rather than a confusing parse failure.
-      setUpcStatus('Lookup proxy returned an unexpected response. Enter manually.', 'error');
-      return null;
-    }
-    // v0.7.20: handle UPCitemdb error codes the proxy passes through.
-    // EXCEED_LIMIT is the dominant case in practice — the trial endpoint's
-    // 100/day quota is per-IP, and Apps Script's IPs are shared with other
-    // users. Often we land on an IP whose quota is already spent.
+    try { data = await res.json(); }
+    catch { return { error: 'PARSE' }; }
     if (data && data.code && data.code !== 'OK') {
-      if (data.code === 'EXCEED_LIMIT') {
-        setUpcStatus('UPC database busy — try again in a minute, or enter manually.', 'error');
-      } else if (data.code === 'INVALID_QUERY') {
-        setUpcStatus('UPC format not accepted by database — check the digits.', 'error');
-      } else {
-        setUpcStatus(`Lookup error: ${data.message || data.code}. Enter manually.`, 'error');
-      }
-      return null;
+      return { error: data.code, message: data.message };
     }
     const item = (data.items && data.items[0]) || null;
-    upcCache.set(code, item);
-    return item;
+    return { item };
   } catch (e) {
-    console.error('UPC lookup failed:', e);
-    // Most common cause now (post-proxy): network blip, Apps Script transient
-    // 5xx, or proxy URL deployment was rotated.
-    setUpcStatus('Lookup failed — check connection or try again.', 'error');
-    return null;
+    console.error('UPCitemdb call failed:', e);
+    return { error: 'NETWORK' };
   }
+}
+
+// OpenFoodFacts fallback. Different response shape — we map it to the
+// UPCitemdb-style item the rest of the app expects.
+async function callOpenFoodFacts(code) {
+  try {
+    const url = `${OPENFOODFACTS_URL}/${encodeURIComponent(code)}.json?fields=${OPENFOODFACTS_FIELDS}`;
+    const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return { error: 'HTTP', status: res.status };
+    const data = await res.json();
+    // OFF returns status:1 if the product is found, status:0 if not
+    if (!data || data.status === 0 || !data.product) return { item: null };
+    const p = data.product;
+    const title = (p.product_name_en || p.product_name || '').trim();
+    if (!title) return { item: null };
+    // Categories from OFF are comma-separated; take the most specific (last) one.
+    const categoryParts = (p.categories || '').split(',').map(s => s.trim()).filter(Boolean);
+    const category = categoryParts.length ? categoryParts[categoryParts.length - 1] : '';
+    const item = {
+      title,
+      brand: (p.brands || '').split(',')[0].trim() || '',
+      category,
+      size: (p.quantity || '').trim(),
+      images: p.image_url && /^https:/i.test(p.image_url) ? [p.image_url] : []
+    };
+    return { item };
+  } catch (e) {
+    console.error('OpenFoodFacts call failed:', e);
+    return { error: 'NETWORK' };
+  }
+}
+
+async function lookupUpc(rawCode) {
+  const code = normalizeUpc(rawCode);
+  if (code.length < 8) return null;
+
+  // L1: in-memory
+  if (upcCache.has(code)) return upcCache.get(code);
+
+  // L2: Firestore persistent cache
+  setUpcStatus('Looking up product…', 'busy');
+  const cached = await readPersistedUpc(code);
+  if (cached) {
+    const item = cached.item || null;
+    upcCache.set(code, item);
+    if (cached.source === 'miss') {
+      setUpcStatus('No match (cached) — enter details manually.', '');
+    }
+    return item;
+  }
+
+  // L3a: live UPCitemdb via proxy
+  const primary = await callUpcItemDb(code);
+  if (primary.item) {
+    upcCache.set(code, primary.item);
+    writePersistedUpc(code, 'upcitemdb', primary.item); // fire-and-forget
+    return primary.item;
+  }
+
+  // L3b: fallback to OpenFoodFacts when UPCitemdb has no result OR
+  // hits a recoverable error (rate limit, network blip). Hard parse/HTTP
+  // errors aren't worth a fallback — usually means our proxy is broken.
+  const shouldFallback = !primary.error || primary.error === 'EXCEED_LIMIT' || primary.error === 'NETWORK';
+  if (shouldFallback) {
+    const off = await callOpenFoodFacts(code);
+    if (off.item) {
+      upcCache.set(code, off.item);
+      writePersistedUpc(code, 'openfoodfacts', off.item); // fire-and-forget
+      return off.item;
+    }
+  }
+
+  // Both sources exhausted — surface the most informative error.
+  if (primary.error === 'EXCEED_LIMIT') {
+    setUpcStatus('UPC database busy and fallback found nothing — try again later or enter manually.', 'error');
+  } else if (primary.error === 'INVALID_QUERY') {
+    setUpcStatus('UPC format not accepted by database — check the digits.', 'error');
+  } else if (primary.error === 'PARSE') {
+    setUpcStatus('Lookup proxy returned an unexpected response. Enter manually.', 'error');
+  } else if (primary.error === 'HTTP' || primary.error === 'NETWORK') {
+    setUpcStatus('Lookup failed — check connection or try again.', 'error');
+  } else {
+    // No error from primary, just no match → cache the miss so we don't
+    // re-call the API for this UPC ever again. Reduces wasted quota over time.
+    upcCache.set(code, null);
+    writePersistedUpc(code, 'miss', null); // fire-and-forget
+  }
+  return null;
 }
 
 /* Kicks off a lookup for whatever is currently in the UPC input.
