@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.13.1
+/* Usage Tracker — v0.14.0
+ * v0.14.0: Search & discovery — live search input above the row-filter tabs
+ *   with autocomplete dropdown (keyboard nav: ↑↓ Enter Esc); mobile type
+ *   chips bumped in size and color-coded per productType for fast visual
+ *   scanning.
  * v0.13.1: Activity log moved from localStorage to Firestore so it syncs
  *   across devices (was per-browser before). One-time migration of legacy
  *   localStorage entries on first run after this version. Cleared via the
@@ -120,7 +124,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.13.1';
+const APP_VERSION = '0.14.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -233,6 +237,19 @@ const CHART_PALETTE = [
   '#2b9fd9', '#d92b8f', '#4a9e4a', '#b97020', '#5b6b8a',
   '#08697d', '#b03b8a'
 ];
+
+// v0.14.0: deterministic color per productType name. Same name always lands
+// on the same palette slot, so "Toothpaste" is consistent across cards.
+// Custom types fall through naturally — the hash works for any string.
+function colorForType(name) {
+  if (!name) return CHART_PALETTE[0];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = ((h << 5) - h) + name.charCodeAt(i);
+    h |= 0; // force int32
+  }
+  return CHART_PALETTE[Math.abs(h) % CHART_PALETTE.length];
+}
 
 /* ---------- calculations ---------- */
 
@@ -778,6 +795,114 @@ function getSortValue(p, column) {
   }
 }
 
+// v0.14.0: live text search across the most-searched fields. Case-insensitive
+// substring match; AND-combines with row-filter tabs and chip filters.
+// Transient (not persisted) — search is meant to be momentary.
+let searchQuery = '';
+const SEARCH_FIELDS = ['productName', 'productType', 'store', 'buyer', 'notes', 'upc', 'cardLast4'];
+
+// v0.14.0 search-autocomplete state. activeSuggestionIndex tracks keyboard
+// nav through the suggestion dropdown (arrow keys); -1 means no row is
+// highlighted, so Enter would just blur without opening anything.
+const SUGGESTION_MAX = 8;
+let activeSuggestionIndex = -1;
+
+function setSearchQuery(q) {
+  searchQuery = String(q || '').trim();
+  activeSuggestionIndex = -1;
+  renderTable();
+  renderSearchSuggestions();
+}
+
+function suggestionMatches() {
+  if (!searchQuery) return [];
+  // Search the FULL product list (not filteredProducts) so suggestions
+  // surface matches regardless of active row-filter / chip filters. The
+  // table view still respects those filters.
+  return products
+    .filter(p => productMatchesSearch(p, searchQuery))
+    .slice(0, SUGGESTION_MAX);
+}
+
+function renderSearchSuggestions() {
+  const list = document.getElementById('row-search-suggestions');
+  const input = document.getElementById('row-search');
+  if (!list || !input) return;
+  // Only show when the search input has focus AND there's a query —
+  // anything else closes the dropdown.
+  const isFocused = document.activeElement === input;
+  if (!isFocused || !searchQuery) {
+    list.hidden = true;
+    list.innerHTML = '';
+    input.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  const matches = suggestionMatches();
+  if (matches.length === 0) {
+    list.hidden = false;
+    list.innerHTML = `<div class="row-search-empty">No products match &ldquo;${escapeHtml(searchQuery)}&rdquo;.</div>`;
+    input.setAttribute('aria-expanded', 'true');
+    return;
+  }
+  list.innerHTML = matches.map((p, i) => {
+    const status = isFinished(p) ? 'finished' : isActive(p) ? 'active' : 'inventory';
+    const thumb = p.imageUrl
+      ? `<img class="row-search-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=row-search-thumb-fallback></span>'">`
+      : '<span class="row-search-thumb-fallback"></span>';
+    return `<button type="button" class="row-search-suggestion${i === activeSuggestionIndex ? ' is-active' : ''}" role="option" aria-selected="${i === activeSuggestionIndex}" data-id="${p.id}">
+      ${thumb}
+      <span class="row-search-info">
+        <span class="row-search-name">${escapeHtml(p.productName) || '(unnamed)'}</span>
+        <span class="row-search-meta">
+          <span class="row-search-type" style="color:${colorForType(p.productType)}">${escapeHtml(p.productType) || '—'}</span>
+          <span class="badge badge-${status}">${status}</span>
+        </span>
+      </span>
+    </button>`;
+  }).join('');
+  list.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function moveSuggestionFocus(delta) {
+  const matches = suggestionMatches();
+  if (matches.length === 0) return;
+  if (activeSuggestionIndex === -1) {
+    activeSuggestionIndex = delta > 0 ? 0 : matches.length - 1;
+  } else {
+    activeSuggestionIndex = (activeSuggestionIndex + delta + matches.length) % matches.length;
+  }
+  renderSearchSuggestions();
+  // Scroll the active suggestion into view if dropdown overflows
+  const el = document.querySelector(`.row-search-suggestion.is-active`);
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+function pickActiveSuggestion() {
+  const matches = suggestionMatches();
+  if (activeSuggestionIndex < 0 || activeSuggestionIndex >= matches.length) return;
+  const p = matches[activeSuggestionIndex];
+  if (p) openSuggestion(p.id);
+}
+
+function openSuggestion(id) {
+  const input = document.getElementById('row-search');
+  if (input) input.blur();
+  const list = document.getElementById('row-search-suggestions');
+  if (list) list.hidden = true;
+  openEditDialog(id);
+}
+
+function productMatchesSearch(p, q) {
+  if (!q) return true;
+  const needle = q.toLowerCase();
+  for (const f of SEARCH_FIELDS) {
+    const v = p[f];
+    if (v && String(v).toLowerCase().includes(needle)) return true;
+  }
+  return false;
+}
+
 function filteredProducts() {
   let list = products;
   // Row-filter tabs (All / Active / Inventory) — applied first.
@@ -790,6 +915,8 @@ function filteredProducts() {
     if (val === '' || val == null) continue;
     list = list.filter(p => String(p[col] ?? '') === String(val));
   }
+  // v0.14.0: text search (last so it filters the already-narrowed list).
+  if (searchQuery) list = list.filter(p => productMatchesSearch(p, searchQuery));
   return list;
 }
 
@@ -918,6 +1045,10 @@ function renderTable() {
     empty.hidden = false;
     if (products.length === 0) {
       empty.innerHTML = 'No products tracked yet. Click <strong>+ Add product</strong> to get started.';
+    } else if (searchQuery) {
+      // v0.14.0: search is the most-likely current source of zero results
+      // when the user just typed something. Surface it first.
+      empty.innerHTML = `No products match <strong>&ldquo;${escapeHtml(searchQuery)}&rdquo;</strong>. Try a different term, or <strong>Reset</strong> to clear all filters.`;
     } else if (hasChipFilters) {
       empty.innerHTML = 'No products match the active filters. Click the <strong>×</strong> on any chip above to remove it.';
     } else if (currentFilter === 'active') {
@@ -1003,7 +1134,7 @@ function renderMobileCard(p) {
     <div class="mc${expanded ? ' mc-expanded' : ''}">
       <div class="mc-head">
         ${p.imageUrl ? `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-        ${p.productType ? `<button type="button" class="cell-chip mc-type-chip" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '<span class="mc-type">—</span>'}
+        ${p.productType ? `<button type="button" class="cell-chip mc-type-chip" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Tap to filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '<span class="mc-type">—</span>'}
         <span class="mc-status">${endLabel}</span>
       </div>
       <button type="button" class="mc-name name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button>
@@ -1859,11 +1990,14 @@ function setFilter(filter) {
 }
 
 function resetFilters() {
-  // Reset both axes: row-filter tabs back to "all" and any cell-click chips
-  // cleared. setFilter calls renderTable; clearChipFilters does too, so we
-  // get a redundant render here — fine, cheap.
+  // Reset every axis: row-filter tabs back to "all", chip filters cleared,
+  // and (v0.14.0) the search input cleared too. setFilter calls renderTable
+  // so we get a redundant render here — fine, cheap.
   activeFilters = {};
   persistActiveFilters();
+  searchQuery = '';
+  const sb = document.getElementById('row-search');
+  if (sb) sb.value = '';
   setFilter('all');
   toast('Filters reset');
 }
@@ -3810,6 +3944,40 @@ document.addEventListener('DOMContentLoaded', () => {
   setFilter(currentFilter);
 
   document.getElementById('btn-reset-filters')?.addEventListener('click', resetFilters);
+
+  // v0.14.0: live search. `input` event fires on every keystroke; filter
+  // logic is fast enough for thousands of products without lag.
+  const searchInput = document.getElementById('row-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', e => setSearchQuery(e.target.value));
+    searchInput.addEventListener('focus', renderSearchSuggestions);
+    searchInput.addEventListener('blur', () => {
+      // Delay so a click on a suggestion registers before the dropdown
+      // hides (mousedown on a suggestion fires blur on the input first).
+      setTimeout(() => {
+        const list = document.getElementById('row-search-suggestions');
+        if (list && document.activeElement !== searchInput) {
+          list.hidden = true;
+          searchInput.setAttribute('aria-expanded', 'false');
+        }
+      }, 150);
+    });
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveSuggestionFocus(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveSuggestionFocus(-1); }
+      else if (e.key === 'Enter' && activeSuggestionIndex >= 0) { e.preventDefault(); pickActiveSuggestion(); }
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        searchInput.value = '';
+        setSearchQuery('');
+        searchInput.blur();
+      }
+    });
+  }
+  document.getElementById('row-search-suggestions')?.addEventListener('click', e => {
+    const btn = e.target.closest('.row-search-suggestion');
+    if (btn) openSuggestion(btn.dataset.id);
+  });
 
   // v0.7.16: dashboard PNG export buttons
   document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);

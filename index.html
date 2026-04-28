@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.13.1">
+  <meta name="version" content="0.14.0">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -30,7 +30,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.13.1</span>
+        <span class="version" id="version">v0.14.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -115,6 +115,15 @@
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
+      <!-- v0.14.0: live search across product fields. AND-combines with the
+           row-filter tabs below + any active chip filters above. -->
+      <div class="row-search-wrap">
+        <span class="row-search-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="search" id="row-search" class="row-search-input" placeholder="Search products by name, type, store, UPC…" aria-label="Search products" autocomplete="off" role="combobox" aria-controls="row-search-suggestions" aria-expanded="false" aria-autocomplete="list">
+        <div class="row-search-suggestions" id="row-search-suggestions" role="listbox" hidden></div>
+      </div>
       <nav class="row-filter-tabs" role="tablist" aria-label="Row filter">
         <button type="button" class="row-filter-tab is-active" data-filter="all" role="tab" aria-selected="true" title="Show every product">All</button>
         <button type="button" class="row-filter-tab" data-filter="active" role="tab" aria-selected="false" title="Only products you've started using and not yet finished">Active</button>

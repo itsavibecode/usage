@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.13.1
+**Version:** v0.14.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.13.1)
+## Current status (v0.14.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.14.0 — 2026-04-27
+- **New: Product search.** A search input above the row-filter tabs lets you live-filter the table across product name, type, store, buyer, notes, UPC, and card-last-4 — case-insensitive substring match. AND-combines with the existing row-filter tabs (All / Active / Inventory) and chip filters above. Reset clears search alongside everything else. Empty state explicitly says when zero products match the typed query.
+- **New: Search autocomplete.** As you type, a dropdown appears below the input with up to 8 matching products. Each shows the thumbnail, name, color-coded type, and status badge. Click any suggestion to jump straight to its Edit dialog. Keyboard nav: **↑/↓** to highlight, **Enter** to open, **Escape** to clear and close.
+- **Mobile: type chips are bigger and color-coded.** The Type chip in each mobile card now uses a deterministic color from the chart palette per product type (Toothpaste always renders one color, Shampoo always another, etc., based on a stable hash of the type name) — makes categories scannable at a glance. Bumped from 11px / tight padding to 13px / 5×12 padding so they're easier to tap. Custom types you add get colors automatically.
+- **Re-discovery hint:** the chip-click filtering has been there since v0.7.10 desktop / v0.7.22 mobile — tap any Type / Buyer / Card chip on a row to filter to just that value, with the active filter showing as a dismissible chip above the table.
 
 ### v0.13.1 — 2026-04-27
 - **Fixed: Activity log now syncs across devices.** It was localStorage-only since v0.7.17, so signing in on another device meant a blank activity page even though the products themselves synced. Now stored at `/users/{uid}/activity/{logId}` in Firestore — same per-user isolation as everything else, no security rules change required (existing wildcard match already covers any subcollection). One-time migration on first sign-in after this update copies any localStorage entries into Firestore (and archives the local key to `usage.activity.v1.<uid>.migrated` rather than deleting). The Clear button now wipes the synced log everywhere, with a clearer confirm message reflecting that.
