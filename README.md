@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.14.1
+**Version:** v0.14.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.14.1)
+## Current status (v0.14.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.14.2 — 2026-04-27
+- **Fixed: `$/day` math no longer double-counts sequential products.** The "$/day by product type" chart and the "YTD daily cost" stat tile previously summed each product's individual `$/day` rate within a category. That double-counted when you used multiple products of the same type sequentially — two $5 underarms used in succession over 30 days showed as `$0.67/day` (each product's `$5/15 = $0.33` summed) when reality is `$10 / 30 = $0.33/day`.
+- **New per-category math:** total spend on that category ÷ span its products covered (earliest start to latest end-or-today). Single-product categories give the same answer as before; multi-product categories now match intuition.
+- **YTD daily cost** is now the *sum* of per-category rates (correct, because categories are typically used in parallel — toothbrush + soap + shampoo all run concurrently — and summing across categories doesn't double-count). Tooltip on the tile updated to explain the math.
+- **Trends panel "highest daily-cost category" insight** also uses the new math.
 
 ### v0.14.1 — 2026-04-27
 - **New: One-tap Finish button on active products.** A green **Finish** button appears next to Edit on every active row (and prominently as a primary green button on every active mobile card). Tap it → a tiny dialog opens with the end date pre-filled to today; confirm and the product is marked finished. The date input enforces "can't end before start" and "can't end in the future." Replaces the old multi-step path of opening the full Edit dialog just to set the end date.

@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.14.1
+/* Usage Tracker — v0.14.2
+ * v0.14.2: Honest $/day math. Per-category rate now = total spend on that
+ *   category / span its products covered (was sum-of-per-product-rates which
+ *   double-counted sequential products of the same type — two $5 items used
+ *   over 30 consecutive days now correctly shows as $0.33/day, not $0.67).
+ *   Affects: $/day-by-type chart, YTD daily-cost stat, "highest daily-cost
+ *   category" insight in trends panel.
  * v0.14.1: One-tap Finish button on active products. Opens a small dialog
  *   with end-date pre-filled to today; confirm marks the product finished
  *   without going through the full Edit flow.
@@ -127,7 +133,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.14.1';
+const APP_VERSION = '0.14.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -313,6 +319,40 @@ function calcCostPerDay(p) {
   if (!d) return null;
   const c = allocatedCost(p);
   return isFinite(c) ? c / d : null;
+}
+
+// v0.14.2: category-level $/day. Honest version of "what's my daily burn
+// rate for this productType." Computed as total spend on the category
+// divided by the date span those products covered.
+//
+// Why this is needed: summing per-product $/day rates across products of
+// the same type DOUBLE-COUNTS when products were used sequentially. E.g.
+// two $5 underarms used over 30 consecutive days = $0.33/day in reality,
+// but sum-of-rates would say $0.67/day (each product's $5/15 rate added).
+//
+// Span = (latest end or today) − (earliest start). Uses today as the
+// endpoint for any active products in the category. Inventory excluded.
+// If there's only one product, this reduces to the same answer as
+// calcCostPerDay for it.
+function categoryDailyRate(type, prods = products) {
+  const items = prods.filter(p => (p.productType || '') === type && !isInventory(p));
+  if (items.length === 0) return null;
+  let totalCost = 0;
+  let earliest = null;
+  let latest = null;
+  const now = new Date();
+  for (const p of items) {
+    const c = allocatedCost(p);
+    if (isFinite(c)) totalCost += c;
+    const s = parseLocalDate(p.startDate);
+    const e = p.endDate ? parseLocalDate(p.endDate) : now;
+    if (!s || !e) continue;
+    if (!earliest || s < earliest) earliest = s;
+    if (!latest || e > latest) latest = e;
+  }
+  if (!earliest || !latest || totalCost <= 0) return null;
+  const days = Math.max(1, Math.round((latest - earliest) / 86400000));
+  return totalCost / days;
 }
 
 // Active = user has started using it and hasn't finished.
@@ -1318,17 +1358,29 @@ function renderStats() {
     return s + (allocatedCost(p) || 0);
   }, 0);
 
-  // YTD $/day: sum of per-day burn for products that were in use at any
-  // point during this year — i.e. startDate <= today AND (endDate blank
-  // OR endDate >= Jan 1 of this year).
-  const ytdPerDay = products.reduce((s, p) => {
+  // YTD $/day — v0.14.2: was sum-of-per-product-rates which double-counted
+  // sequential products (two $5 underarms used in succession over 30 days
+  // showed as $0.67/day instead of the true $0.33/day). Now: sum of
+  // category-level rates, where each category's rate is total spend on
+  // that category divided by the date span its products covered. Summing
+  // across categories is correct because categories are typically used in
+  // parallel (toothpaste + soap + shampoo all run concurrently), so the
+  // sum genuinely represents your daily burn rate across all tracked
+  // products. Excludes inventory (no startDate → no rate).
+  const typesActiveYTD = new Set();
+  for (const p of products) {
+    if (isInventory(p)) continue;
     const start = parseLocalDate(p.startDate);
-    if (!start || start > now) return s;
+    if (!start || start > now) continue;
     const end = p.endDate ? parseLocalDate(p.endDate) : now;
-    if (!end || end < yearStart) return s;
-    const perDay = calcCostPerDay(p);
-    return s + (perDay != null && isFinite(perDay) ? perDay : 0);
-  }, 0);
+    if (!end || end < yearStart) continue;
+    if (p.productType) typesActiveYTD.add(p.productType);
+  }
+  let ytdPerDay = 0;
+  for (const t of typesActiveYTD) {
+    const r = categoryDailyRate(t);
+    if (r != null && isFinite(r)) ytdPerDay += r;
+  }
 
   document.getElementById('stat-count').textContent = count;
   document.getElementById('stat-active').textContent = active;
@@ -1644,18 +1696,27 @@ const INSIGHT_GENERATORS = [
   // Inventory has no startDate so it's already excluded by calcCostPerDay,
   // but we filter explicitly to keep the rule self-evident in the code.
   function topPerDayCategory(ps) {
+    // v0.14.2: use categoryDailyRate (corrects sequential-product inflation)
+    // instead of summing per-product rates. Still requires 3+ finished
+    // products as the min-data threshold so this only fires when there's
+    // real data to compute against.
     const finished = ps.filter(isFinished);
     if (finished.length < 3) return null;
-    const map = new Map();
-    for (const p of finished) {
-      const v = calcCostPerDay(p);
-      if (v == null || !isFinite(v) || v <= 0) continue;
-      const k = p.productType || 'Unknown';
-      map.set(k, (map.get(k) || 0) + v);
+    const types = new Set();
+    for (const p of ps) {
+      if (!isInventory(p) && p.productType) types.add(p.productType);
     }
-    const top = topEntry(map);
-    if (!top || top[1] <= 0) return null;
-    return `${top[0]} is your highest daily-cost category, burning ${moneyFine(top[1])} per day.`;
+    let bestType = null;
+    let bestRate = 0;
+    for (const t of types) {
+      const r = categoryDailyRate(t, ps);
+      if (r != null && isFinite(r) && r > bestRate) {
+        bestRate = r;
+        bestType = t;
+      }
+    }
+    if (!bestType || bestRate <= 0) return null;
+    return `${bestType} is your highest daily-cost category, burning ${moneyFine(bestRate)} per day.`;
   },
   // Inventory pile-up
   function inventoryPileUp(ps) {
@@ -1814,12 +1875,18 @@ function renderReorderReminders() {
 // Inventory rows have null cost-per-day so they fall through naturally;
 // finished rows still contribute (their per-day rate over their lifespan).
 function renderChartPerDayByType() {
-  const map = new Map();
+  // v0.14.2: was sum-of-per-product-rates which double-counted sequential
+  // products of the same type. Now uses categoryDailyRate (total cost on
+  // the type / span those products covered) — matches user intuition for
+  // "$5 underarm × 2 over 30 days = $0.33/day."
+  const types = new Set();
   for (const p of products) {
-    const v = calcCostPerDay(p);
-    if (v == null || !isFinite(v) || v <= 0) continue;
-    const k = p.productType || 'Unknown';
-    map.set(k, (map.get(k) || 0) + v);
+    if (!isInventory(p) && p.productType) types.add(p.productType);
+  }
+  const map = new Map();
+  for (const t of types) {
+    const r = categoryDailyRate(t);
+    if (r != null && isFinite(r) && r > 0) map.set(t, r);
   }
   const entries = sortedEntriesDesc(map);
   destroyChart('perDayByType');
