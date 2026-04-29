@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.14.4">
+  <meta name="version" content="0.15.0">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.14.4</span>
+        <span class="version" id="version">v0.15.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -130,6 +130,7 @@
       <button type="button" class="view-tab is-active" data-view="table" role="tab" aria-selected="true">Table</button>
       <button type="button" class="view-tab" data-view="dashboard" role="tab" aria-selected="false">Dashboard</button>
       <button type="button" class="view-tab" data-view="activity" role="tab" aria-selected="false">Activity</button>
+      <button type="button" class="view-tab" data-view="favorites" role="tab" aria-selected="false">Favorites</button>
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
@@ -232,6 +233,20 @@
       <p class="empty-state" id="dash-empty" hidden>Add some products to see your dashboard.</p>
     </section>
 
+    <!-- v0.15.0: Favorites — catalog of products you remember/liked but
+         haven't necessarily tracked. Cross-references with tracked products
+         by UPC for "last used / times used" stats. Doesn't affect any
+         stats, charts, reminders, or trends. -->
+    <section class="view" id="view-favorites" role="tabpanel" hidden>
+      <div class="favorites-controls">
+        <h2 class="favorites-title">Favorites</h2>
+        <span class="favorites-count" id="favorites-count"></span>
+        <button type="button" id="btn-add-favorite" class="btn btn-primary">+ Add favorite</button>
+      </div>
+      <div class="favorites-grid" id="favorites-grid"></div>
+      <p class="empty-state" id="favorites-empty" hidden>No favorites yet. Tap <strong>+ Add favorite</strong> to remember a product you liked but aren't actively tracking.</p>
+    </section>
+
     <section class="view" id="view-activity" role="tabpanel" hidden>
       <div class="activity-controls">
         <h2 class="activity-title">Activity log</h2>
@@ -259,7 +274,7 @@
         <button type="button" class="icon-btn" id="dialog-close" aria-label="Close">&times;</button>
       </header>
 
-      <section id="continue-bundle-wrap" class="form-banner">
+      <section id="continue-bundle-wrap" class="form-banner" data-tracked-only>
         <label class="field">
           <span>Continue existing bundle</span>
           <select id="continue-bundle">
@@ -299,12 +314,12 @@
           <input name="productName" type="text" required maxlength="120">
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Size <em>*</em></span>
           <input name="size" type="number" step="any" min="0" required>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Unit <em>*</em></span>
           <select name="unit" required>
             <option value="">Select...</option>
@@ -327,18 +342,18 @@
           </select>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Start date <em class="muted">(leave blank for inventory)</em></span>
           <input name="startDate" type="date">
           <small class="field-hint">If you've purchased this but haven't started using it yet, leave this blank — it'll be tracked as inventory and won't affect daily-cost stats until you set a start date.</small>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>End date</span>
           <input name="endDate" type="date">
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Cost (pre-tax) <em>*</em></span>
           <div class="currency-wrap">
             <span class="currency-prefix" data-currency-symbol>$</span>
@@ -346,7 +361,7 @@
           </div>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Cost with tax</span>
           <div class="currency-wrap">
             <span class="currency-prefix" data-currency-symbol>$</span>
@@ -354,37 +369,37 @@
           </div>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Store</span>
           <select name="store"></select>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Buyer</span>
           <select name="buyer"></select>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Card (last 4)</span>
           <select name="cardLast4"></select>
         </label>
 
-        <label class="field">
+        <label class="field" data-tracked-only>
           <span>Purchase date</span>
           <input name="purchaseDate" type="date">
         </label>
 
-        <label class="field checkbox-field">
+        <label class="field checkbox-field" data-tracked-only>
           <input name="bundleStatus" type="checkbox">
           <span>Part of a bundle purchase</span>
         </label>
 
-        <label class="field" id="bundle-size-wrap" hidden>
+        <label class="field" id="bundle-size-wrap" data-tracked-only hidden>
           <span>How many in the bundle? <em>*</em></span>
           <input name="bundleSize" type="number" min="1" step="1" placeholder="e.g. 3">
         </label>
 
-        <label class="field" id="bundle-position-wrap" hidden>
+        <label class="field" id="bundle-position-wrap" data-tracked-only hidden>
           <span>Which number of the bundle is this? <em>*</em></span>
           <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
         </label>
@@ -401,6 +416,28 @@
         <label class="field field-wide">
           <span>Notes</span>
           <textarea name="notes" rows="2" maxlength="500"></textarea>
+        </label>
+
+        <!-- v0.15.0: favorite-only fields. Visible only when the dialog is in
+             favorite mode (the openAddFavoriteDialog flow). The hidden
+             `favorite` input carries the catalog flag through the FIELDS
+             loop in handleSubmit. Rating is 1–5 stars; "why" is free-form. -->
+        <input name="favorite" type="hidden">
+        <label class="field field-wide" data-favorite-only>
+          <span>Rating</span>
+          <div class="rating-input" id="rating-input" role="radiogroup" aria-label="Rating">
+            <button type="button" class="rating-star" data-value="1" aria-label="1 star">★</button>
+            <button type="button" class="rating-star" data-value="2" aria-label="2 stars">★</button>
+            <button type="button" class="rating-star" data-value="3" aria-label="3 stars">★</button>
+            <button type="button" class="rating-star" data-value="4" aria-label="4 stars">★</button>
+            <button type="button" class="rating-star" data-value="5" aria-label="5 stars">★</button>
+            <button type="button" class="rating-clear" id="rating-clear" title="Clear rating">Clear</button>
+          </div>
+          <input name="favoriteRating" type="hidden">
+        </label>
+        <label class="field field-wide" data-favorite-only>
+          <span>Why I like it</span>
+          <textarea name="favoriteWhy" rows="2" maxlength="500" placeholder="What stood out about this product? (optional)"></textarea>
         </label>
       </div>
 

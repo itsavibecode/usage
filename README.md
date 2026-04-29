@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.14.4
+**Version:** v0.15.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.14.4)
+## Current status (v0.15.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,13 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.15.0 — 2026-04-29
+- **New: Favorites view.** A new top-level tab alongside Table / Dashboard / Activity. Favorites are products you remember and want to keep handy — even if you didn't formally track them. They live in their own catalog and **don't affect any stats, charts, reorder reminders, daily-cost calcs, or dashboard cards.** Each card shows the type chip (color-coded, same hash as mobile chips), product name, optional 1–5 star rating, your "why I liked it" note, the image (from UPC lookup), and — if you have a UPC and any tracked products that share it — a *"Last used Mar 14 · tracked 3 times"* line.
+- **+ Add favorite** opens the existing Add dialog in a simplified mode (the date/cost/store/buyer/bundle fields are hidden via CSS; rating + "why" fields appear). Same UPC lookup auto-fills name/type/image. Same scanner. Same image thumbnail.
+- **Track new** button on each favorite pre-fills the Add dialog with the catalog data so you can start tracking a new instance of a remembered product in one tap. The favorite stays in the catalog; cross-reference stats refresh automatically once you add the new tracked row.
+- **Edit / Remove** per favorite, same look as elsewhere. Remove only deletes the catalog entry; tracked instances of the same product (if any) are NOT affected.
+- **Filtering:** every existing aggregate (`renderStats`, `groupAllocatedSpend`, `categoryDailyRate`, all charts, reorder reminders, trends panel, search dropdown, bundle helpers, price history) now goes through a `trackedOnly()` helper that excludes favorites. `isInventory` / `isActive` / `isFinished` also got a `!p.favorite` guard at the source so favorites can never accidentally be classified as inventory items.
 
 ### v0.14.4 — 2026-04-29
 - **Full favicon coverage.** v0.13.0 had only `favicon.svg` declared, which works on modern desktop browsers but doesn't cover iOS home-screen icons, Android Add-to-Home, browser-chrome tinting, or legacy fallbacks. Added: 32×32 PNG (browser tab fallback), 180×180 apple-touch-icon (iOS home-screen), 192×192 + 512×512 PNGs (Android adaptive icons / PWA install). All generated from the existing SVG via `npx sharp-cli` so the design is consistent across every output.

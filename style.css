@@ -266,6 +266,177 @@ main {
   }
 }
 
+/* v0.15.0 — Favorites view. Card grid (one per favorite) with cross-ref
+ * usage stats inline. Distinct visual treatment from the main table cards
+ * to signal "this is the catalog, not your tracked rotation." */
+.favorites-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.favorites-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.favorites-count {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+#btn-add-favorite { margin-left: auto; }
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.fav-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.fav-card:hover {
+  border-color: #c9d0de;
+  box-shadow: 0 4px 16px rgba(20, 30, 60, 0.08);
+}
+.fav-thumb,
+.fav-thumb-fallback {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+  border-bottom: 1px solid var(--border);
+  display: block;
+}
+.fav-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.fav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fav-type {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+.fav-rating {
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #d98f2b;
+  white-space: nowrap;
+}
+.fav-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.fav-why {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.fav-usage {
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 500;
+}
+.fav-usage-none { color: var(--text-muted); font-weight: 400; }
+.fav-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.fav-actions button {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.fav-actions button:hover { background: var(--surface-alt); }
+.fav-promote-btn { color: var(--primary); border-color: var(--primary); font-weight: 500; }
+.fav-promote-btn:hover { background: #eef3ff; }
+.fav-delete-btn:hover {
+  background: #fbeaea;
+  color: var(--danger);
+  border-color: #f4c7c7;
+}
+
+/* Dialog mode toggling: favorite mode hides tracked-only fields and
+ * reveals favorite-only fields. Default state hides favorite-only fields. */
+.product-dialog [data-favorite-only] { display: none; }
+.product-dialog.is-favorite-mode [data-tracked-only] { display: none !important; }
+.product-dialog.is-favorite-mode [data-favorite-only] { display: flex; }
+
+/* Rating input — five clickable stars + clear button. */
+.rating-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rating-star {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: #d4d8e4;
+  transition: color 0.12s, transform 0.05s;
+  font-family: inherit;
+}
+.rating-star:hover { color: #f0c060; }
+.rating-star.is-active { color: #d98f2b; }
+.rating-star:active { transform: scale(0.92); }
+.rating-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-left: 8px;
+  font-family: inherit;
+}
+.rating-clear:hover { background: var(--surface-alt); color: var(--text); }
+
+@media (max-width: 720px) {
+  .favorites-grid { grid-template-columns: 1fr; }
+  #btn-add-favorite { margin-left: 0; }
+}
+
 /* v0.7.12 trends panel — sits above everything in the main view. Shows one
  * "insight" or "did you know" line. Hidden when there are no products and
  * when no real insight or cold-start fact applies. Computed once per page

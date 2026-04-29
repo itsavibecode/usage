@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.14.4
+/* Usage Tracker — v0.15.0
+ * v0.15.0: Favorites — new top-level view alongside Table / Dashboard /
+ *   Activity. Catalog of products you remember/liked but aren't necessarily
+ *   tracking. Cross-references with tracked products by UPC for "last used /
+ *   times used." Doesn't affect any stats, charts, reminders, or trends.
+ *   "Track new" button on each favorite pre-fills the Add dialog so you can
+ *   start tracking a new instance of a remembered product in one tap.
  * v0.14.4: Full favicon coverage — SVG (modern), 32px PNG fallback,
  *   180px apple-touch-icon, 192/512 PNGs for Android, manifest.webmanifest
  *   so the app is installable as a PWA, theme-color meta tag for mobile
@@ -139,7 +145,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.14.4';
+const APP_VERSION = '0.15.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -154,7 +160,12 @@ const FIELDS = [
   'startDate', 'endDate', 'cost', 'costWithTax',
   'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
-  'purchaseDate', 'notes', 'upc', 'imageUrl', 'createdAt'
+  'purchaseDate', 'notes', 'upc', 'imageUrl', 'createdAt',
+  // v0.15.0: favorite catalog entries. When `favorite: true`, the row is a
+  // standalone reference (no dates, no cost, no stats impact) — purely a
+  // remembered product. Shows up in the Favorites view, never in the main
+  // table or any aggregate. Cross-referenced with tracked products via UPC.
+  'favorite', 'favoriteRating', 'favoriteWhy'
 ];
 
 const ADD_NEW = '__add_new__';
@@ -341,7 +352,7 @@ function calcCostPerDay(p) {
 // If there's only one product, this reduces to the same answer as
 // calcCostPerDay for it.
 function categoryDailyRate(type, prods = products) {
-  const items = prods.filter(p => (p.productType || '') === type && !isInventory(p));
+  const items = prods.filter(p => !isFavorite(p) && (p.productType || '') === type && !isInventory(p));
   if (items.length === 0) return null;
   let totalCost = 0;
   let earliest = null;
@@ -365,9 +376,23 @@ function categoryDailyRate(type, prods = products) {
 // Inventory = bought but not yet in use (no startDate).
 // Finished = has an endDate.
 // These three categories partition the product set.
-function isActive(p) { return !!p.startDate && !p.endDate; }
-function isInventory(p) { return !p.startDate; }
-function isFinished(p) { return !!p.endDate; }
+function isActive(p) { return !p.favorite && !!p.startDate && !p.endDate; }
+// v0.15.0: a favorite has no startDate but is NOT inventory — it's a catalog
+// entry. Adding the !p.favorite guard at the source of truth means every
+// caller of isInventory is automatically correct. isActive / isFinished
+// already return false for favorites since favorites have no dates.
+function isInventory(p) { return !p.favorite && !p.startDate; }
+function isFinished(p) { return !p.favorite && !!p.endDate; }
+
+// v0.15.0: favorite = catalog entry, NOT a tracked usage. Filtered out of
+// every stat / chart / aggregate. Lives in its own Favorites view.
+function isFavorite(p) { return p.favorite === true; }
+
+// Convenience wrapper used by every place that aggregates real tracked
+// data — stats, charts, reminders, trends, bundles, price history. Calling
+// `trackedOnly()` (with no args, defaults to module `products`) is the
+// idiomatic way to get the not-favorite set anywhere in the file.
+function trackedOnly(arr = products) { return arr.filter(p => !isFavorite(p)); }
 
 /* ---------- formatting ---------- */
 
@@ -470,7 +495,9 @@ function newBundleId() { return 'b-' + newId(); }
 // "bundle × N" chip). Sibling rows are the rest.
 function bundleSiblings(bundleId) {
   if (!bundleId) return [];
-  return products.filter(p => p.bundleId === bundleId);
+  // Favorites can't be bundle members — they have no bundle data — but
+  // filter defensively so a future bug couldn't poison the panel.
+  return products.filter(p => !isFavorite(p) && p.bundleId === bundleId);
 }
 
 /* ---------- Firestore storage ---------- */
@@ -821,7 +848,7 @@ function allProductTypes() {
 function bundlesList() {
   const seen = new Map();
   for (const p of products) {
-    if (!p.bundleStatus) continue;
+    if (isFavorite(p) || !p.bundleStatus) continue;
     const key = `${p.productName}|${p.purchaseDate}|${p.bundleSize}`;
     if (!seen.has(key)) seen.set(key, p);
   }
@@ -865,10 +892,10 @@ function setSearchQuery(q) {
 
 function suggestionMatches() {
   if (!searchQuery) return [];
-  // Search the FULL product list (not filteredProducts) so suggestions
-  // surface matches regardless of active row-filter / chip filters. The
-  // table view still respects those filters.
-  return products
+  // Search the FULL tracked product list (not filteredProducts) so suggestions
+  // surface matches regardless of active row-filter / chip filters. v0.15.0:
+  // favorites excluded — they have their own view and search there if needed.
+  return trackedOnly()
     .filter(p => productMatchesSearch(p, searchQuery))
     .slice(0, SUGGESTION_MAX);
 }
@@ -953,7 +980,9 @@ function productMatchesSearch(p, q) {
 }
 
 function filteredProducts() {
-  let list = products;
+  // v0.15.0: favorites never appear in the main table — they live in the
+  // dedicated Favorites view. Stats/charts/aggregates also exclude them.
+  let list = trackedOnly();
   // Row-filter tabs (All / Active / Inventory) — applied first.
   if (currentFilter === 'active') list = list.filter(isActive);
   else if (currentFilter === 'inventory') list = list.filter(isInventory);
@@ -1072,6 +1101,9 @@ function render() {
   renderTable();
   renderStats();
   renderDashboard();
+  // v0.15.0: refresh favorites view if it's currently active. Otherwise it
+  // re-renders on view switch via setView.
+  if (currentView === 'favorites') renderFavorites();
 }
 
 function renderTable() {
@@ -1336,16 +1368,18 @@ function renderBundleSiblingsRow(p) {
 }
 
 function renderStats() {
-  const count = products.length;
-  const active = products.filter(isActive).length;
-  const inventory = products.filter(isInventory).length;
-  const finished = products.filter(isFinished).length;
+  // v0.15.0: every aggregate filters favorites out via trackedOnly().
+  const tracked = trackedOnly();
+  const count = tracked.length;
+  const active = tracked.filter(isActive).length;
+  const inventory = tracked.filter(isInventory).length;
+  const finished = tracked.filter(isFinished).length;
   // v0.7.7: spend tiles exclude inventory. Rationale: until you start using
   // a product, treating it as "spent" mixes accounting cash-flow with the
   // app's usage-tracking purpose. Inventory items only contribute to spend
   // metrics once they get a startDate (active or finished). Same exclusion
   // applies to YTD spend and to the dashboard groupAllocatedSpend below.
-  const total = products
+  const total = tracked
     .filter(p => !isInventory(p))
     .reduce((s, p) => s + (allocatedCost(p) || 0), 0);
 
@@ -1357,7 +1391,7 @@ function renderStats() {
   // YTD spend: products purchased AND started using in the current calendar
   // year. Inventory excluded — see comment on `total` above. Falls back to
   // startDate if purchaseDate is missing (legacy rows).
-  const ytdSpend = products.reduce((s, p) => {
+  const ytdSpend = tracked.reduce((s, p) => {
     if (isInventory(p)) return s;
     const purchase = parseLocalDate(p.purchaseDate || p.startDate);
     if (!purchase || purchase.getFullYear() !== currentYear) return s;
@@ -1374,7 +1408,7 @@ function renderStats() {
   // sum genuinely represents your daily burn rate across all tracked
   // products. Excludes inventory (no startDate → no rate).
   const typesActiveYTD = new Set();
-  for (const p of products) {
+  for (const p of tracked) {
     if (isInventory(p)) continue;
     const start = parseLocalDate(p.startDate);
     if (!start || start > now) continue;
@@ -1463,10 +1497,9 @@ function renderDashCards() {
 
 function groupAllocatedSpend(keyFn) {
   // Inventory items are excluded from all spend aggregations (see renderStats
-  // comment for rationale). This drives the dashboard's "Top category by
-  // spend" / "Top store by spend" cards and the two donut/bar charts.
+  // comment for rationale). v0.15.0: favorites also excluded.
   const map = new Map();
-  for (const p of products) {
+  for (const p of trackedOnly()) {
     if (isInventory(p)) continue;
     const k = keyFn(p);
     if (!k) continue;
@@ -1767,9 +1800,12 @@ function pickColdStartFact(ps) {
 let trendInsightCache;
 
 function computeTrendInsight() {
-  const real = pickRealInsight(products);
+  // v0.15.0: trends always operate on tracked products only — favorites are
+  // catalog references, not data the user has insights about.
+  const ps = trackedOnly();
+  const real = pickRealInsight(ps);
   if (real) return { kind: 'real', text: real };
-  const cold = pickColdStartFact(products);
+  const cold = pickColdStartFact(ps);
   if (cold) return { kind: 'cold', text: cold.fact };
   return null;
 }
@@ -1886,7 +1922,7 @@ function renderChartPerDayByType() {
   // the type / span those products covered) — matches user intuition for
   // "$5 underarm × 2 over 30 days = $0.33/day."
   const types = new Set();
-  for (const p of products) {
+  for (const p of trackedOnly()) {
     if (!isInventory(p) && p.productType) types.add(p.productType);
   }
   const map = new Map();
@@ -1923,7 +1959,7 @@ function renderChartPerDayByType() {
 // is a purchase whether or not you've started it).
 function renderChartCountByType() {
   const map = new Map();
-  for (const p of products) {
+  for (const p of trackedOnly()) {
     const k = p.productType || 'Unknown';
     map.set(k, (map.get(k) || 0) + 1);
   }
@@ -1956,7 +1992,7 @@ function renderChartCountByType() {
 // you can see at a glance which are still running. Inventory rows have no
 // duration and are excluded.
 function renderChartLongestRunning() {
-  const rows = products
+  const rows = trackedOnly()
     .map(p => {
       const dur = calcDuration(p);
       if (dur == null || !isFinite(dur) || dur <= 0) return null;
@@ -2081,11 +2117,12 @@ function resetFilters() {
 }
 
 function setView(view) {
-  if (view !== 'table' && view !== 'dashboard' && view !== 'activity') return;
+  if (view !== 'table' && view !== 'dashboard' && view !== 'activity' && view !== 'favorites') return;
   currentView = view;
   document.getElementById('view-table').hidden = view !== 'table';
   document.getElementById('view-dashboard').hidden = view !== 'dashboard';
   document.getElementById('view-activity').hidden = view !== 'activity';
+  document.getElementById('view-favorites').hidden = view !== 'favorites';
   for (const btn of document.querySelectorAll('.view-tab')) {
     const isActive = btn.dataset.view === view;
     btn.classList.toggle('is-active', isActive);
@@ -2094,6 +2131,85 @@ function setView(view) {
   // Dashboard charts must render after the container is visible so Chart.js measures width correctly.
   if (view === 'dashboard') renderDashboard();
   if (view === 'activity') renderActivity();
+  if (view === 'favorites') renderFavorites();
+}
+
+/* ---------- v0.15.0 Favorites view ---------- */
+
+// Cross-reference: for a favorite, find tracked products that share its UPC
+// and aggregate "last used" + "times used." UPC is the strongest match
+// signal — name fuzzy-matching is too noisy. If the favorite has no UPC,
+// returns zeros (still renders the card, just without usage stats).
+function favoriteStats(fav) {
+  const upc = (fav.upc || '').trim();
+  if (!upc) return { timesUsed: 0, lastUsed: null };
+  const usages = products.filter(p =>
+    !isFavorite(p) &&
+    (p.upc || '').trim() === upc &&
+    !!p.startDate
+  );
+  if (usages.length === 0) return { timesUsed: 0, lastUsed: null };
+  let lastUsed = null;
+  for (const p of usages) {
+    // "Last used" = most recent endDate (if finished) or startDate (if active).
+    const candidate = p.endDate || p.startDate;
+    if (candidate && (!lastUsed || candidate > lastUsed)) lastUsed = candidate;
+  }
+  return { timesUsed: usages.length, lastUsed };
+}
+
+function renderFavorites() {
+  const grid = document.getElementById('favorites-grid');
+  const empty = document.getElementById('favorites-empty');
+  const count = document.getElementById('favorites-count');
+  if (!grid || !empty || !count) return;
+  const favs = products.filter(isFavorite);
+  // Sort: highest rating first, then most recently created.
+  favs.sort((a, b) => {
+    const ra = Number(a.favoriteRating) || 0;
+    const rb = Number(b.favoriteRating) || 0;
+    if (ra !== rb) return rb - ra;
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+  });
+  count.textContent = favs.length === 0 ? '' : `${favs.length} ${favs.length === 1 ? 'item' : 'items'}`;
+  if (favs.length === 0) {
+    grid.innerHTML = '';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  grid.innerHTML = favs.map(f => {
+    const stats = favoriteStats(f);
+    const rating = Number(f.favoriteRating) || 0;
+    const ratingDisplay = rating > 0
+      ? `<span class="fav-rating" title="Rating: ${rating} of 5">${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}</span>`
+      : '';
+    const usageLine = stats.timesUsed > 0
+      ? `<span class="fav-usage">Last used ${formatDate(stats.lastUsed)} &middot; tracked ${stats.timesUsed} time${stats.timesUsed === 1 ? '' : 's'}</span>`
+      : (f.upc ? '<span class="fav-usage fav-usage-none">Not yet tracked</span>' : '<span class="fav-usage fav-usage-none">No UPC for cross-reference</span>');
+    const why = f.favoriteWhy ? `<p class="fav-why">${escapeHtml(f.favoriteWhy)}</p>` : '';
+    const thumb = f.imageUrl
+      ? `<img class="fav-thumb" src="${escapeHtml(f.imageUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=fav-thumb-fallback></div>'">`
+      : '<div class="fav-thumb-fallback"></div>';
+    const typeStyle = f.productType ? `style="background:${colorForType(f.productType)};color:#fff"` : '';
+    return `<article class="fav-card" data-id="${f.id}">
+      ${thumb}
+      <div class="fav-body">
+        <header class="fav-head">
+          ${f.productType ? `<span class="fav-type" ${typeStyle}>${escapeHtml(f.productType)}</span>` : ''}
+          ${ratingDisplay}
+        </header>
+        <h3 class="fav-name">${escapeHtml(f.productName) || '(unnamed)'}</h3>
+        ${why}
+        ${usageLine}
+        <div class="fav-actions">
+          <button type="button" class="fav-edit-btn" data-id="${f.id}" title="Edit favorite">Edit</button>
+          <button type="button" class="fav-promote-btn" data-id="${f.id}" title="Start tracking a new instance of this product">Track new</button>
+          <button type="button" class="fav-delete-btn" data-id="${f.id}" title="Remove from favorites">Remove</button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
 }
 
 // v0.7.17 — render the activity log entries. Pulls from localStorage (newest
@@ -2182,6 +2298,7 @@ function populateBundleSelect(el) {
     const filled = b.bundleId
       ? bundleSiblings(b.bundleId).length
       : products.filter(p =>
+          !isFavorite(p) &&
           p.bundleStatus &&
           p.productName === b.productName &&
           p.purchaseDate === b.purchaseDate &&
@@ -2269,8 +2386,33 @@ function populateFormSelects(current = {}) {
     current.cardLast4 || '', v => `•••• ${v}`);
 }
 
+// v0.15.0: which mode is the product dialog currently in. Drives field
+// visibility (data-tracked-only vs data-favorite-only) and validation
+// branching in handleSubmit. Cleared in closeDialog.
+let dialogMode = 'tracked'; // 'tracked' | 'favorite'
+
+function applyDialogMode(mode) {
+  dialogMode = mode;
+  const dlg = dialog();
+  dlg.classList.toggle('is-favorite-mode', mode === 'favorite');
+  // Required-attribute juggling: HTML `required` on a hidden input still
+  // blocks form submit. So when we hide tracked-only inputs, also clear
+  // their required flag — and remember the original so we can restore it
+  // when switching back.
+  for (const el of dlg.querySelectorAll('[data-tracked-only] input, [data-tracked-only] select')) {
+    if (mode === 'favorite') {
+      if (el.required) el.dataset.wasRequired = '1';
+      el.required = false;
+    } else {
+      if (el.dataset.wasRequired === '1') el.required = true;
+      delete el.dataset.wasRequired;
+    }
+  }
+}
+
 function openAddDialog() {
   editingId = null;
+  applyDialogMode('tracked');
   document.getElementById('dialog-title').textContent = 'Add product';
   const f = form();
   f.reset();
@@ -2322,6 +2464,94 @@ function closeDialog() {
   dialog().close();
   editingId = null;
   pendingDuplicateSourceId = null; // v0.7.17 — clear duplicate flag on cancel
+  applyDialogMode('tracked'); // v0.15.0 — reset to tracked default
+}
+
+// v0.15.0: open the dialog in favorite-add mode. Same form, different
+// field visibility + validation. Hidden `favorite` input set to "true"
+// so handleSubmit knows to skip date/cost/bundle validation.
+function openAddFavoriteDialog() {
+  editingId = null;
+  applyDialogMode('favorite');
+  document.getElementById('dialog-title').textContent = 'Add favorite';
+  const f = form();
+  f.reset();
+  populateFormSelects();
+  document.getElementById('continue-bundle-wrap').hidden = true;
+  f.elements.favorite.value = 'true';
+  syncRatingDisplay(0);
+  setUpcStatus('');
+  syncAmazonCheckLink('');
+  dialog().showModal();
+  requestAnimationFrame(() => {
+    const upc = f.elements.upc;
+    if (upc) try { upc.focus(); } catch {}
+  });
+}
+
+// Edit an existing favorite. Reuses the populate-from-product loop the
+// regular Edit dialog uses; the dialog mode flag handles the rest.
+function openEditFavoriteDialog(id) {
+  const p = products.find(x => x.id === id);
+  if (!p || !isFavorite(p)) return;
+  editingId = id;
+  applyDialogMode('favorite');
+  document.getElementById('dialog-title').textContent = 'Edit favorite';
+  const f = form();
+  f.reset();
+  populateFormSelects(p);
+  document.getElementById('continue-bundle-wrap').hidden = true;
+  for (const key of FIELDS) {
+    if (key === 'id') continue;
+    const el = f.elements[key];
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!p[key];
+    else el.value = p[key] ?? '';
+  }
+  syncRatingDisplay(Number(p.favoriteRating) || 0);
+  setUpcStatus('');
+  syncAmazonCheckLink(p.upc);
+  dialog().showModal();
+}
+
+// "Track new" — user wants to start tracking a new instance of a product
+// they had favorited. Opens the standard Add dialog pre-filled with the
+// favorite's catalog data (type/name/UPC/image). The favorite stays in
+// the catalog; this just creates a separate tracked product.
+function trackFromFavorite(id) {
+  const fav = products.find(x => x.id === id);
+  if (!fav || !isFavorite(fav)) return;
+  openAddDialog();
+  const f = form();
+  // Carry over the catalog data; leave dates/cost/bundle blank for the user.
+  const carry = ['productType', 'productName', 'size', 'unit', 'upc', 'imageUrl'];
+  for (const key of carry) {
+    const el = f.elements[key];
+    if (el && fav[key] != null) el.value = fav[key];
+  }
+  document.getElementById('dialog-title').textContent = 'Track new (from favorite)';
+  syncAmazonCheckLink(fav.upc || '');
+  toast('Pre-filled from favorite — set start date and save');
+}
+
+function syncRatingDisplay(value) {
+  const v = Number(value) || 0;
+  const f = form();
+  if (f.elements.favoriteRating) f.elements.favoriteRating.value = v > 0 ? String(v) : '';
+  for (const star of document.querySelectorAll('#rating-input .rating-star')) {
+    const sv = Number(star.dataset.value);
+    star.classList.toggle('is-active', sv <= v && v > 0);
+  }
+}
+
+function confirmDeleteFavorite(id) {
+  const p = products.find(x => x.id === id);
+  if (!p || !isFavorite(p)) return;
+  if (!confirm(`Remove "${p.productName}" from favorites? Tracked instances of this product (if any) are NOT affected.`)) return;
+  deleteProduct(id).then(() => {
+    toast('Favorite removed');
+    logActivity('delete', p);
+  }).catch(() => {});
 }
 
 function handleContinueBundle(e) {
@@ -2411,6 +2641,46 @@ async function handleSubmit(e) {
     if (el.type === 'checkbox') data[key] = el.checked;
     else data[key] = (el.value ?? '').toString().trim();
   }
+
+  // v0.15.0: favorite-mode shortcut. The hidden `favorite` input is "true"
+  // when openAddFavoriteDialog set the dialog up. Validation skips
+  // dates/cost/bundle since those don't apply to a catalog entry.
+  const isFavoriteSubmit = data.favorite === 'true' || data.favorite === true;
+  if (isFavoriteSubmit) {
+    data.favorite = true;
+    if (!data.productType || data.productType === ADD_NEW) {
+      toast('Product type is required'); return;
+    }
+    if (!data.productName) { toast('Product name is required'); return; }
+    // Clear all tracked-only fields so they don't bleed into the favorite doc.
+    data.startDate = ''; data.endDate = '';
+    data.cost = ''; data.costWithTax = '';
+    data.bundleStatus = false; data.bundleSize = ''; data.bundlePosition = ''; data.bundleId = '';
+    data.store = ''; data.buyer = ''; data.cardLast4 = '';
+    data.purchaseDate = '';
+    // Continue to id assignment + save below (reuses the same path).
+    const id = editingId || newId();
+    if (!editingId) data.createdAt = new Date().toISOString();
+    else {
+      const existing = products.find(p => p.id === editingId);
+      data.createdAt = existing?.createdAt || new Date().toISOString();
+    }
+    const saveBtn = document.getElementById('dialog-save');
+    saveBtn.disabled = true;
+    try {
+      const product = { id, ...data };
+      await saveProduct(product);
+      toast(editingId ? 'Favorite updated' : 'Added to favorites');
+      logActivity(editingId ? 'edit' : 'add', product);
+      closeDialog();
+      // If we're already on the Favorites view, refresh it now.
+      if (currentView === 'favorites') renderFavorites();
+    } catch {} finally { saveBtn.disabled = false; }
+    return;
+  }
+
+  // Tracked-mode validation continues below — favorite flag explicitly false.
+  data.favorite = false;
 
   if (!data.productType || data.productType === ADD_NEW) {
     toast('Product type is required'); return;
@@ -2696,7 +2966,8 @@ function getPriceHistoryForUpc(upc) {
 // render the "Price history" button on a row.
 function priceHistoryCount(upc) {
   if (!upc) return 0;
-  return products.reduce((n, p) => p.upc === upc ? n + 1 : n, 0);
+  // v0.15.0: favorites excluded — they're catalog refs, not purchase events.
+  return products.reduce((n, p) => (!isFavorite(p) && p.upc === upc) ? n + 1 : n, 0);
 }
 
 function openPriceHistory(productId) {
@@ -2966,14 +3237,15 @@ function buildDashboardExportHtml({ portrait } = { portrait: false }) {
 // Stats tiles for the export — pulls fresh values via the same calculations
 // renderStats uses, but as plain divs instead of writing to existing DOM.
 function renderStatsForExport() {
-  const count = products.length;
-  const active = products.filter(isActive).length;
-  const inventory = products.filter(isInventory).length;
-  const finished = products.filter(isFinished).length;
-  const total = products.filter(p => !isInventory(p)).reduce((s, p) => s + (allocatedCost(p) || 0), 0);
+  const tracked = trackedOnly();
+  const count = tracked.length;
+  const active = tracked.filter(isActive).length;
+  const inventory = tracked.filter(isInventory).length;
+  const finished = tracked.filter(isFinished).length;
+  const total = tracked.filter(p => !isInventory(p)).reduce((s, p) => s + (allocatedCost(p) || 0), 0);
   const now = new Date();
   const yr = now.getFullYear();
-  const ytdSpend = products.reduce((s, p) => {
+  const ytdSpend = tracked.reduce((s, p) => {
     if (isInventory(p)) return s;
     const d = parseLocalDate(p.purchaseDate || p.startDate);
     if (!d || d.getFullYear() !== yr) return s;
@@ -4131,6 +4403,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reminders-panel')?.addEventListener('click', e => {
     const item = e.target.closest('.reminder-item');
     if (item) openEditDialog(item.dataset.id);
+  });
+
+  // v0.15.0: favorites view handlers
+  document.getElementById('btn-add-favorite')?.addEventListener('click', openAddFavoriteDialog);
+  document.getElementById('favorites-grid')?.addEventListener('click', e => {
+    const editBtn = e.target.closest('.fav-edit-btn');
+    const promoteBtn = e.target.closest('.fav-promote-btn');
+    const deleteBtn = e.target.closest('.fav-delete-btn');
+    if (editBtn) openEditFavoriteDialog(editBtn.dataset.id);
+    else if (promoteBtn) trackFromFavorite(promoteBtn.dataset.id);
+    else if (deleteBtn) confirmDeleteFavorite(deleteBtn.dataset.id);
+  });
+  // Rating star clicks (in the dialog when favorite mode is on)
+  document.getElementById('rating-input')?.addEventListener('click', e => {
+    const star = e.target.closest('.rating-star');
+    if (star) syncRatingDisplay(Number(star.dataset.value) || 0);
+    if (e.target.id === 'rating-clear') syncRatingDisplay(0);
   });
 
   // v0.11.0: share dialog handlers
