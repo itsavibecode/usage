@@ -1,4 +1,6 @@
-/* Usage Tracker — v0.14.2
+/* Usage Tracker — v0.14.3
+ * v0.14.3: PNG og-image alongside the SVG (Twitter/X, Facebook, LinkedIn
+ *   reject SVG OG images). Added og:url + og:locale on share/404 too.
  * v0.14.2: Honest $/day math. Per-category rate now = total spend on that
  *   category / span its products covered (was sum-of-per-product-rates which
  *   double-counted sequential products of the same type — two $5 items used
@@ -133,7 +135,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.14.2';
+const APP_VERSION = '0.14.3';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

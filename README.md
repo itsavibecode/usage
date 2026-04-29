@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.14.2
+**Version:** v0.14.3
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.14.2)
+## Current status (v0.14.3)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.14.3 — 2026-04-29
+- **OG image: PNG version added.** Twitter/X, Facebook, and LinkedIn all reject SVG og-images, so v0.13.0's SVG-only setup meant those platforms fell back to a text-only embed. Generated a 1200×630 PNG (35KB) from the existing SVG and committed it. The PNG is now the primary `og:image`, with the SVG kept as a secondary entry for platforms that prefer it (Discord/Telegram render SVG fine). Result: full image-embed coverage across every major social/messaging platform.
+- **Filled in smaller OG gaps:** `og:url` was missing on `share.html` and `404.html` (only set on `index.html`); added. `og:locale` set to `en_US` on all three pages.
+- **Twitter Cards refinement:** `twitter:image` now points to the PNG; added `twitter:image:alt` for accessibility.
 
 ### v0.14.2 — 2026-04-27
 - **Fixed: `$/day` math no longer double-counts sequential products.** The "$/day by product type" chart and the "YTD daily cost" stat tile previously summed each product's individual `$/day` rate within a category. That double-counted when you used multiple products of the same type sequentially — two $5 underarms used in succession over 30 days showed as `$0.67/day` (each product's `$5/15 = $0.33` summed) when reality is `$10 / 30 = $0.33/day`.
