@@ -1,0 +1,31 @@
+{
+  "name": "Usage Tracker",
+  "short_name": "Usage",
+  "description": "Personal product usage tracker — log everyday products, see per-day cost, track lifespans.",
+  "start_url": "/usage/",
+  "scope": "/usage/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2b5fd9",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

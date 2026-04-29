@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.14.3
+/* Usage Tracker — v0.14.4
+ * v0.14.4: Full favicon coverage — SVG (modern), 32px PNG fallback,
+ *   180px apple-touch-icon, 192/512 PNGs for Android, manifest.webmanifest
+ *   so the app is installable as a PWA, theme-color meta tag for mobile
+ *   browser chrome.
  * v0.14.3: PNG og-image alongside the SVG (Twitter/X, Facebook, LinkedIn
  *   reject SVG OG images). Added og:url + og:locale on share/404 too.
  * v0.14.2: Honest $/day math. Per-category rate now = total spend on that
@@ -135,7 +139,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.14.3';
+const APP_VERSION = '0.14.4';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

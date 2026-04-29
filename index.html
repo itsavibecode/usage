@@ -3,13 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.14.3">
+  <meta name="version" content="0.14.4">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
+  <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
+       (scales perfectly); PNG fallbacks for everything else. apple-touch
+       drives iOS home-screen icon. manifest enables Android Add-to-Home.
+       theme-color tints the browser chrome on mobile. -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#2b5fd9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Usage Tracker">
   <!-- Open Graph + Twitter Cards. Renders branded previews in Slack, Discord,
        iMessage, Twitter/X, Facebook, LinkedIn, etc. when the URL is shared.
-       v0.14.3: PNG promoted to primary og:image (Twitter/X, Facebook, LinkedIn
+       v0.14.4: PNG promoted to primary og:image (Twitter/X, Facebook, LinkedIn
        reject SVG); SVG kept as secondary for platforms that prefer it. -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Usage Tracker">
@@ -37,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.14.3</span>
+        <span class="version" id="version">v0.14.4</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -122,7 +133,7 @@
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
-      <!-- v0.14.3: live search across product fields. AND-combines with the
+      <!-- v0.14.4: live search across product fields. AND-combines with the
            row-filter tabs below + any active chip filters above. -->
       <div class="row-search-wrap">
         <span class="row-search-icon" aria-hidden="true">
@@ -411,7 +422,7 @@
   <!-- v0.12.0: Share dialog. Read-only share-link generator. Encodes a
        curated subset of the product into a base64 URL hash that points at
        share.html. Self-contained recipient page; no auth required to view. -->
-  <!-- v0.14.3: Finish dialog — quick "end active product" path that prompts
+  <!-- v0.14.4: Finish dialog — quick "end active product" path that prompts
        for the end date with today pre-filled. Avoids the full Edit dialog
        just to mark something done. -->
   <dialog id="finish-dialog" class="finish-dialog">

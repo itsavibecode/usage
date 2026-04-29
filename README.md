@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.14.3
+**Version:** v0.14.4
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.14.3)
+## Current status (v0.14.4)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.14.4 — 2026-04-29
+- **Full favicon coverage.** v0.13.0 had only `favicon.svg` declared, which works on modern desktop browsers but doesn't cover iOS home-screen icons, Android Add-to-Home, browser-chrome tinting, or legacy fallbacks. Added: 32×32 PNG (browser tab fallback), 180×180 apple-touch-icon (iOS home-screen), 192×192 + 512×512 PNGs (Android adaptive icons / PWA install). All generated from the existing SVG via `npx sharp-cli` so the design is consistent across every output.
+- **PWA manifest** at `manifest.webmanifest` — name, short_name, icons array, theme_color (`#2b5fd9`), background_color, display:standalone, scope `/usage/`. Means Android users can "Add to Home Screen" and get a real installable app icon, not a screenshot. Linked from `index.html` only — share.html and 404.html are not PWA entry points.
+- **`theme-color` meta tag** (`#2b5fd9`) on all three pages — tints the browser chrome on Android Chrome, iOS PWA top bar, and other mobile browsers that respect it.
+- **iOS PWA meta tags** on index.html (`apple-mobile-web-app-capable`, `-status-bar-style`, `-title`) so when iOS users add the app to their home screen, it opens in standalone mode with the right title.
 
 ### v0.14.3 — 2026-04-29
 - **OG image: PNG version added.** Twitter/X, Facebook, and LinkedIn all reject SVG og-images, so v0.13.0's SVG-only setup meant those platforms fell back to a text-only embed. Generated a 1200×630 PNG (35KB) from the existing SVG and committed it. The PNG is now the primary `og:image`, with the SVG kept as a secondary entry for platforms that prefer it (Discord/Telegram render SVG fine). Result: full image-embed coverage across every major social/messaging platform.

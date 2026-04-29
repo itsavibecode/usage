@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.14.3">
+  <meta name="version" content="0.14.4">
   <title>Page not found · Usage Tracker</title>
   <meta name="description" content="That URL on Usage Tracker doesn't exist — the link may be broken, or the page may have moved.">
+  <!-- v0.14.4: favicon coverage matching index.html (no manifest — not the
+       PWA entry point). -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+  <meta name="theme-color" content="#2b5fd9">
   <!-- OG tags so a broken link still produces a sane embed.
-       v0.14.3: PNG primary; SVG secondary; og:url and og:locale added. -->
+       v0.14.4: PNG primary; SVG secondary; og:url and og:locale added. -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Usage Tracker">
   <meta property="og:title" content="Page not found · Usage Tracker">
@@ -147,7 +152,7 @@
       <a href="/usage/" class="btn">Back to Usage Tracker</a>
       <div class="footer">
         <span class="brand">Usage Tracker</span>
-        <span class="version">v0.14.3</span>
+        <span class="version">v0.14.4</span>
       </div>
     </section>
   </main>
