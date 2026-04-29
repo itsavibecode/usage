@@ -517,6 +517,37 @@ body.pretax-mode .products tbody td.cell-with-tax {
   font-size: 12px;
 }
 
+/* v0.14.1 Finish dialog. Compact — just a date input and confirm. */
+.finish-dialog { max-width: 420px; }
+.finish-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.finish-lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.finish-body .field { gap: 4px; }
+
+/* v0.14.1: Finish button visually prioritized on mobile (primary green to
+ * suggest "complete this") so the most-common action stands out from
+ * the row of secondary actions. Desktop keeps neutral default style. */
+@media (max-width: 720px) {
+  .mc-actions .finish-btn-primary {
+    background: var(--success);
+    color: #fff;
+    border-color: var(--success);
+    font-weight: 600;
+  }
+  .mc-actions .finish-btn-primary:hover {
+    background: #246e4d;
+    border-color: #246e4d;
+  }
+}
+
 /* Notes chip — replaces the raw note text in the desktop table cell when
  * notes are longer than the preview length. Click to expand inline. The
  * .is-expanded variant shows the full text and grows the cell vertically

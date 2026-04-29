@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.14.0
+**Version:** v0.14.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.14.0)
+## Current status (v0.14.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.14.1 — 2026-04-27
+- **New: One-tap Finish button on active products.** A green **Finish** button appears next to Edit on every active row (and prominently as a primary green button on every active mobile card). Tap it → a tiny dialog opens with the end date pre-filled to today; confirm and the product is marked finished. The date input enforces "can't end before start" and "can't end in the future." Replaces the old multi-step path of opening the full Edit dialog just to set the end date.
 
 ### v0.14.0 — 2026-04-27
 - **New: Product search.** A search input above the row-filter tabs lets you live-filter the table across product name, type, store, buyer, notes, UPC, and card-last-4 — case-insensitive substring match. AND-combines with the existing row-filter tabs (All / Active / Inventory) and chip filters above. Reset clears search alongside everything else. Empty state explicitly says when zero products match the typed query.

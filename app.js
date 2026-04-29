@@ -1,4 +1,7 @@
-/* Usage Tracker — v0.14.0
+/* Usage Tracker — v0.14.1
+ * v0.14.1: One-tap Finish button on active products. Opens a small dialog
+ *   with end-date pre-filled to today; confirm marks the product finished
+ *   without going through the full Edit flow.
  * v0.14.0: Search & discovery — live search input above the row-filter tabs
  *   with autocomplete dropdown (keyboard nav: ↑↓ Enter Esc); mobile type
  *   chips bumped in size and color-coded per productType for fast visual
@@ -124,7 +127,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.14.0';
+const APP_VERSION = '0.14.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1149,6 +1152,7 @@ function renderMobileCard(p) {
       ${(p.bundleId && expandedBundleRow === p.id) ? renderBundleSiblingsInline(p) : ''}
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+        ${isActive(p) ? `<button type="button" class="finish-btn finish-btn-primary" data-id="${p.id}" title="Mark as finished">Finish</button>` : ''}
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
         ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC">History</button>` : ''}
         <button type="button" class="share-btn" data-id="${p.id}" title="Get a read-only share link">Share</button>
@@ -1215,6 +1219,7 @@ function renderRow(p) {
     })()}</td>
     <td class="actions-cell">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+      ${isActive(p) ? `<button type="button" class="finish-btn" data-id="${p.id}" title="Mark as finished — sets end date">Finish</button>` : ''}
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
       ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC across all purchases">History</button>` : ''}
       <button type="button" class="share-btn" data-id="${p.id}" title="Get a read-only share link for this product">Share</button>
@@ -2449,6 +2454,70 @@ function confirmDelete(id) {
     cd.close(); cleanup();
   };
   no.onclick = () => { cd.close(); cleanup(); };
+}
+
+/* ---------- v0.14.1 quick-finish dialog ---------- */
+// Lightweight "mark this active product as finished" flow. The full Edit
+// dialog works for this too, but on mobile especially the path is heavy
+// (open dialog → scroll to End date field → date picker → save). This is
+// one tap → confirm date → done. Defaults to today; user can change.
+
+let pendingFinishId = null;
+
+function openFinishDialog(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  if (!isActive(p)) {
+    // Defensive — the Finish button is only rendered for active rows, but
+    // just in case it gets fired on something else, fall back to Edit.
+    openEditDialog(productId);
+    return;
+  }
+  pendingFinishId = productId;
+  const dlg = document.getElementById('finish-dialog');
+  const lead = document.getElementById('finish-lead');
+  const dateInput = document.getElementById('finish-date');
+  if (!dlg || !lead || !dateInput) return;
+  lead.textContent = `When did you finish "${p.productName || 'this product'}"?`;
+  dateInput.value = new Date().toISOString().slice(0, 10);
+  dateInput.min = p.startDate || ''; // can't end before start
+  dateInput.max = new Date().toISOString().slice(0, 10); // can't end in the future
+  if (!dlg.open) dlg.showModal();
+  // Focus the date input so the user can immediately tap to change or just
+  // confirm with Enter.
+  requestAnimationFrame(() => { try { dateInput.focus(); } catch {} });
+}
+
+function closeFinishDialog() {
+  pendingFinishId = null;
+  const dlg = document.getElementById('finish-dialog');
+  if (dlg && dlg.open) dlg.close();
+}
+
+async function confirmFinish() {
+  const id = pendingFinishId;
+  if (!id) return;
+  const p = products.find(x => x.id === id);
+  if (!p) { closeFinishDialog(); return; }
+  const dateInput = document.getElementById('finish-date');
+  const endDate = dateInput?.value || new Date().toISOString().slice(0, 10);
+  if (p.startDate && endDate < p.startDate) {
+    toast('End date can\'t be before the start date.');
+    return;
+  }
+  const btn = document.getElementById('finish-confirm');
+  if (btn) btn.disabled = true;
+  try {
+    const updated = { ...p, endDate };
+    await saveProduct(updated);
+    toast(`"${p.productName || 'Product'}" marked finished.`);
+    logActivity('edit', updated, 'finished via quick-finish');
+    closeFinishDialog();
+  } catch {
+    // toast already shown by saveProduct
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ---------- v0.11.0 read-only share link ---------- */
@@ -3864,6 +3933,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = e.target.closest('.export-btn');
     const historyBtn = e.target.closest('.history-btn');
     const shareBtn = e.target.closest('.share-btn');
+    const finishBtn = e.target.closest('.finish-btn');
     if (cellChip) {
       addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
       return;
@@ -3888,6 +3958,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exportBtn) { exportProductPng(exportBtn.dataset.id); return; }
     if (historyBtn) { openPriceHistory(historyBtn.dataset.id); return; }
     if (shareBtn) { openShareDialog(shareBtn.dataset.id); return; }
+    if (finishBtn) { openFinishDialog(finishBtn.dataset.id); return; }
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
@@ -3993,6 +4064,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('share-close')?.addEventListener('click', closeShareDialog);
   document.getElementById('share-copy')?.addEventListener('click', copyShareLink);
   document.getElementById('share-open')?.addEventListener('click', openShareInNewTab);
+
+  // v0.14.1: finish dialog handlers
+  document.getElementById('finish-close')?.addEventListener('click', closeFinishDialog);
+  document.getElementById('finish-cancel')?.addEventListener('click', closeFinishDialog);
+  document.getElementById('finish-confirm')?.addEventListener('click', confirmFinish);
+  document.getElementById('finish-date')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); confirmFinish(); }
+  });
 
   // v0.8.0: price history dialog close handlers
   document.getElementById('price-history-close')?.addEventListener('click', closePriceHistory);

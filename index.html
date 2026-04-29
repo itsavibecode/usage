@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.14.0">
+  <meta name="version" content="0.14.1">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -30,7 +30,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.14.0</span>
+        <span class="version" id="version">v0.14.1</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -115,7 +115,7 @@
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
-      <!-- v0.14.0: live search across product fields. AND-combines with the
+      <!-- v0.14.1: live search across product fields. AND-combines with the
            row-filter tabs below + any active chip filters above. -->
       <div class="row-search-wrap">
         <span class="row-search-icon" aria-hidden="true">
@@ -404,6 +404,27 @@
   <!-- v0.12.0: Share dialog. Read-only share-link generator. Encodes a
        curated subset of the product into a base64 URL hash that points at
        share.html. Self-contained recipient page; no auth required to view. -->
+  <!-- v0.14.1: Finish dialog — quick "end active product" path that prompts
+       for the end date with today pre-filled. Avoids the full Edit dialog
+       just to mark something done. -->
+  <dialog id="finish-dialog" class="finish-dialog">
+    <header class="dialog-header">
+      <h2>Finish product</h2>
+      <button type="button" class="icon-btn" id="finish-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="finish-body">
+      <p class="finish-lead" id="finish-lead">When did you finish this?</p>
+      <label class="field">
+        <span>End date</span>
+        <input type="date" id="finish-date" required>
+      </label>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="finish-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="finish-confirm">Mark finished</button>
+    </footer>
+  </dialog>
+
   <dialog id="share-dialog" class="share-dialog">
     <header class="dialog-header">
       <h2>Share product</h2>
