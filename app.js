@@ -1,4 +1,18 @@
-/* Usage Tracker — v0.15.0
+/* Usage Tracker — v0.15.1
+ * v0.15.1: Bug fixes + rolling 30-day cost + mobile polish.
+ *   - Fixed: purchase date defaulted to tomorrow's UTC date late at night
+ *     (off-by-one for negative-offset timezones). Now uses local date.
+ *   - Fixed: mobile save button silently failed when HTML5 required
+ *     validation tooltips weren't visible. Form is now novalidate; JS
+ *     validates explicitly and toasts the specific issue.
+ *   - New: rolling 30-day cost stat tile. Sums each tracked product's
+ *     proportional cost contribution to the [today-30, today] window.
+ *   - New: manual "Look up" button on UPC field bypasses cache so a past
+ *     failed lookup can be retried fresh.
+ *   - Mobile: "Where" row split into separate Size / Store / Buyer / Card
+ *     rows for better visual rhythm and tappability.
+ *   - Edit dialog: shows the product image thumbnail near the UPC field
+ *     when imageUrl is set.
  * v0.15.0: Favorites — new top-level view alongside Table / Dashboard /
  *   Activity. Catalog of products you remember/liked but aren't necessarily
  *   tracking. Cross-references with tracked products by UPC for "last used /
@@ -145,7 +159,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.15.0';
+const APP_VERSION = '0.15.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1180,16 +1194,24 @@ function renderMobileCard(p) {
   const costPerDay = calcCostPerDay(p);
   const perDayStr = costPerDay != null ? ` &middot; ${moneyFine(costPerDay)}/day` : '';
 
-  // v0.7.22: Buyer and Card render as `.cell-chip` filter buttons on mobile,
-  // matching the desktop table behavior. Size and store stay as plain text —
-  // they aren't filterable columns. Existing click delegation in
-  // attachTableHandlers picks up `.cell-chip` clicks regardless of viewport.
-  const metaParts = [];
-  if (p.size && p.unit) metaParts.push(`<span class="mc-meta-text">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</span>`);
-  if (p.store) metaParts.push(`<span class="mc-meta-text">${escapeHtml(p.store)}</span>`);
-  if (p.buyer) metaParts.push(`<button type="button" class="cell-chip mc-meta-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button>`);
-  if (p.cardLast4) metaParts.push(`<button type="button" class="cell-chip mc-meta-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card &bull;&bull;&bull;&bull; ${escapeHtml(p.cardLast4)}">&bull;&bull; ${escapeHtml(p.cardLast4)}</button>`);
-  const meta = metaParts.join(' <span class="mc-meta-sep">&middot;</span> ');
+  // v0.15.1: each meta value gets its own labeled row instead of being
+  // crammed onto a single line. Better use of card vertical space and
+  // makes each value individually scannable. Buyer and Card render as
+  // .cell-chip filter buttons (matching desktop); Size and Store render
+  // as plain values.
+  const sizeRow = (p.size && p.unit)
+    ? `<div class="mc-row mc-row-extra"><dt>Size</dt><dd>${escapeHtml(p.size)} ${escapeHtml(p.unit)}</dd></div>`
+    : '';
+  const storeRow = p.store
+    ? `<div class="mc-row mc-row-extra"><dt>Store</dt><dd>${escapeHtml(p.store)}</dd></div>`
+    : '';
+  const buyerRow = p.buyer
+    ? `<div class="mc-row mc-row-extra"><dt>Buyer</dt><dd><button type="button" class="cell-chip mc-meta-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button></dd></div>`
+    : '';
+  const cardRow = p.cardLast4
+    ? `<div class="mc-row mc-row-extra"><dt>Card</dt><dd><button type="button" class="cell-chip mc-meta-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card &bull;&bull;&bull;&bull; ${escapeHtml(p.cardLast4)}">&bull;&bull; ${escapeHtml(p.cardLast4)}</button></dd></div>`
+    : '';
+  const metaRows = sizeRow + storeRow + buyerRow + cardRow;
 
   // v0.7.13: clickable bundle chip on mobile too, opens the same sibling
   // slide-out (rendered inline inside the card when expanded).
@@ -1209,7 +1231,7 @@ function renderMobileCard(p) {
   // CSS can hide them by default. The button only renders if there's anything
   // to hide — no point showing "Show more" on a card with no extra rows.
   const expanded = expandedCards.has(p.id);
-  const hasExtras = !!(meta || p.notes);
+  const hasExtras = !!(metaRows || p.notes);
 
   return `
     <div class="mc${expanded ? ' mc-expanded' : ''}">
@@ -1223,7 +1245,7 @@ function renderMobileCard(p) {
         <div class="mc-row"><dt>Started</dt><dd>${startLabel}${durationStr}</dd></div>
         <div class="mc-row"><dt>Cost</dt><dd>${costPrimary}${perDayStr}</dd></div>
         ${bundleChip ? `<div class="mc-row"><dt>Bundle</dt><dd>${bundleChip}</dd></div>` : ''}
-        ${meta ? `<div class="mc-row mc-row-extra"><dt>Where</dt><dd>${meta}</dd></div>` : ''}
+        ${metaRows}
         ${p.notes ? `<div class="mc-row mc-row-extra mc-row-notes"><dt>Notes</dt><dd>${escapeHtml(p.notes)}</dd></div>` : ''}
       </dl>
       ${hasExtras ? `<button type="button" class="mc-more-btn" data-id="${p.id}">${expanded ? 'Show less' : 'Show more'}</button>` : ''}
@@ -1422,6 +1444,30 @@ function renderStats() {
     if (r != null && isFinite(r)) ytdPerDay += r;
   }
 
+  // v0.15.1: Rolling 30-day cost. Each tracked non-inventory product
+  // contributes its allocatedCost prorated by how many of its lifespan
+  // days fall in the [today-30, today] window. Correctly handles
+  // sequential same-type products (two $5 underarms back-to-back over
+  // 30 days = $10, not $20) and partial-window overlaps. Updates daily
+  // as the window rolls forward.
+  const windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+  let rolling30 = 0;
+  for (const p of tracked) {
+    if (isInventory(p)) continue;
+    const lifespanDays = calcDuration(p);
+    if (lifespanDays == null || lifespanDays <= 0) continue;
+    const start = parseLocalDate(p.startDate);
+    const end = p.endDate ? parseLocalDate(p.endDate) : now;
+    if (!start || !end) continue;
+    const overlapStart = start > windowStart ? start : windowStart;
+    const overlapEnd = end < now ? end : now;
+    if (overlapEnd < overlapStart) continue;
+    const overlapDays = Math.max(1, Math.round((overlapEnd - overlapStart) / 86400000) + 1);
+    const cost = allocatedCost(p);
+    if (!isFinite(cost) || cost <= 0) continue;
+    rolling30 += (cost / lifespanDays) * Math.min(overlapDays, lifespanDays);
+  }
+
   document.getElementById('stat-count').textContent = count;
   document.getElementById('stat-active').textContent = active;
   document.getElementById('stat-inventory').textContent = inventory;
@@ -1432,6 +1478,8 @@ function renderStats() {
   // "avg $/day" card still uses moneyFine because it's comparing fine-grained
   // values. See user request v0.7.2.
   document.getElementById('stat-ytd-perday').textContent = money(ytdPerDay);
+  // v0.15.1: rolling 30-day cost
+  document.getElementById('stat-rolling30').textContent = money(rolling30);
 }
 
 /* ---------- dashboard ---------- */
@@ -2391,6 +2439,25 @@ function populateFormSelects(current = {}) {
 // branching in handleSubmit. Cleared in closeDialog.
 let dialogMode = 'tracked'; // 'tracked' | 'favorite'
 
+// v0.15.1: keep the dialog's product-image preview in sync with whatever
+// imageUrl is in the form. Called after UPC lookup auto-fill, after
+// openEditDialog populates fields, and after openDuplicateDialog/Track-new.
+function syncDialogImagePreview() {
+  const wrap = document.getElementById('upc-image-preview');
+  const img = document.getElementById('upc-image-preview-img');
+  if (!wrap || !img) return;
+  const f = form();
+  const url = (f.elements.imageUrl?.value || '').trim();
+  if (url && /^https:/i.test(url)) {
+    img.src = url;
+    wrap.hidden = false;
+    img.onerror = () => { wrap.hidden = true; };
+  } else {
+    img.src = '';
+    wrap.hidden = true;
+  }
+}
+
 function applyDialogMode(mode) {
   dialogMode = mode;
   const dlg = dialog();
@@ -2419,14 +2486,13 @@ function openAddDialog() {
   populateFormSelects();
   populateBundleSelect(document.getElementById('continue-bundle'));
   document.getElementById('continue-bundle-wrap').hidden = false;
-  const today = new Date().toISOString().slice(0, 10);
-  // startDate intentionally left blank — leaving it blank records this as
-  // inventory (bought but not yet in use). User sets a start date when they
-  // actually begin using the product.
-  f.elements.purchaseDate.value = today;
+  // v0.15.1: use local-date helper, not UTC. UTC was off-by-one for users
+  // in negative-offset timezones late in the evening.
+  f.elements.purchaseDate.value = todayLocalISODate();
   setBundleSizeVisibility();
   setUpcStatus('');
   syncAmazonCheckLink(''); // v0.9.0 — hide the Amazon link until UPC is entered
+  syncDialogImagePreview(); // v0.15.1 — hide preview on fresh Add
   dialog().showModal();
   // v0.7.23: autofocus the UPC field on Add. The dialog opens for the
   // primary path (scan or paste a UPC), so the user shouldn't need an extra
@@ -2457,6 +2523,7 @@ function openEditDialog(id) {
   setBundleSizeVisibility();
   setUpcStatus('');
   syncAmazonCheckLink(p.upc); // v0.9.0 — show Amazon link if existing UPC is set
+  syncDialogImagePreview(); // v0.15.1 — show existing image
   dialog().showModal();
 }
 
@@ -2622,8 +2689,8 @@ function openDuplicateDialog(id) {
     f.elements.bundleId.value = source.bundleId;
   }
   // Today's purchaseDate is a sensible default for "I just bought another";
-  // user can correct it if they're back-filling history.
-  f.elements.purchaseDate.value = new Date().toISOString().slice(0, 10);
+  // user can correct it if they're back-filling history. v0.15.1: local date.
+  f.elements.purchaseDate.value = todayLocalISODate();
   setBundleSizeVisibility();
   document.getElementById('dialog-title').textContent = 'Duplicate product';
   toast('Duplicated — set start date when you begin using it');
@@ -2689,7 +2756,18 @@ async function handleSubmit(e) {
   if (data.buyer === ADD_NEW) data.buyer = '';
   if (data.cardLast4 === ADD_NEW) data.cardLast4 = '';
 
+  if (!data.productName) { toast('Product name is required'); return; }
   if (!data.upc) { toast('UPC is required'); return; }
+  // v0.15.1: explicit JS validation for size / unit / cost (form is novalidate
+  // so HTML5 required attributes don't fire). Previously these silently failed
+  // on mobile when the native validation tooltip wasn't visible.
+  if (!data.size || !isFinite(Number(data.size)) || Number(data.size) <= 0) {
+    toast('Size is required (a positive number)'); return;
+  }
+  if (!data.unit) { toast('Unit is required'); return; }
+  if (!data.cost || !isFinite(Number(data.cost)) || Number(data.cost) < 0) {
+    toast('Cost is required'); return;
+  }
   if (data.endDate && data.startDate && data.endDate < data.startDate) {
     toast('End date cannot be before start date'); return;
   }
@@ -2822,9 +2900,9 @@ function openFinishDialog(productId) {
   const dateInput = document.getElementById('finish-date');
   if (!dlg || !lead || !dateInput) return;
   lead.textContent = `When did you finish "${p.productName || 'this product'}"?`;
-  dateInput.value = new Date().toISOString().slice(0, 10);
+  dateInput.value = todayLocalISODate();
   dateInput.min = p.startDate || ''; // can't end before start
-  dateInput.max = new Date().toISOString().slice(0, 10); // can't end in the future
+  dateInput.max = todayLocalISODate(); // can't end in the future
   if (!dlg.open) dlg.showModal();
   // Focus the date input so the user can immediately tap to change or just
   // confirm with Enter.
@@ -2843,7 +2921,7 @@ async function confirmFinish() {
   const p = products.find(x => x.id === id);
   if (!p) { closeFinishDialog(); return; }
   const dateInput = document.getElementById('finish-date');
-  const endDate = dateInput?.value || new Date().toISOString().slice(0, 10);
+  const endDate = dateInput?.value || todayLocalISODate();
   if (p.startDate && endDate < p.startDate) {
     toast('End date can\'t be before the start date.');
     return;
@@ -3365,6 +3443,19 @@ function csvCell(v) {
 }
 
 function dateStamp() { return new Date().toISOString().slice(0, 10); }
+
+// v0.15.1: today's date in the LOCAL timezone, formatted YYYY-MM-DD. Critical
+// for any user-facing date input — `new Date().toISOString().slice(0,10)`
+// returns the UTC date, which can be tomorrow when the user is in a negative
+// timezone late in the evening. (Reported bug: 4/29 at 10:55pm Eastern showed
+// tomorrow's date as "today" for purchaseDate.)
+function todayLocalISODate() {
+  const d = new Date();
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+}
 
 function download(text, filename, mime) {
   const blob = new Blob([text], { type: mime });
@@ -3898,23 +3989,27 @@ async function callOpenFoodFacts(code) {
   }
 }
 
-async function lookupUpc(rawCode) {
+async function lookupUpc(rawCode, { forceFresh = false } = {}) {
   const code = normalizeUpc(rawCode);
   if (code.length < 8) return null;
 
-  // L1: in-memory
-  if (upcCache.has(code)) return upcCache.get(code);
+  // L1: in-memory (skipped on forceFresh so explicit Look up always retries)
+  if (!forceFresh && upcCache.has(code)) return upcCache.get(code);
 
-  // L2: Firestore persistent cache
+  // L2: Firestore persistent cache (also skipped on forceFresh — that's the
+  // whole point of the Look up button: bypass cached misses from prior
+  // failed attempts and try a fresh API call).
   setUpcStatus('Looking up product…', 'busy');
-  const cached = await readPersistedUpc(code);
-  if (cached) {
-    const item = cached.item || null;
-    upcCache.set(code, item);
-    if (cached.source === 'miss') {
-      setUpcStatus('No match (cached) — enter details manually.', '');
+  if (!forceFresh) {
+    const cached = await readPersistedUpc(code);
+    if (cached) {
+      const item = cached.item || null;
+      upcCache.set(code, item);
+      if (cached.source === 'miss') {
+        setUpcStatus('No match (cached) — tap Look up to retry.', '');
+      }
+      return item;
     }
-    return item;
   }
 
   // L3a: live UPCitemdb via proxy
@@ -3958,13 +4053,13 @@ async function lookupUpc(rawCode) {
 
 /* Kicks off a lookup for whatever is currently in the UPC input.
  * Called on scan result and on UPC input blur (when the value has changed). */
-async function lookupAndOfferUpc(rawCode, { fromScan = false } = {}) {
+async function lookupAndOfferUpc(rawCode, { fromScan = false, forceFresh = false } = {}) {
   const code = normalizeUpc(rawCode);
   if (!code) { setUpcStatus(''); return; }
   if (code.length < 8) { setUpcStatus('UPC too short to look up.', 'error'); return; }
 
   pendingUpcLookup = code;
-  const item = await lookupUpc(code);
+  const item = await lookupUpc(code, { forceFresh });
 
   // Abort if the user changed the UPC while the request was in flight
   if (pendingUpcLookup !== code) return;
@@ -4055,6 +4150,7 @@ function applyUpcItemToForm(item) {
     if (httpsImage) setIfEmpty('imageUrl', httpsImage);
   }
 
+  syncDialogImagePreview(); // v0.15.1 — show the image we just captured
   toast('Prefilled from UPC database');
 }
 
@@ -4219,6 +4315,12 @@ document.addEventListener('DOMContentLoaded', () => {
   f.elements.bundleSize.addEventListener('input', updateBundlePositionMax);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
+  // v0.15.1: explicit manual Look up button. Force-fresh fetch (bypasses
+  // both L1 and L2 caches) so the user can retry past failures.
+  document.getElementById('btn-lookup-upc')?.addEventListener('click', () => {
+    const upc = form().elements.upc.value;
+    lookupAndOfferUpc(upc, { fromScan: false, forceFresh: true });
+  });
   document.getElementById('scanner-close').addEventListener('click', closeScanner);
   document.getElementById('scanner-cancel').addEventListener('click', closeScanner);
   // Browser Esc-closes dialogs by firing a "close" event — release the camera if that happens

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.15.0
+**Version:** v0.15.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.15.0)
+## Current status (v0.15.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,14 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.15.1 — 2026-04-29
+- **Fixed: purchase date defaulted to tomorrow when adding a product late at night.** `new Date().toISOString().slice(0, 10)` returns the UTC date — at 10:55pm Eastern that's already 2:55am UTC the next day. Now uses a local-date helper. Also fixes the same bug in the Finish dialog and the duplicate flow.
+- **Fixed: mobile save button silently failing.** HTML5 `required` validation tooltips can be invisible in scrolled mobile dialogs, so Save would do nothing without explanation. Form is now `novalidate`; JS validates explicitly and toasts the specific issue (`"Size is required"`, `"Cost is required"`, etc.).
+- **New: manual "Look up" button** next to the UPC field. Forces a fresh fetch bypassing the L1 in-memory and L2 Firestore caches — useful when a previous lookup got cached as a miss (rate limit / transient error) and you want to retry now that things are working.
+- **New: rolling 30-day cost stat tile** — shows total product-usage cost over the last 30 days. Math correctly attributes each product's cost proportionally to the days of its lifespan that fall within the window, so two $5 products used sequentially over 30 days correctly totals $10, not $20. Updates as the window rolls forward each day.
+- **Mobile: "Where" row split into separate rows.** Was one cramped line with size · store · buyer · card all squished together; now each is its own labeled row, easier to read and tap.
+- **Edit dialog: product image preview** appears near the UPC status when one's set (after lookup or for existing products with stored imageUrl).
 
 ### v0.15.0 — 2026-04-29
 - **New: Favorites view.** A new top-level tab alongside Table / Dashboard / Activity. Favorites are products you remember and want to keep handy — even if you didn't formally track them. They live in their own catalog and **don't affect any stats, charts, reorder reminders, daily-cost calcs, or dashboard cards.** Each card shows the type chip (color-coded, same hash as mobile chips), product name, optional 1–5 star rating, your "why I liked it" note, the image (from UPC lookup), and — if you have a UPC and any tracked products that share it — a *"Last used Mar 14 · tracked 3 times"* line.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.15.0">
+  <meta name="version" content="0.15.1">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.15.0</span>
+        <span class="version" id="version">v0.15.1</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -123,6 +123,7 @@
       <div class="stat"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></div>
       <div class="stat" title="Sum of allocated cost for products you've started using. Inventory items (no start date) are excluded until you begin using them."><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
       <div class="stat" title="Sum of allocated cost for products purchased AND started using in the current calendar year. Inventory items are excluded."><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></div>
+      <div class="stat" title="Total cost of product usage in the last 30 days. Each product contributes its per-day rate × days of overlap with the 30-day window — so two $5 products used sequentially over 30 days correctly totals $10, not $20. Updates daily as the window rolls forward."><span class="stat-label">Last 30 days</span><span class="stat-value" id="stat-rolling30">$0.00</span></div>
       <div class="stat" title="Combined daily burn rate across all product categories active this year. For each category, rate = total spend on that category divided by the date span its products covered (so two $5 underarms used over 30 days = $0.33/day, not $0.67/day). Categories sum because they're used in parallel."><span class="stat-label">YTD daily cost</span><span class="stat-value" id="stat-ytd-perday">$0.00</span></div>
     </section>
 
@@ -268,7 +269,11 @@
   </main>
 
   <dialog id="product-dialog" class="product-dialog">
-    <form id="product-form" method="dialog">
+    <!-- v0.15.1: novalidate so submit always fires and JS handles validation.
+         HTML5 required validation can fail silently on mobile (the "Please
+         fill out this field" tooltip is sometimes invisible in scrolled
+         dialogs) — JS validation lets us toast the specific issue. -->
+    <form id="product-form" method="dialog" novalidate>
       <header class="dialog-header">
         <h2 id="dialog-title">Add product</h2>
         <button type="button" class="icon-btn" id="dialog-close" aria-label="Close">&times;</button>
@@ -289,6 +294,15 @@
           <span>UPC <em>*</em></span>
           <div class="input-with-btn">
             <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="Scan or type — we'll look it up automatically">
+            <!-- v0.15.1: explicit Look up button. Forces a fresh fetch
+                 bypassing both L1 and L2 caches. Useful when a previous
+                 lookup failed (rate limit / network blip) and got cached
+                 as a miss; this button gives a one-tap retry without
+                 needing to clear any state. Also helps mobile where blur
+                 events sometimes don't fire reliably between fields. -->
+            <button type="button" id="btn-lookup-upc" class="btn btn-scan" title="Look up this UPC fresh, bypassing any cached miss">
+              Look up
+            </button>
             <button type="button" id="btn-scan-upc" class="btn btn-scan" title="Scan a barcode with your camera">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M23 19V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2z"/>
@@ -298,6 +312,12 @@
             </button>
           </div>
           <span class="upc-status" id="upc-status" aria-live="polite"></span>
+          <!-- v0.15.1: small product image preview, populated when UPC
+               lookup returns an image. Visible only when imageUrl is set. -->
+          <div class="upc-image-preview" id="upc-image-preview" hidden>
+            <img id="upc-image-preview-img" src="" alt="" loading="lazy">
+            <span class="upc-image-preview-label">Product image</span>
+          </div>
           <!-- v0.12.0: Amazon search link, only shown when UPC has 8+ digits.
                Opens amazon.com/s?k={upc} in a new tab so the user can check
                the current market price for this item. -->
