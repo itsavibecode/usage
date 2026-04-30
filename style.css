@@ -1512,6 +1512,13 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   background: #fff;
   border: 1px solid var(--border);
 }
+.upc-image-preview img[hidden] { display: none; }
+/* v0.15.2: brand logo gets the circular treatment in the preview too */
+#upc-brand-logo {
+  border-radius: 50% !important;
+  object-fit: contain !important;
+  padding: 2px;
+}
 .upc-image-preview-label {
   font-size: 12px;
   color: var(--text-muted);
@@ -1767,6 +1774,15 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   flex-shrink: 0;
   display: inline-block;
 }
+/* v0.15.2: brand logos from logo.dev render with a slightly different
+ * treatment — circular, white background, contained (not cropped) — to
+ * signal "this is a brand identifier" vs the boxy product photos. */
+.name-thumb-logo {
+  border-radius: 50%;
+  background: #fff;
+  object-fit: contain;
+  padding: 1px;
+}
 
 /* Mobile-card head thumbnail — slightly larger since it's the only visual
  * anchor for the card and there's more horizontal room. */
@@ -1778,6 +1794,13 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   background: var(--surface-alt);
   border: 1px solid var(--border);
   flex-shrink: 0;
+}
+/* v0.15.2: brand-logo variant for mobile cards */
+.mc-thumb-logo {
+  border-radius: 50%;
+  background: #fff;
+  object-fit: contain;
+  padding: 2px;
 }
 
 /* Clickable product name in the table */

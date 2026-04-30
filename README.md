@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.15.1
+**Version:** v0.15.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.15.1)
+## Current status (v0.15.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.15.2 — 2026-04-30
+- **New: company logos via logo.dev.** Each product now shows a small circular brand-logo icon (Crest, Old Spice, Pantene, etc.) in the desktop table, mobile card head, and Edit dialog. The brand name is auto-captured from UPCitemdb when you scan/lookup a UPC; you can also type or edit it manually in the new **Brand** field in the dialog. Domain is guessed from the brand (`Crest` → `crest.com`, `Old Spice` → `oldspice.com`); when the guess misses, the icon silently hides. Same `pk_` publishable token used by the stocks repo — safe to commit per logo.dev's convention.
+- **Brand is also indexed by search** so you can type "crest" or "p&g" and get matching products in the autocomplete dropdown.
 
 ### v0.15.1 — 2026-04-29
 - **Fixed: purchase date defaulted to tomorrow when adding a product late at night.** `new Date().toISOString().slice(0, 10)` returns the UTC date — at 10:55pm Eastern that's already 2:55am UTC the next day. Now uses a local-date helper. Also fixes the same bug in the Finish dialog and the duplicate flow.

@@ -1,4 +1,9 @@
-/* Usage Tracker — v0.15.1
+/* Usage Tracker — v0.15.2
+ * v0.15.2: Brand company logos via logo.dev. Same publishable token used in
+ *   the stocks repo. New `brand` field captured from UPCitemdb (and editable
+ *   in the dialog). Renders as a circular logo icon in the desktop name
+ *   cell, mobile card head, and Edit dialog preview. Falls back to the UPC
+ *   product image when no brand is set; both can fail load and self-hide.
  * v0.15.1: Bug fixes + rolling 30-day cost + mobile polish.
  *   - Fixed: purchase date defaulted to tomorrow's UTC date late at night
  *     (off-by-one for negative-offset timezones). Now uses local date.
@@ -159,7 +164,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.15.1';
+const APP_VERSION = '0.15.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -175,6 +180,10 @@ const FIELDS = [
   'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
   'purchaseDate', 'notes', 'upc', 'imageUrl', 'createdAt',
+  // v0.15.2: brand name (from UPCitemdb response) — drives the company-logo
+  // icon via logo.dev. Editable in the dialog so users can correct or fill
+  // it in for products without UPC lookups.
+  'brand',
   // v0.15.0: favorite catalog entries. When `favorite: true`, the row is a
   // standalone reference (no dates, no cost, no stats impact) — purely a
   // remembered product. Shows up in the Favorites view, never in the main
@@ -277,6 +286,25 @@ const CHART_PALETTE = [
   '#2b9fd9', '#d92b8f', '#4a9e4a', '#b97020', '#5b6b8a',
   '#08697d', '#b03b8a'
 ];
+
+// v0.15.2: company logo via logo.dev. Same publishable token used in the
+// stocks repo (`pk_` prefix = client-safe by logo.dev's convention).
+// Brand-name → domain heuristic: lowercase, strip spaces, append .com. Works
+// for most well-known consumer brands ("Crest" → crest.com, "Old Spice" →
+// oldspice.com, "Pantene" → pantene.com). Misses are silent (the rendered
+// <img> uses onerror to hide). For more reliability we'd need a brand→domain
+// mapping table, but the simple guess is acceptable for an MVP.
+const LOGO_DEV_TOKEN = 'pk_X-1ZO13GSgeOoUrIuJ6GMQ';
+function brandToDomain(brand) {
+  const s = String(brand || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9.-]/g, '');
+  if (!s) return '';
+  return s.includes('.') ? s : s + '.com';
+}
+function brandLogoUrl(brand, size = 64) {
+  const domain = brandToDomain(brand);
+  if (!domain) return '';
+  return `https://img.logo.dev/${encodeURIComponent(domain)}?token=${LOGO_DEV_TOKEN}&size=${size}&format=png`;
+}
 
 // v0.14.0: deterministic color per productType name. Same name always lands
 // on the same palette slot, so "Toothpaste" is consistent across cards.
@@ -889,7 +917,7 @@ function getSortValue(p, column) {
 // substring match; AND-combines with row-filter tabs and chip filters.
 // Transient (not persisted) — search is meant to be momentary.
 let searchQuery = '';
-const SEARCH_FIELDS = ['productName', 'productType', 'store', 'buyer', 'notes', 'upc', 'cardLast4'];
+const SEARCH_FIELDS = ['productName', 'productType', 'brand', 'store', 'buyer', 'notes', 'upc', 'cardLast4'];
 
 // v0.14.0 search-autocomplete state. activeSuggestionIndex tracks keyboard
 // nav through the suggestion dropdown (arrow keys); -1 means no row is
@@ -1236,7 +1264,12 @@ function renderMobileCard(p) {
   return `
     <div class="mc${expanded ? ' mc-expanded' : ''}">
       <div class="mc-head">
-        ${p.imageUrl ? `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+        ${(() => {
+          // v0.15.2: brand logo preferred; fallback to UPC product image.
+          if (p.brand) return `<img class="mc-thumb mc-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" onerror="this.remove()">`;
+          if (p.imageUrl) return `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
+          return '';
+        })()}
         ${p.productType ? `<button type="button" class="cell-chip mc-type-chip" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Tap to filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '<span class="mc-type">—</span>'}
         <span class="mc-status">${endLabel}</span>
       </div>
@@ -1272,7 +1305,14 @@ function renderRow(p) {
   // no duplicated event-handler wiring.
   tr.innerHTML = `
     <td>${p.productType ? `<button type="button" class="cell-chip" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
-    <td class="name-cell">${p.imageUrl ? `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">` : ''}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
+    <td class="name-cell">${(() => {
+      // v0.15.2: prefer brand company logo (consistent visual scanning by
+      // brand). If no brand, fall back to UPC product image. Both onerror
+      // handlers self-remove on load failure.
+      if (p.brand) return `<img class="name-thumb name-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" onerror="this.remove()">`;
+      if (p.imageUrl) return `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
+      return '';
+    })()}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td>${formatDate(p.startDate)}</td>
     <td>${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
@@ -2445,17 +2485,33 @@ let dialogMode = 'tracked'; // 'tracked' | 'favorite'
 function syncDialogImagePreview() {
   const wrap = document.getElementById('upc-image-preview');
   const img = document.getElementById('upc-image-preview-img');
+  const logoImg = document.getElementById('upc-brand-logo');
   if (!wrap || !img) return;
   const f = form();
   const url = (f.elements.imageUrl?.value || '').trim();
+  const brand = (f.elements.brand?.value || '').trim();
+  // v0.15.2: brand logo (left) + product image (right) — both shown when set.
+  if (logoImg) {
+    if (brand) {
+      logoImg.src = brandLogoUrl(brand);
+      logoImg.alt = `${brand} logo`;
+      logoImg.hidden = false;
+      logoImg.onerror = () => { logoImg.hidden = true; };
+    } else {
+      logoImg.hidden = true;
+      logoImg.src = '';
+    }
+  }
   if (url && /^https:/i.test(url)) {
     img.src = url;
-    wrap.hidden = false;
-    img.onerror = () => { wrap.hidden = true; };
+    img.hidden = false;
+    img.onerror = () => { img.hidden = true; if (!brand) wrap.hidden = true; };
   } else {
     img.src = '';
-    wrap.hidden = true;
+    img.hidden = true;
   }
+  // Show wrapper if either icon is showing; hide if neither
+  wrap.hidden = !brand && !(url && /^https:/i.test(url));
 }
 
 function applyDialogMode(mode) {
@@ -4130,6 +4186,10 @@ function applyUpcItemToForm(item) {
   const title = (item.title || '').trim();
   if (title) setIfEmpty('productName', title);
 
+  // v0.15.2: capture the brand for the company-logo icon
+  const brand = (item.brand || '').trim();
+  if (brand) setIfEmpty('brand', brand);
+
   // Product type from category
   const guessedType = guessProductTypeFromCategory(item.category || '');
   if (guessedType) setIfEmpty('productType', guessedType);
@@ -4312,6 +4372,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // the link prefers name over UPC, so updating as the user types gives a
   // more accurate search the moment they hit it.
   f.elements.productName.addEventListener('input', () => syncAmazonCheckLink(f.elements.upc.value));
+  // v0.15.2: re-render the brand logo preview when the brand field is edited.
+  if (f.elements.brand) f.elements.brand.addEventListener('input', syncDialogImagePreview);
   f.elements.bundleSize.addEventListener('input', updateBundlePositionMax);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
