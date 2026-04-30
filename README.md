@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.15.3
+**Version:** v0.15.4
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.15.3)
+## Current status (v0.15.4)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.15.4 — 2026-04-30
+- **Fixed: UPC lookup wasn't auto-filling size for many products.** UPCitemdb's dedicated `size` field is empty for a lot of records (e.g. the Old Spice deodorant has `size:""` while the actual `6 oz` is embedded in the title). New title-fallback parser scans for `<number> <unit>` patterns and uses the LAST match — titles almost always end with the size (`"... - 6 oz"`, `"... 4.7 oz"`). Validated against real titles: Old Spice 6 oz, Crest 4.7 oz, Pantene 12 fl oz, "Pack of 3 - 8 oz bottles" (correctly picks 8 oz, not the bare 3). Falls through to the same canonical-unit normalization as the `size` field.
 
 ### v0.15.3 — 2026-04-30
 - **Fixed: Duplicate of a bundled product threw "Position already taken."** Was inheriting the source row's `bundleId` from v0.7.13, which made the duplicate a sibling of the original physical bundle. When you actually bought a *separate* physical bundle (e.g. a second 2-pack of the same deodorant), Duplicate is now what you want and starts a fresh bundleId. If you want a sibling within the same physical bundle, use the **Continue existing bundle** picker at the top of the dialog instead.

@@ -1,4 +1,9 @@
-/* Usage Tracker — v0.15.3
+/* Usage Tracker — v0.15.4
+ * v0.15.4: UPC lookup auto-fill now parses size from the product TITLE
+ *   when item.size is empty (which is common — UPCitemdb's dedicated size
+ *   field is unreliable). New findSizeInString helper scans for
+ *   "<num> <unit>" patterns and uses the last match (titles typically end
+ *   with the size). Verified against real titles.
  * v0.15.3: Bug fixes + UX polish.
  *   - Fixed: Duplicate of a bundled product was inheriting the source's
  *     bundleId, causing "Position N is already taken" when the user added
@@ -180,7 +185,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.15.3';
+const APP_VERSION = '0.15.4';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -4234,8 +4239,12 @@ function applyUpcItemToForm(item) {
   const guessedType = guessProductTypeFromCategory(item.category || '');
   if (guessedType) setIfEmpty('productType', guessedType);
 
-  // Size + unit from "4.8 oz" style string
-  const parsed = parseSizeString(item.size || '');
+  // Size + unit. UPCitemdb's `size` field is unreliable — for many entries
+  // it's empty (the user's Old Spice example has size:"" with the actual
+  // "6 oz" embedded in the title). Try item.size first, then fall back to
+  // parsing from the title. v0.15.4.
+  let parsed = parseSizeString(item.size || '');
+  if (!parsed && item.title) parsed = findSizeInString(item.title);
   if (parsed) {
     setIfEmpty('size', parsed.size);
     setIfEmpty('unit', parsed.unit);
@@ -4314,6 +4323,22 @@ function parseSizeString(raw) {
   const unit = ALIASES[unitKey] || (UNIT_SET.has(unitKey) ? unitKey : null);
   if (!unit) return null;
   return { size, unit };
+}
+
+// v0.15.4: scan an arbitrary string (typically a UPCitemdb product title)
+// for "<number> <unit>" patterns. Returns the LAST match — product titles
+// almost always put the size at the end ("... - 6 oz", "... 4.7 oz").
+// Falls through parseSizeString for the canonical-unit normalization. The
+// unit alternation covers the same set parseSizeString does, but anchored
+// loosely (with \b) instead of matching the whole string.
+function findSizeInString(text) {
+  if (!text) return null;
+  const re = /(\d+(?:\.\d+)?)\s*(fl\s*oz|fluid\s*ounces?|ounces?|oz|lbs?|pounds?|kilograms?|grams?|kg|milliliters?|liters?|gallons?|mL|gal|ft|feet|foot|meters?|count|ct|packs?|rolls?|sheets?|loads?|servings?)\b/gi;
+  let last = null;
+  let m;
+  while ((m = re.exec(text)) !== null) last = m;
+  if (!last) return null;
+  return parseSizeString(`${last[1]} ${last[2]}`);
 }
 
 /* ---------- toast ---------- */
