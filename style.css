@@ -1108,6 +1108,14 @@ body.pretax-mode .products tbody td.cell-with-tax {
   border-color: var(--primary);
   color: var(--primary);
 }
+/* v0.15.3: type chips have inline color from colorForType — preserve on
+ * hover by overriding the generic .cell-chip:hover above. */
+.cell-chip-type:hover {
+  filter: brightness(1.08);
+  background: inherit !important;
+  color: inherit !important;
+  border-color: transparent !important;
+}
 
 /* Active-filter bar — sits between the row-filter tabs and the table. Each
  * chip is dismissible; "Clear all" appears when 2+ filters are active. */
@@ -1923,24 +1931,33 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   padding: 12px 20px 20px;
 }
 
-/* Toast */
+/* Toast — v0.15.3 is now a <dialog> element so it renders in the browser
+ * top layer (above any modal). Reset all the default <dialog> chrome
+ * (border, padding, etc.) and position it at the top center. */
 .toast {
   position: fixed;
-  bottom: 24px;
+  top: 24px;
+  bottom: auto;
   left: 50%;
+  margin: 0;
   transform: translateX(-50%);
   background: #1a2238;
   color: #fff;
   padding: 10px 18px;
+  border: none;
   border-radius: 999px;
   font-size: 13px;
   box-shadow: var(--shadow-md);
   z-index: 100;
   animation: toast-in 0.2s ease-out;
+  /* <dialog> default styles override */
+  max-width: min(90vw, 480px);
 }
+.toast:not([open]) { display: none; }
+.toast::backdrop { display: none; background: transparent; }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translate(-50%, 8px); }
+  from { opacity: 0; transform: translate(-50%, -8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 

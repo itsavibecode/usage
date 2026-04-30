@@ -1,4 +1,20 @@
-/* Usage Tracker — v0.15.2
+/* Usage Tracker — v0.15.3
+ * v0.15.3: Bug fixes + UX polish.
+ *   - Fixed: Duplicate of a bundled product was inheriting the source's
+ *     bundleId, causing "Position N is already taken" when the user added
+ *     a separate physical bundle. Duplicate now starts a fresh bundleId.
+ *   - Fixed: toast notifications appeared UNDER modal dialogs because the
+ *     dialog top-layer beats CSS z-index. Toast is now a <dialog>.show()
+ *     so it lives in the same top layer.
+ *   - Fixed: lookupAndOfferUpc was overwriting lookupUpc's specific error
+ *     messages with generic "No match" — the user couldn't see what
+ *     actually failed. Preserves the specific message now.
+ *   - UPC fetch: cache: 'no-store' + console diagnostics to surface what
+ *     the proxy actually returned when lookups appear to fail.
+ *   - Desktop type chips now color-coded per category (matches mobile).
+ *   - Share + PNG combined into one Share button → dialog has both
+ *     options (link + PNG export).
+ *   - Size auto-decimal on blur for oz/lb/etc.
  * v0.15.2: Brand company logos via logo.dev. Same publishable token used in
  *   the stocks repo. New `brand` field captured from UPCitemdb (and editable
  *   in the dialog). Renders as a circular logo icon in the desktop name
@@ -164,7 +180,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.15.2';
+const APP_VERSION = '0.15.3';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1288,8 +1304,7 @@ function renderMobileCard(p) {
         ${isActive(p) ? `<button type="button" class="finish-btn finish-btn-primary" data-id="${p.id}" title="Mark as finished">Finish</button>` : ''}
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
         ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC">History</button>` : ''}
-        <button type="button" class="share-btn" data-id="${p.id}" title="Get a read-only share link">Share</button>
-        <button type="button" class="export-btn" data-id="${p.id}" title="Export 4:3 PNG">PNG</button>
+        <button type="button" class="share-btn" data-id="${p.id}" title="Share link or export PNG">Share</button>
         <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
       </div>
     </div>
@@ -1304,7 +1319,7 @@ function renderRow(p) {
   // on the row and lets the card render as a block. Same DOM, two layouts,
   // no duplicated event-handler wiring.
   tr.innerHTML = `
-    <td>${p.productType ? `<button type="button" class="cell-chip" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
+    <td>${p.productType ? `<button type="button" class="cell-chip cell-chip-type" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
     <td class="name-cell">${(() => {
       // v0.15.2: prefer brand company logo (consistent visual scanning by
       // brand). If no brand, fall back to UPC product image. Both onerror
@@ -1362,8 +1377,7 @@ function renderRow(p) {
       ${isActive(p) ? `<button type="button" class="finish-btn" data-id="${p.id}" title="Mark as finished — sets end date">Finish</button>` : ''}
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
       ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC across all purchases">History</button>` : ''}
-      <button type="button" class="share-btn" data-id="${p.id}" title="Get a read-only share link for this product">Share</button>
-      <button type="button" class="export-btn" data-id="${p.id}" title="Export this product as a 4:3 PNG card">PNG</button>
+      <button type="button" class="share-btn" data-id="${p.id}" title="Share link or export PNG">Share</button>
       <button type="button" class="delete-btn" data-id="${p.id}">Delete</button>
     </td>
     <td class="mobile-card-cell">${renderMobileCard(p)}</td>
@@ -2737,13 +2751,14 @@ function openDuplicateDialog(id) {
     if (el.type === 'checkbox') el.checked = !!source[key];
     else el.value = source[key] ?? '';
   }
-  // v0.7.13: if the source is bundled, the duplicate inherits the same
-  // bundleId so it becomes another sibling rather than starting a separate
-  // bundle. Position is intentionally NOT copied — siblings need unique
-  // positions; the user picks the next number when filling out the dialog.
-  if (source.bundleStatus && source.bundleId && f.elements.bundleId) {
-    f.elements.bundleId.value = source.bundleId;
-  }
+  // v0.15.3: Duplicate now starts a NEW bundle, not a sibling of the source.
+  // Reverted v0.7.13 behavior — turned out it was wrong: the user reported
+  // hitting "Position X is already taken" when adding a SECOND physical
+  // 2-pack of the same product, because Duplicate kept reusing the source's
+  // bundleId. If you actually want a sibling (continuing the same physical
+  // bundle), the dialog has a dedicated **Continue existing bundle** picker.
+  // Duplicate should mean "similar product, separate physical bundle."
+  if (f.elements.bundleId) f.elements.bundleId.value = '';
   // Today's purchaseDate is a sensible default for "I just bought another";
   // user can correct it if they're back-filling history. v0.15.1: local date.
   f.elements.purchaseDate.value = todayLocalISODate();
@@ -3043,6 +3058,7 @@ function openShareDialog(productId) {
   input.value = url;
   hint.textContent = '';
   dlg._shareUrl = url;
+  dlg._productId = productId; // v0.15.3 — for the PNG export button
   if (!dlg.open) dlg.showModal();
   // Select the URL so the user can quickly Cmd/Ctrl-C as a fallback.
   requestAnimationFrame(() => { try { input.select(); } catch {} });
@@ -3996,21 +4012,36 @@ async function writePersistedUpc(code, source, item) {
 //   { item: null }            on success-but-no-match
 async function callUpcItemDb(code) {
   try {
+    // v0.15.3: cache: 'no-store' bypasses any browser HTTP cache. The
+    // Apps Script proxy returns no-cache headers, but defensive belt-and-
+    // braces. Also helps when retrying after a transient failure.
     const res = await fetch(`${UPCITEMDB_URL}?upc=${encodeURIComponent(code)}`, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
     });
-    if (!res.ok) return { error: 'HTTP', status: res.status };
+    if (!res.ok) {
+      console.warn('[UPC lookup] HTTP', res.status, 'for', code);
+      return { error: 'HTTP', status: res.status };
+    }
+    const text = await res.text();
     let data;
-    try { data = await res.json(); }
-    catch { return { error: 'PARSE' }; }
+    try { data = JSON.parse(text); }
+    catch (parseErr) {
+      console.warn('[UPC lookup] PARSE failed for', code, '— body starts:', text.slice(0, 200));
+      return { error: 'PARSE' };
+    }
     if (data && data.code && data.code !== 'OK') {
+      console.warn('[UPC lookup] non-OK code:', data.code, data.message || '', 'for', code);
       return { error: data.code, message: data.message };
     }
     const item = (data.items && data.items[0]) || null;
+    if (!item) {
+      console.info('[UPC lookup] OK but no items for', code, '— response:', data);
+    }
     return { item };
   } catch (e) {
-    console.error('UPCitemdb call failed:', e);
+    console.error('[UPC lookup] NETWORK error for', code, e);
     return { error: 'NETWORK' };
   }
 }
@@ -4122,8 +4153,17 @@ async function lookupAndOfferUpc(rawCode, { fromScan = false, forceFresh = false
   pendingUpcLookup = null;
 
   if (!item) {
-    if (fromScan) setUpcStatus('No match in UPC database — enter details manually.', '');
-    else setUpcStatus('No match — enter details manually.', '');
+    // v0.15.3: don't overwrite a more-specific error message that lookupUpc
+    // may have already set (e.g. "Lookup failed — check connection",
+    // "UPC database busy", "Lookup proxy returned an unexpected response").
+    // Only show the generic "No match" message when the status pill is
+    // currently neutral (no is-error class).
+    const statusEl = document.getElementById('upc-status');
+    const hasErrorAlready = statusEl?.classList.contains('is-error');
+    if (!hasErrorAlready) {
+      if (fromScan) setUpcStatus('No match in UPC database — enter details manually.', '');
+      else setUpcStatus('No match — enter details manually.', '');
+    }
     return;
   }
 
@@ -4281,10 +4321,24 @@ function parseSizeString(raw) {
 let toastTimer = null;
 function toast(message) {
   const el = document.getElementById('toast');
+  if (!el) return;
   el.textContent = message;
-  el.hidden = false;
+  // v0.15.3: <dialog>.show() puts the toast in the browser top layer so it
+  // appears ABOVE any modal dialog. show() is non-modal — doesn't block
+  // background interaction. Reset open state if it was already showing so
+  // the new message is the visible one.
+  try {
+    if (el.open) el.close();
+    el.show();
+  } catch {
+    // Fallback: if <dialog> API isn't available for some reason, just
+    // toggle visibility via the hidden attribute.
+    el.removeAttribute('hidden');
+  }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2800);
+  toastTimer = setTimeout(() => {
+    try { el.close(); } catch { el.setAttribute('hidden', ''); }
+  }, 2800);
 }
 
 /* ---------- cost input → $0.00 on blur ---------- */
@@ -4295,6 +4349,26 @@ function formatCostInput(e) {
   const n = Number(el.value);
   if (!isFinite(n)) return;
   el.value = n.toFixed(2);
+}
+
+// v0.15.3: format size input on blur for measurement units. "5" → "5.0",
+// "4.7" → "4.7" (preserved). Only applies to weight/volume units where
+// decimals make sense; count/pack/roll/sheet/load/serving stay as integers.
+const SIZE_DECIMAL_UNITS = new Set(['oz', 'fl oz', 'lb', 'g', 'kg', 'mL', 'L', 'gal', 'ft', 'm']);
+function formatSizeInput() {
+  const f = form();
+  const sizeEl = f.elements.size;
+  const unitEl = f.elements.unit;
+  if (!sizeEl || !unitEl) return;
+  if (sizeEl.value === '' || sizeEl.value == null) return;
+  const n = Number(sizeEl.value);
+  if (!isFinite(n) || n <= 0) return;
+  if (!SIZE_DECIMAL_UNITS.has(unitEl.value)) return;
+  // Only reformat when the user typed a whole number (no decimal point) —
+  // don't disturb someone who entered "4.7" or "0.5".
+  if (Number.isInteger(n) && !sizeEl.value.includes('.')) {
+    sizeEl.value = n.toFixed(1);
+  }
 }
 
 /* ---------- auth UI ---------- */
@@ -4427,6 +4501,11 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const name of ['cost', 'costWithTax']) {
     f.elements[name].addEventListener('blur', formatCostInput);
   }
+  // v0.15.3: format size on blur ("5" → "5.0" for oz/lb/etc.).
+  f.elements.size?.addEventListener('blur', formatSizeInput);
+  // Re-run on unit change too — switching from "count" to "oz" should
+  // immediately apply the decimal format if the size is a whole number.
+  f.elements.unit?.addEventListener('change', formatSizeInput);
 
   document.getElementById('products-body').addEventListener('click', e => {
     const editBtn = e.target.closest('.edit-btn');
@@ -4586,10 +4665,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'rating-clear') syncRatingDisplay(0);
   });
 
-  // v0.11.0: share dialog handlers
+  // v0.11.0: share dialog handlers (v0.15.3: + PNG export)
   document.getElementById('share-close')?.addEventListener('click', closeShareDialog);
   document.getElementById('share-copy')?.addEventListener('click', copyShareLink);
   document.getElementById('share-open')?.addEventListener('click', openShareInNewTab);
+  document.getElementById('share-png')?.addEventListener('click', () => {
+    const dlg = document.getElementById('share-dialog');
+    const id = dlg?._productId;
+    if (id) exportProductPng(id);
+  });
 
   // v0.14.1: finish dialog handlers
   document.getElementById('finish-close')?.addEventListener('click', closeFinishDialog);

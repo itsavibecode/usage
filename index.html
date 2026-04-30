@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.15.2">
+  <meta name="version" content="0.15.3">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.15.2</span>
+        <span class="version" id="version">v0.15.3</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -269,7 +269,7 @@
   </main>
 
   <dialog id="product-dialog" class="product-dialog">
-    <!-- v0.15.2: novalidate so submit always fires and JS handles validation.
+    <!-- v0.15.3: novalidate so submit always fires and JS handles validation.
          HTML5 required validation can fail silently on mobile (the "Please
          fill out this field" tooltip is sometimes invisible in scrolled
          dialogs) — JS validation lets us toast the specific issue. -->
@@ -294,7 +294,7 @@
           <span>UPC <em>*</em></span>
           <div class="input-with-btn">
             <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="Scan or type — we'll look it up automatically">
-            <!-- v0.15.2: explicit Look up button. Forces a fresh fetch
+            <!-- v0.15.3: explicit Look up button. Forces a fresh fetch
                  bypassing both L1 and L2 caches. Useful when a previous
                  lookup failed (rate limit / network blip) and got cached
                  as a miss; this button gives a one-tap retry without
@@ -312,7 +312,7 @@
             </button>
           </div>
           <span class="upc-status" id="upc-status" aria-live="polite"></span>
-          <!-- v0.15.2/v0.15.2: brand logo + product image preview shown
+          <!-- v0.15.3/v0.15.3: brand logo + product image preview shown
                next to each other inside the dialog. Wrapper hides when
                neither is set; either child can fail load and self-hide
                via its onerror handler. -->
@@ -522,7 +522,10 @@
       <p class="share-hint" id="share-hint" aria-live="polite"></p>
     </div>
     <footer class="dialog-footer">
-      <button type="button" class="btn" id="share-open">Open in new tab</button>
+      <!-- v0.15.3: PNG export folded into the Share dialog so the user has
+           one Share button on each row instead of two. -->
+      <button type="button" class="btn" id="share-png" title="Download a 4:3 PNG card of this product">Export PNG</button>
+      <button type="button" class="btn" id="share-open">Open link</button>
       <button type="button" class="btn btn-primary" id="share-copy">Copy link</button>
     </footer>
   </dialog>
@@ -590,7 +593,10 @@
     </footer>
   </dialog>
 
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <!-- v0.15.3: <dialog> instead of <div> so toasts render in the browser's
+       top layer — visible on top of modal dialogs (Add/Edit, Finish, Share,
+       etc.). show() is non-modal so it doesn't block interaction. -->
+  <dialog id="toast" class="toast" role="status" aria-live="polite"></dialog>
 
   <script type="module" src="app.js"></script>
 </body>

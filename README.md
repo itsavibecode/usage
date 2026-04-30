@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.15.2
+**Version:** v0.15.3
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.15.2)
+## Current status (v0.15.3)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,15 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.15.3 — 2026-04-30
+- **Fixed: Duplicate of a bundled product threw "Position already taken."** Was inheriting the source row's `bundleId` from v0.7.13, which made the duplicate a sibling of the original physical bundle. When you actually bought a *separate* physical bundle (e.g. a second 2-pack of the same deodorant), Duplicate is now what you want and starts a fresh bundleId. If you want a sibling within the same physical bundle, use the **Continue existing bundle** picker at the top of the dialog instead.
+- **Fixed: toast notifications appeared underneath modal dialogs.** The browser's modal-dialog top layer beats CSS `z-index`, so a toast in the regular DOM was always behind. Toast is now a `<dialog>` element that uses `.show()` (non-modal) — same top layer as the modals, so it floats above everything. Also moved to top-of-viewport instead of bottom.
+- **Fixed: UPC lookup error messages getting overwritten.** When `lookupUpc` set a specific error like "Lookup failed — check connection" or "UPC database busy," the wrapping `lookupAndOfferUpc` would immediately overwrite it with the generic "No match — enter details manually." Specific errors now stick.
+- **Diagnostic: UPC fetch + console logging.** Added `cache: 'no-store'` to the proxy fetch (defeats any browser HTTP cache between attempts) plus `console.warn` / `console.info` for HTTP errors, parse failures, and OK-but-empty responses. If a lookup fails again, open the browser console — there'll be a clear breadcrumb explaining what came back.
+- **Type chips on desktop now color-coded** per product category (matching mobile). Toothpaste always renders the same blue; Underarm always renders its color, etc. Click still adds the filter chip exactly as before.
+- **Share + PNG combined into one button.** Each row now has a single **Share** button instead of separate Share and PNG. Clicking it opens the share dialog with three actions: Copy link, Open link in new tab, and Export PNG. Mobile cards too. Cleaner action row.
+- **Size auto-decimals on blur** for measurement units (oz, fl oz, lb, g, kg, mL, L, gal, ft, m). Type `5` for an oz product, blur the field, it becomes `5.0` — keeps the decimal-formatted look consistent. Count / pack / roll / sheet / load / serving are integer units and stay as integers.
 
 ### v0.15.2 — 2026-04-30
 - **New: company logos via logo.dev.** Each product now shows a small circular brand-logo icon (Crest, Old Spice, Pantene, etc.) in the desktop table, mobile card head, and Edit dialog. The brand name is auto-captured from UPCitemdb when you scan/lookup a UPC; you can also type or edit it manually in the new **Brand** field in the dialog. Domain is guessed from the brand (`Crest` → `crest.com`, `Old Spice` → `oldspice.com`); when the guess misses, the icon silently hides. Same `pk_` publishable token used by the stocks repo — safe to commit per logo.dev's convention.
