@@ -1,4 +1,12 @@
-/* Usage Tracker — v0.17.1
+/* Usage Tracker — v0.17.2
+ * v0.17.2: Mobile regression fix. v0.17.1's flex-wrap rule on
+ *   .actions-cell had higher specificity than the mobile-block
+ *   `.products tbody td { display: none }` rule, so on mobile the
+ *   desktop action buttons were rendering on top of the mobile card —
+ *   leading to a duplicate set of Edit/Duplicate/etc. buttons stacked
+ *   above the card's own button row. Fixed by scoping both v0.17.1
+ *   rules (name-wrap + actions-flex) inside @media (min-width: 721px)
+ *   so they only apply on desktop. Mobile cards are unchanged.
  * v0.17.1: Two table tweaks following the v0.17.0 consolidation:
  *   - Long product names now wrap onto multiple lines instead of forcing
  *     the Name column wider. The cell caps at 280px and word-breaks on
@@ -234,7 +242,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.1';
+const APP_VERSION = '0.17.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

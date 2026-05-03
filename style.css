@@ -887,32 +887,37 @@ body.density-compact .bought-by {
  * of forcing the column wider (Old Spice's full SKU title is ~70 chars
  * and was making the column ~600px on its own). Cap the cell width so
  * a very long name doesn't dominate the table — at the cap, the text
- * wraps to additional lines in the same row. */
-.products tbody td.name-cell {
-  white-space: normal;
-  max-width: 280px;
-}
-.products tbody td.name-cell .name-link {
-  display: inline;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.35;
-}
+ * wraps to additional lines in the same row. v0.17.2: scoped to desktop
+ * only via min-width media so the mobile @media block's
+ * `.products tbody td { display: none }` rule still wins (otherwise the
+ * desktop name cell renders alongside the mobile card on phones). */
+@media (min-width: 721px) {
+  .products tbody td.name-cell {
+    white-space: normal;
+    max-width: 280px;
+  }
+  .products tbody td.name-cell .name-link {
+    display: inline;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
+  }
 
-/* v0.17.1: Stack the row-actions buttons across two rows when the cell
- * is narrow. The row is already two visual lines tall whenever a name
- * wraps, so stacking doesn't add overall height — it just lets the
- * buttons share the existing vertical space and reclaims horizontal
- * width for the data columns. */
-.products tbody td.actions-cell {
-  white-space: normal;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
-}
-.products tbody td.actions-cell button {
-  margin-left: 0; /* gap handles spacing now that the cell is flex */
+  /* v0.17.1: Stack the row-actions buttons across two rows when the cell
+   * is narrow. The row is already two visual lines tall whenever a name
+   * wraps, so stacking doesn't add overall height — it just lets the
+   * buttons share the existing vertical space and reclaims horizontal
+   * width for the data columns. */
+  .products tbody td.actions-cell {
+    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .products tbody td.actions-cell button {
+    margin-left: 0; /* gap handles spacing now that the cell is flex */
+  }
 }
 
 .products tbody tr:hover { background: var(--surface-alt); }
