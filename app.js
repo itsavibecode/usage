@@ -1,4 +1,13 @@
-/* Usage Tracker — v0.16.0
+/* Usage Tracker — v0.16.1
+ * v0.16.1: $/unit and $/day columns now show 2 decimal places instead of 4.
+ *   The 4-decimal precision was forcing horizontal table scrolling on
+ *   reasonable-sized monitors, and at personal-tracker scale ($1-2 per oz,
+ *   a few cents per day) the extra digits were noise rather than signal.
+ *   Affects table cells, dashboard cards, mobile card subtitles, chart
+ *   axes/tooltips, trends-panel insight sentences, and PNG export labels —
+ *   wherever moneyFine() is called. (moneyFine and money now produce
+ *   identical output; left as separate functions for now to keep the
+ *   diff minimal.)
  * v0.16.0: Email reorder reminders. New Settings dialog (in the user-chip
  *   toolbar) toggles a daily digest email — the usage-worker Cloudflare
  *   Worker reads /users/{uid}/meta/emailPrefs every morning, computes which
@@ -198,7 +207,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.16.0';
+const APP_VERSION = '0.16.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -517,9 +526,14 @@ function getMoneyFormatters() {
       style: 'currency', currency: userCurrency,
       minimumFractionDigits: 2, maximumFractionDigits: 2
     }),
+    // v0.16.1: dropped from 4→2 decimals. The 4-decimal precision was
+    // making the $/unit and $/day table columns wide enough to force
+    // horizontal scrolling — and at personal-tracker scale ($1-2/unit,
+    // a few cents per day at most) the extra precision was noise.
+    // moneyFine and money now produce identical output by design.
     fine: new Intl.NumberFormat(undefined, {
       style: 'currency', currency: userCurrency,
-      minimumFractionDigits: 2, maximumFractionDigits: 4
+      minimumFractionDigits: 2, maximumFractionDigits: 2
     })
   };
   return _moneyFormatters;
