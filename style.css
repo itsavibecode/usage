@@ -590,6 +590,211 @@ body.pretax-mode .products tbody td.cell-with-tax {
   display: none;
 }
 
+/* v0.17.0: BOUGHT BY column (STORE + BUYER + CARD merged). Pieces sit in
+ * a single flex row with thin dot separators; missing pieces render
+ * nothing (the join-fold in renderRow skips them). */
+.bought-by {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.bb-store {
+  color: var(--text);
+  font-weight: 500;
+}
+.bb-sep {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+.bb-chip {
+  /* Inherit the .cell-chip look but tighten padding so 3 pieces fit nicely
+   * in one cell without forcing the column to grow. */
+  padding: 1px 8px;
+}
+
+/* v0.17.0: column visibility chooser. Each toggleable column has both a
+ * data-sort attribute on the <th> and a .col-<key> class on the <td>.
+ * When the user unchecks a column in the Columns dropdown, body gets a
+ * .cols-hide-<key> class and both pieces disappear together. The mobile
+ * card layout doesn't use these classes (it picks its own subset), so
+ * this only affects the desktop table. */
+body.cols-hide-productType .products thead th[data-sort="productType"],
+body.cols-hide-productType .products tbody td.col-productType { display: none; }
+body.cols-hide-size .products thead th[data-sort="size"],
+body.cols-hide-size .products tbody td.col-size { display: none; }
+body.cols-hide-startDate .products thead th[data-sort="startDate"],
+body.cols-hide-startDate .products tbody td.col-startDate { display: none; }
+body.cols-hide-endDate .products thead th[data-sort="endDate"],
+body.cols-hide-endDate .products tbody td.col-endDate { display: none; }
+body.cols-hide-duration .products thead th[data-sort="duration"],
+body.cols-hide-duration .products tbody td.col-duration { display: none; }
+body.cols-hide-cost .products thead th[data-sort="cost"],
+body.cols-hide-cost .products tbody td.col-cost { display: none; }
+body.cols-hide-costWithTax .products thead th[data-sort="costWithTax"],
+body.cols-hide-costWithTax .products tbody td.col-costWithTax { display: none; }
+body.cols-hide-costPerUnit .products thead th[data-sort="costPerUnit"],
+body.cols-hide-costPerUnit .products tbody td.col-costPerUnit { display: none; }
+body.cols-hide-costPerDay .products thead th[data-sort="costPerDay"],
+body.cols-hide-costPerDay .products tbody td.col-costPerDay { display: none; }
+body.cols-hide-bundleStatus .products thead th[data-sort="bundleStatus"],
+body.cols-hide-bundleStatus .products tbody td.col-bundleStatus { display: none; }
+body.cols-hide-boughtBy .products thead th[data-sort="boughtBy"],
+body.cols-hide-boughtBy .products tbody td.col-boughtBy { display: none; }
+body.cols-hide-purchaseDate .products thead th[data-sort="purchaseDate"],
+body.cols-hide-purchaseDate .products tbody td.col-purchaseDate { display: none; }
+body.cols-hide-upc .products thead th[data-sort="upc"],
+body.cols-hide-upc .products tbody td.col-upc { display: none; }
+body.cols-hide-notes .products thead th[data-sort="notes"],
+body.cols-hide-notes .products tbody td.col-notes { display: none; }
+
+/* v0.17.0: auto-hide NOTES column when no currently-rendered row has any
+ * note text. The .no-notes-data class is toggled by renderTable based on
+ * what's actually in the body. Hides regardless of the user's column
+ * preference — if there's nothing to show, the column shouldn't take up
+ * space. The user's manual preference (cols-hide-notes) is preserved
+ * separately and re-applies when notes do exist. */
+.products.no-notes-data thead th[data-sort="notes"],
+.products.no-notes-data tbody td.col-notes { display: none; }
+
+/* v0.17.0: density toggle. Compact mode trims row padding and shrinks
+ * the table font so more rows fit on screen. Affects desktop table only;
+ * mobile cards use their own layout. */
+.density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.density-toggle select {
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+body.density-compact .products {
+  font-size: 12px;
+}
+body.density-compact .products thead th {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+body.density-compact .products tbody td {
+  padding: 4px 8px;
+}
+body.density-compact .products .cell-chip,
+body.density-compact .products .badge {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+body.density-compact .products .name-thumb,
+body.density-compact .products .name-thumb-logo {
+  width: 20px;
+  height: 20px;
+}
+body.density-compact .products .actions-cell {
+  gap: 4px;
+}
+body.density-compact .products .actions-cell button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+body.density-compact .bought-by {
+  font-size: 12px;
+  gap: 3px 5px;
+}
+
+/* v0.17.0: Columns dropdown — sits in the display-controls bar next to
+ * the density toggle and currency selector. Uses the same dropdown
+ * pattern as Import/Export menus. */
+.columns-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.columns-dropdown .columns-trigger {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+.columns-dropdown .columns-trigger:hover {
+  background: var(--surface-alt);
+  border-color: var(--primary);
+}
+.columns-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1));
+  padding: 6px;
+  display: none;
+  z-index: 50;
+}
+.columns-menu.open { display: block; }
+.columns-menu .columns-menu-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px;
+}
+.columns-menu .columns-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+.columns-menu .columns-menu-row:hover { background: var(--surface-alt); }
+.columns-menu .columns-menu-row input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.columns-menu .columns-menu-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.columns-menu .columns-menu-action {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-muted);
+}
+.columns-menu .columns-menu-action:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
 /* Stats bar */
 .stats-bar {
   display: grid;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.16.1">
+  <meta name="version" content="0.17.0">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.16.1</span>
+        <span class="version" id="version">v0.17.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -118,6 +118,27 @@
         <span class="pretax-track" aria-hidden="true"><span class="pretax-thumb"></span></span>
         <span class="pretax-label">Show pre-tax prices</span>
       </label>
+      <!-- v0.17.0: density + column visibility controls. Persist per
+           browser via localStorage. Affect the desktop table only — the
+           mobile card layout has its own column subset already. -->
+      <label class="density-toggle" title="Switch table row spacing">
+        <span>Density</span>
+        <select id="density-select" aria-label="Table density">
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+        </select>
+      </label>
+      <div class="columns-dropdown">
+        <button type="button" id="btn-columns" class="columns-trigger" aria-haspopup="true" aria-expanded="false" title="Show or hide table columns">Columns &#9662;</button>
+        <div class="columns-menu" id="columns-menu" role="menu">
+          <div class="columns-menu-title">Show columns</div>
+          <div id="columns-menu-rows"></div>
+          <div class="columns-menu-actions">
+            <button type="button" class="columns-menu-action" id="columns-show-all">Show all</button>
+            <button type="button" class="columns-menu-action" id="columns-reset">Reset</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <section class="stats-bar" id="stats-bar" aria-label="Summary">
@@ -180,9 +201,8 @@
               <th data-sort="costPerUnit">$/unit</th>
               <th data-sort="costPerDay">$/day</th>
               <th data-sort="bundleStatus">Bundle</th>
-              <th data-sort="store">Store</th>
-              <th data-sort="buyer">Buyer</th>
-              <th data-sort="cardLast4">Card</th>
+              <!-- v0.17.0: STORE + BUYER + CARD consolidated into one BOUGHT BY column. -->
+              <th data-sort="boughtBy">Bought by</th>
               <th data-sort="purchaseDate">Purchased</th>
               <th data-sort="upc">UPC</th>
               <th data-sort="notes">Notes</th>

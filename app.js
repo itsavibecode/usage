@@ -1,4 +1,21 @@
-/* Usage Tracker — v0.16.1
+/* Usage Tracker — v0.17.0
+ * v0.17.0: Desktop table consolidation pass. Four changes shipped together:
+ *   1. STORE + BUYER + CARD merged into a single BOUGHT BY column. Each
+ *      piece keeps its own filter-chip behavior; missing pieces are
+ *      skipped. Sort by BOUGHT BY orders by store first, then buyer,
+ *      then card. Saves two columns of horizontal width.
+ *   2. New Density toggle (Comfortable / Compact) in the display-controls
+ *      bar. Compact tightens row padding and shrinks the table font for
+ *      ~15% more rows per screen. Persists per browser at
+ *      usage.density.v1.
+ *   3. NOTES column auto-hides when nothing in the current view has any
+ *      note text. Manual columns preference still applies on top.
+ *   4. New Columns dropdown lets the user toggle visibility of any
+ *      non-essential column (everything except NAME and ACTIONS). State
+ *      persists at usage.columns.v1; "Reset" clears the override and
+ *      shows everything.
+ *   Bundle siblings panel colspan adjusted 19 → 17 to match the new
+ *   total column count (16 desktop + 1 mobile).
  * v0.16.1: $/unit and $/day columns now show 2 decimal places instead of 4.
  *   The 4-decimal precision was forcing horizontal table scrolling on
  *   reasonable-sized monitors, and at personal-tracker scale ($1-2 per oz,
@@ -207,7 +224,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.16.1';
+const APP_VERSION = '0.17.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -266,6 +283,50 @@ const PRETAX_KEY = 'usage.preTaxMode.v1';
 let preTaxMode = (() => {
   try { return localStorage.getItem(PRETAX_KEY) === '1'; }
   catch { return false; }
+})();
+
+// v0.17.0: table density mode. 'comfortable' is the original layout;
+// 'compact' tightens row padding and shrinks the font for users who
+// want more rows per screen. Persists per browser.
+const DENSITY_KEY = 'usage.density.v1';
+let densityMode = (() => {
+  try {
+    const v = localStorage.getItem(DENSITY_KEY);
+    return v === 'compact' ? 'compact' : 'comfortable';
+  } catch { return 'comfortable'; }
+})();
+
+// v0.17.0: per-column visibility for the desktop table. Each entry maps
+// a column key (matches data-sort on the th and col-X on the td) to a
+// boolean — true = show, false = hide. NAME and ACTIONS are intentionally
+// not toggleable (the row would be useless without them) so they're
+// absent from this map.
+const COLUMNS_KEY = 'usage.columns.v1';
+const TOGGLEABLE_COLUMNS = [
+  { key: 'productType',  label: 'Type' },
+  { key: 'size',         label: 'Size' },
+  { key: 'startDate',    label: 'Start' },
+  { key: 'endDate',      label: 'End' },
+  { key: 'duration',     label: 'Duration' },
+  { key: 'cost',         label: 'Cost' },
+  { key: 'costWithTax',  label: 'w/ Tax' },
+  { key: 'costPerUnit',  label: '$/unit' },
+  { key: 'costPerDay',   label: '$/day' },
+  { key: 'bundleStatus', label: 'Bundle' },
+  { key: 'boughtBy',     label: 'Bought by' },
+  { key: 'purchaseDate', label: 'Purchased' },
+  { key: 'upc',          label: 'UPC' },
+  { key: 'notes',        label: 'Notes' },
+];
+let columnVisibility = (() => {
+  // Default: everything visible. localStorage stores any user overrides.
+  const defaults = Object.fromEntries(TOGGLEABLE_COLUMNS.map(c => [c.key, true]));
+  try {
+    const raw = localStorage.getItem(COLUMNS_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return { ...defaults, ...parsed };
+  } catch { return defaults; }
 })();
 // Mobile cards collapse Where + Notes by default to save vertical space.
 // Per-product expansion state survives re-renders (in-memory only — no
@@ -985,6 +1046,14 @@ function getSortValue(p, column) {
     case 'costPerDay': return calcCostPerDay(p) ?? 0;
     case 'bundleStatus': return p.bundleStatus ? 1 : 0;
     case 'endDate': return p.endDate || '\uffff';
+    // v0.17.0: STORE / BUYER / CARD merged into one BOUGHT BY column. Sort
+    // by store first, then buyer, then card \u2014 the leftmost piece dominates
+    // ordering so click-the-header still feels like "sort by where I shop."
+    case 'boughtBy': return [
+      (p.store || '\uffff'),
+      (p.buyer || '\uffff'),
+      (p.cardLast4 || '\uffff'),
+    ].join('|').toLowerCase();
     default: return (p[column] ?? '').toString().toLowerCase();
   }
 }
@@ -1267,6 +1336,16 @@ function renderTable() {
     }
   }
 
+  // v0.17.0: auto-hide the Notes column when nothing in the current view
+  // actually has notes — saves a column of width on tables of products
+  // that aren't annotated. Independent of the user's manual columns
+  // preference (which still applies on top via body.cols-hide-notes).
+  const tableEl = document.getElementById('products-table');
+  if (tableEl) {
+    const anyNotes = visible.some(p => p.notes && p.notes.trim().length);
+    tableEl.classList.toggle('no-notes-data', !anyNotes);
+  }
+
   document.querySelectorAll('#products-table thead th[data-sort]').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
     if (th.dataset.sort === sortState.column) {
@@ -1379,8 +1458,8 @@ function renderRow(p) {
   // on the row and lets the card render as a block. Same DOM, two layouts,
   // no duplicated event-handler wiring.
   tr.innerHTML = `
-    <td>${p.productType ? `<button type="button" class="cell-chip cell-chip-type" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
-    <td class="name-cell">${(() => {
+    <td class="col-productType">${p.productType ? `<button type="button" class="cell-chip cell-chip-type" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
+    <td class="name-cell col-productName">${(() => {
       // v0.15.2: prefer brand company logo (consistent visual scanning by
       // brand). If no brand, fall back to UPC product image. Both onerror
       // handlers self-remove on load failure.
@@ -1388,15 +1467,15 @@ function renderRow(p) {
       if (p.imageUrl) return `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
       return '';
     })()}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
-    <td class="num">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
-    <td>${formatDate(p.startDate)}</td>
-    <td>${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
-    <td class="num">${formatDuration(p)}</td>
-    <td class="num">${money(p.cost)}</td>
-    <td class="num cell-with-tax">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
-    <td class="num">${moneyFine(calcCostPerUnit(p))}</td>
-    <td class="num">${moneyFine(calcCostPerDay(p))}</td>
-    <td>${(() => {
+    <td class="num col-size">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
+    <td class="col-startDate">${formatDate(p.startDate)}</td>
+    <td class="col-endDate">${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
+    <td class="num col-duration">${formatDuration(p)}</td>
+    <td class="num col-cost">${money(p.cost)}</td>
+    <td class="num cell-with-tax col-costWithTax">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
+    <td class="num col-costPerUnit">${moneyFine(calcCostPerUnit(p))}</td>
+    <td class="num col-costPerDay">${moneyFine(calcCostPerDay(p))}</td>
+    <td class="col-bundleStatus">${(() => {
       if (!p.bundleStatus) return '—';
       const label = p.bundlePosition
         ? `${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}`
@@ -1410,12 +1489,21 @@ function renderRow(p) {
       }
       return `<span class="badge ${cls}">${label}</span>`;
     })()}</td>
-    <td>${escapeHtml(p.store) || '—'}</td>
-    <td>${p.buyer ? `<button type="button" class="cell-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button>` : '—'}</td>
-    <td>${p.cardLast4 ? `<button type="button" class="cell-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card •••• ${escapeHtml(p.cardLast4)}">•••• ${escapeHtml(p.cardLast4)}</button>` : '—'}</td>
-    <td>${formatDate(p.purchaseDate)}</td>
-    <td><code>${escapeHtml(p.upc)}</code></td>
-    <td class="notes-cell">${(() => {
+    <td class="col-boughtBy">${(() => {
+      // v0.17.0: STORE + BUYER + CARD consolidated into one column to free
+      // horizontal space. Each piece keeps its own filter-chip behavior so
+      // clicking still narrows the table; missing pieces are skipped, and
+      // an entirely empty cell renders as a single em-dash.
+      const parts = [];
+      if (p.store) parts.push(`<span class="bb-store">${escapeHtml(p.store)}</span>`);
+      if (p.buyer) parts.push(`<button type="button" class="cell-chip bb-chip" data-filter-col="buyer" data-filter-val="${escapeHtml(p.buyer)}" title="Filter to ${escapeHtml(p.buyer)}">${escapeHtml(p.buyer)}</button>`);
+      if (p.cardLast4) parts.push(`<button type="button" class="cell-chip bb-chip" data-filter-col="cardLast4" data-filter-val="${escapeHtml(p.cardLast4)}" title="Filter to card •••• ${escapeHtml(p.cardLast4)}">•••• ${escapeHtml(p.cardLast4)}</button>`);
+      if (!parts.length) return '—';
+      return `<div class="bought-by">${parts.join('<span class="bb-sep" aria-hidden="true">·</span>')}</div>`;
+    })()}</td>
+    <td class="col-purchaseDate">${formatDate(p.purchaseDate)}</td>
+    <td class="col-upc"><code>${escapeHtml(p.upc)}</code></td>
+    <td class="notes-cell col-notes">${(() => {
       // Notes column is space-hungry on a wide desktop table. Show a short
       // preview chip; click to expand inline. Reuses the .mc-more-btn click
       // handler? No — desktop has its own toggle (notes-chip class).
@@ -1432,7 +1520,7 @@ function renderRow(p) {
         ? `<button type="button" class="notes-chip is-expanded" data-id="${p.id}" title="Click to collapse"><span class="notes-text">${text}</span></button>`
         : `<button type="button" class="notes-chip" data-id="${p.id}" title="Click to expand">${preview}</button>`;
     })()}</td>
-    <td class="actions-cell">
+    <td class="actions-cell col-actions">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
       ${isActive(p) ? `<button type="button" class="finish-btn" data-id="${p.id}" title="Mark as finished — sets end date">Finish</button>` : ''}
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
@@ -1449,7 +1537,8 @@ function renderRow(p) {
 // all sibling rows that share the same bundleId. Clicking a sibling jumps
 // to its Edit dialog. The current row is highlighted via .is-current.
 // Renders as a `<tr>` with a single colspan'd `<td>` so it spans the full
-// table width (18 desktop columns + 1 mobile-card-cell = 19 total).
+// table width. v0.17.0: 16 desktop columns + 1 mobile-card-cell = 17 total
+// (was 19 pre-v0.17.0 when STORE/BUYER/CARD were three separate columns).
 // Shared body of the slide-out panel — inner HTML only, used both for the
 // desktop full-width row and the mobile inline-in-card variant.
 function renderBundleSiblingsInner(p) {
@@ -1497,9 +1586,10 @@ function renderBundleSiblingsInline(p) {
 function renderBundleSiblingsRow(p) {
   const tr = document.createElement('tr');
   tr.className = 'bundle-siblings-row';
-  // colspan=19: 18 desktop columns + 1 mobile-card-cell. The cell spans the
-  // full table width so the panel reads as detail belonging to the row above.
-  tr.innerHTML = `<td colspan="19" class="bundle-siblings-cell">${renderBundleSiblingsInner(p)}</td>`;
+  // colspan=17: 16 desktop columns + 1 mobile-card-cell (post-v0.17.0). The
+  // cell spans the full table width so the panel reads as detail belonging
+  // to the row above.
+  tr.innerHTML = `<td colspan="17" class="bundle-siblings-cell">${renderBundleSiblingsInner(p)}</td>`;
   return tr;
 }
 
@@ -2208,6 +2298,40 @@ function renderChartLongestRunning() {
 // triggered separately by the caller — this is purely presentational.
 function applyPreTaxMode() {
   document.body.classList.toggle('pretax-mode', preTaxMode);
+}
+
+// v0.17.0: density mode. CSS-only via body class — no re-render needed.
+function applyDensityMode() {
+  document.body.classList.toggle('density-compact', densityMode === 'compact');
+}
+
+// v0.17.0: column visibility. For each column the user has hidden, set a
+// body class .cols-hide-<key> that the CSS uses to display:none both the
+// <th> and matching <td>s. NAME and ACTIONS are not part of this set.
+function applyColumnVisibility() {
+  for (const col of TOGGLEABLE_COLUMNS) {
+    document.body.classList.toggle(`cols-hide-${col.key}`, !columnVisibility[col.key]);
+  }
+}
+
+// v0.17.0: persist column visibility to localStorage. Called on every
+// checkbox change.
+function saveColumnVisibility() {
+  try { localStorage.setItem(COLUMNS_KEY, JSON.stringify(columnVisibility)); } catch {}
+}
+
+// v0.17.0: build the dropdown menu rows. One checkbox per toggleable
+// column. Wiring is delegated to the parent on('change'). Called once on
+// init and again whenever the menu is re-opened (cheap; <20 nodes).
+function renderColumnsMenu() {
+  const host = document.getElementById('columns-menu-rows');
+  if (!host) return;
+  host.innerHTML = TOGGLEABLE_COLUMNS.map(col => `
+    <label class="columns-menu-row">
+      <input type="checkbox" data-col-key="${col.key}" ${columnVisibility[col.key] ? 'checked' : ''}>
+      <span>${col.label}</span>
+    </label>
+  `).join('');
 }
 
 // v0.12.0: derive the currency symbol from the active currency for use in
@@ -4926,6 +5050,73 @@ document.addEventListener('DOMContentLoaded', () => {
       applyPreTaxMode();
       render();
       toast(preTaxMode ? 'Showing pre-tax prices' : 'Showing prices with tax');
+    });
+  }
+
+  // v0.17.0: density toggle. CSS-only via body class — render() is not
+  // needed since no data changes; the rules just re-style the existing
+  // table cells.
+  const densitySelect = document.getElementById('density-select');
+  if (densitySelect) {
+    densitySelect.value = densityMode;
+    applyDensityMode();
+    densitySelect.addEventListener('change', () => {
+      densityMode = densitySelect.value === 'compact' ? 'compact' : 'comfortable';
+      try { localStorage.setItem(DENSITY_KEY, densityMode); } catch {}
+      applyDensityMode();
+    });
+  }
+
+  // v0.17.0: column visibility dropdown. Per-column checkboxes; persists
+  // to localStorage. The rows are rendered up-front and re-rendered when
+  // the user clicks "Show all" or "Reset" so the checked states stay in
+  // sync with the source-of-truth state object.
+  applyColumnVisibility();
+  renderColumnsMenu();
+  const columnsBtn = document.getElementById('btn-columns');
+  const columnsMenu = document.getElementById('columns-menu');
+  if (columnsBtn && columnsMenu) {
+    columnsBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const wasOpen = columnsMenu.classList.contains('open');
+      // Close sibling dropdowns first.
+      document.getElementById('export-menu')?.classList.remove('open');
+      document.getElementById('import-menu')?.classList.remove('open');
+      columnsMenu.classList.toggle('open', !wasOpen);
+      columnsBtn.setAttribute('aria-expanded', String(!wasOpen));
+    });
+    // Close on outside click — mirrors the pattern used by Import/Export menus.
+    document.addEventListener('click', e => {
+      if (!columnsMenu.contains(e.target) && e.target !== columnsBtn) {
+        columnsMenu.classList.remove('open');
+        columnsBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+    // Per-checkbox change.
+    columnsMenu.addEventListener('change', e => {
+      const cb = e.target.closest('input[type="checkbox"][data-col-key]');
+      if (!cb) return;
+      const key = cb.dataset.colKey;
+      columnVisibility[key] = !!cb.checked;
+      saveColumnVisibility();
+      applyColumnVisibility();
+    });
+    // Show-all / Reset action buttons inside the dropdown footer.
+    document.getElementById('columns-show-all')?.addEventListener('click', () => {
+      for (const col of TOGGLEABLE_COLUMNS) columnVisibility[col.key] = true;
+      saveColumnVisibility();
+      applyColumnVisibility();
+      renderColumnsMenu();
+    });
+    document.getElementById('columns-reset')?.addEventListener('click', () => {
+      // Reset = same as Show all for now; if we ever introduce a
+      // recommended default subset (e.g. hide UPC and Duration on
+      // narrow screens), this is the place to apply it.
+      for (const col of TOGGLEABLE_COLUMNS) columnVisibility[col.key] = true;
+      try { localStorage.removeItem(COLUMNS_KEY); } catch {}
+      applyColumnVisibility();
+      renderColumnsMenu();
+      toast('Columns reset to default');
     });
   }
 

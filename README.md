@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.16.1
+**Version:** v0.17.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.16.1)
+## Current status (v0.17.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,14 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.0 — 2026-05-03
+- **Desktop table consolidation.** The product table was 18 columns wide and forced horizontal scrolling on most monitors. Four changes shipped together:
+  1. **Store + Buyer + Card merged into one Bought by column.** Each piece keeps its filter-chip behavior; missing pieces are skipped, so a row that only has a store still reads cleanly. Sort by *Bought by* orders by store first, then buyer, then card. Saves two columns of horizontal width.
+  2. **New Density toggle (Comfortable / Compact)** in the display-controls bar above the stats. Compact tightens row padding and shrinks the table font, fitting ~15% more rows per screen on the same monitor. Persists per browser.
+  3. **Notes column auto-hides** when nothing in the current view actually has notes. Independent of the manual columns preference — if you turn Notes on but no current row has any, the column still hides itself for now and reappears the moment a visible row gets a note.
+  4. **New Columns dropdown** in the display-controls bar lets you toggle any non-essential column on or off (everything except Name and Actions). State persists per browser. *Reset* clears the override and shows everything again.
+- Combined effect on the live table: 18 columns → 16 columns by default, and you can drop further from there if you want a tighter view (e.g. hide UPC + Duration + Purchased on a 1080p screen). Compact density on top of column hiding gets the same data into a fraction of the original horizontal space, and nothing's lost — every value is still on the row, you're just choosing which to display.
 
 ### v0.16.1 — 2026-05-03
 - **$/unit and $/day columns now show 2 decimal places instead of 4.** The 4-decimal precision (`$1.0412/oz`) was forcing horizontal table scrolling on reasonable-sized monitors, and at personal-tracker scale ($1–2 per oz, a few cents per day) the extra digits were noise rather than signal. Affects every place `moneyFine()` is called: table cells, dashboard cards, mobile card subtitles, chart axes/tooltips, trends-panel insight sentences, and PNG export labels.
