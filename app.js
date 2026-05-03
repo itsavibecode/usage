@@ -1,4 +1,13 @@
-/* Usage Tracker — v0.15.5
+/* Usage Tracker — v0.16.0
+ * v0.16.0: Email reorder reminders. New Settings dialog (in the user-chip
+ *   toolbar) toggles a daily digest email — the usage-worker Cloudflare
+ *   Worker reads /users/{uid}/meta/emailPrefs every morning, computes which
+ *   actives are at >=85% of their type's average lifespan, and sends one
+ *   email through Resend (max one per week so persistent reminders don't
+ *   spam). Email defaults to the signed-in Google account; an override
+ *   field lets the user point reminders elsewhere. The in-app reorder
+ *   reminders panel is unchanged — the email is just a push version of
+ *   the same algorithm.
  * v0.15.5: Mobile card actions row wraps + buttons size to content.
  *   Duplicate button text was wrapping to 2 lines (broken centering,
  *   stretched height) because min-width:64 + padding:16 couldn't fit the
@@ -189,7 +198,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.15.5';
+const APP_VERSION = '0.16.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -592,6 +601,34 @@ async function deleteProduct(id) {
 async function saveCustomTypes(list) {
   try { await setDoc(typesDoc(), { types: list }); }
   catch (e) { toast('Could not save custom types: ' + e.message); }
+}
+
+// v0.16.0: email reminder prefs. Read by usage-worker daily cron to decide
+// whether to send the digest. Only the two user-controlled fields
+// (reorderEmailsEnabled, notifyEmail) are written from the app — the worker
+// owns lastReorderEmailSentAt / lastReorderEmailRecipientCount / lastResendId
+// and we use { merge: true } to avoid clobbering them.
+function emailPrefsDoc(uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'meta', 'emailPrefs');
+}
+async function loadEmailPrefs() {
+  if (!currentUser) return null;
+  try {
+    const snap = await getDoc(emailPrefsDoc());
+    return snap.exists() ? snap.data() : null;
+  } catch (e) {
+    console.warn('loadEmailPrefs failed', e);
+    return null;
+  }
+}
+async function saveEmailPrefs({ enabled, email }) {
+  if (!currentUser) throw new Error('Not signed in');
+  const payload = {
+    reorderEmailsEnabled: !!enabled,
+    notifyEmail: (email || '').trim() || null,
+  };
+  await setDoc(emailPrefsDoc(), payload, { merge: true });
+  return payload;
 }
 
 function subscribeData(uid) {
@@ -3099,6 +3136,80 @@ function openShareInNewTab() {
   if (url) window.open(url, '_blank', 'noopener');
 }
 
+/* ---------- v0.16.0 Settings dialog (email reorder reminders) ---------- */
+
+// Loads the current prefs from /users/{uid}/meta/emailPrefs and seeds the
+// dialog inputs, then opens it. If no prefs doc exists yet, the toggle
+// defaults to off and the email field defaults to the signed-in account
+// email (visible in the placeholder hint, not pre-filled, so saving without
+// touching the field cleanly omits the override).
+async function openSettingsDialog() {
+  if (!currentUser) { toast('Please sign in first'); return; }
+  const dlg = document.getElementById('settings-dialog');
+  const enabledInput = document.getElementById('settings-email-enabled');
+  const emailInput = document.getElementById('settings-email-address');
+  const hintEl = document.getElementById('settings-email-default-hint');
+  const status = document.getElementById('settings-status');
+  if (!dlg || !enabledInput || !emailInput) return;
+
+  // Reset dialog state every open. Status line is also cleared.
+  enabledInput.checked = false;
+  emailInput.value = '';
+  if (status) { status.textContent = ''; status.className = 'settings-status'; }
+
+  const accountEmail = currentUser.email || '';
+  if (hintEl) {
+    hintEl.textContent = accountEmail
+      ? `Leave blank to use ${accountEmail} (your Google account email).`
+      : 'Leave blank to use the email on your Google account.';
+  }
+
+  // Seed from Firestore if present. Best-effort — failure just leaves
+  // defaults so the user can still toggle/save.
+  const prefs = await loadEmailPrefs();
+  if (prefs) {
+    enabledInput.checked = !!prefs.reorderEmailsEnabled;
+    if (prefs.notifyEmail) emailInput.value = prefs.notifyEmail;
+  }
+
+  if (!dlg.open) dlg.showModal();
+}
+
+function closeSettingsDialog() {
+  const dlg = document.getElementById('settings-dialog');
+  if (dlg && dlg.open) dlg.close();
+}
+
+async function handleSettingsSave() {
+  const enabledInput = document.getElementById('settings-email-enabled');
+  const emailInput = document.getElementById('settings-email-address');
+  const status = document.getElementById('settings-status');
+  const saveBtn = document.getElementById('settings-save');
+  if (!enabledInput || !emailInput) return;
+
+  const enabled = enabledInput.checked;
+  const email = (emailInput.value || '').trim();
+
+  // Lightweight email validation. Empty is fine — the worker falls back to
+  // the auth user's email via Identity Toolkit. If the user typed something,
+  // it must look like an address.
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (status) { status.textContent = 'That email doesn\'t look right.'; status.className = 'settings-status is-error'; }
+    return;
+  }
+
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    await saveEmailPrefs({ enabled, email });
+    closeSettingsDialog();
+    toast(enabled ? 'Email reminders on. We\'ll send when something\'s due.' : 'Email reminders off.');
+  } catch (e) {
+    if (status) { status.textContent = 'Save failed: ' + (e.message || e.code || 'unknown error'); status.className = 'settings-status is-error'; }
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
 /* ---------- v0.8.0 price history per UPC ---------- */
 
 let priceHistoryChart = null;
@@ -4711,6 +4822,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('finish-date')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); confirmFinish(); }
   });
+
+  // v0.16.0: settings dialog (email reminder opt-in) handlers
+  document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
+  document.getElementById('settings-close')?.addEventListener('click', closeSettingsDialog);
+  document.getElementById('settings-cancel')?.addEventListener('click', closeSettingsDialog);
+  document.getElementById('settings-save')?.addEventListener('click', handleSettingsSave);
 
   // v0.8.0: price history dialog close handlers
   document.getElementById('price-history-close')?.addEventListener('click', closePriceHistory);

@@ -2558,3 +2558,128 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   .auth-card { padding: 24px 20px; }
   .chart-box { height: 220px; }
 }
+
+/* v0.16.0 Settings dialog. Email-reminder opt-in lives here; future
+ * account-level prefs would slot in as additional .settings-section blocks. */
+.settings-dialog { max-width: 480px; }
+.settings-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-section-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.settings-toggle-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.settings-toggle-track {
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.settings-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.settings-toggle-row input:checked ~ .settings-toggle-track {
+  background: var(--primary);
+}
+.settings-toggle-row input:checked ~ .settings-toggle-track .settings-toggle-thumb {
+  transform: translateX(16px);
+}
+.settings-toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settings-field input[type="email"] {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-field input[type="email"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(43, 95, 217, 0.15);
+}
+.settings-field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.settings-cadence-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.settings-cadence-list li { margin-bottom: 2px; }
+.settings-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+}
+.settings-status.is-error { color: var(--danger, #b03434); }
+.settings-status.is-success { color: var(--success, #2f7d54); }
+
+@media (max-width: 640px) {
+  .settings-dialog { max-width: 92vw; }
+}

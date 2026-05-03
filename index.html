@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.15.5">
+  <meta name="version" content="0.16.0">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.15.5</span>
+        <span class="version" id="version">v0.16.0</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -72,6 +72,10 @@
       <div class="user-chip" id="user-chip" hidden>
         <img id="user-avatar" alt="" referrerpolicy="no-referrer">
         <span id="user-name"></span>
+        <!-- v0.16.0: Settings dialog houses email-reminder opt-in for the
+             usage-worker daily digest. Kept in the user chip so it sits
+             alongside Sign out (account-level prefs cluster). -->
+        <button type="button" id="btn-settings" class="btn btn-ghost" title="Settings">Settings</button>
         <button type="button" id="btn-signout" class="btn btn-ghost" title="Sign out">Sign out</button>
       </div>
     </nav>
@@ -590,6 +594,47 @@
     </div>
     <footer class="dialog-footer">
       <button type="button" class="btn" id="scanner-cancel">Cancel</button>
+    </footer>
+  </dialog>
+
+  <!-- v0.16.0: Settings dialog. Currently houses email-reminder prefs only.
+       Writes to /users/{uid}/meta/emailPrefs which is read by the
+       usage-worker daily cron. Master switch + optional email override
+       (defaults to the signed-in Google account email). -->
+  <dialog id="settings-dialog" class="settings-dialog">
+    <header class="dialog-header">
+      <h2>Settings</h2>
+      <button type="button" class="icon-btn" id="settings-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="settings-body">
+      <section class="settings-section">
+        <h3 class="settings-section-title">Email reorder reminders</h3>
+        <p class="settings-section-lead">Get a daily digest email when active products are approaching their average lifespan, so you can reorder before they run out.</p>
+
+        <label class="settings-toggle-row">
+          <input type="checkbox" id="settings-email-enabled">
+          <span class="settings-toggle-track" aria-hidden="true"><span class="settings-toggle-thumb"></span></span>
+          <span class="settings-toggle-label">Email me when products are running low</span>
+        </label>
+
+        <label class="settings-field">
+          <span>Email address</span>
+          <input type="email" id="settings-email-address" autocomplete="email" placeholder="you@example.com">
+          <small class="settings-field-hint" id="settings-email-default-hint">Leave blank to use the email on your Google account.</small>
+        </label>
+
+        <ul class="settings-cadence-list">
+          <li>Runs daily at 8am US Eastern (13:00 UTC).</li>
+          <li>One digest per email — at most one email per week so reminders don't repeat.</li>
+          <li>Skipped if nothing's due. You can turn this off any time.</li>
+        </ul>
+
+        <p class="settings-status" id="settings-status" aria-live="polite"></p>
+      </section>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="settings-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="settings-save">Save</button>
     </footer>
   </dialog>
 

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.15.5
+**Version:** v0.16.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.15.5)
+## Current status (v0.16.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.16.0 — 2026-05-03
+- **New: email reorder reminders.** A daily digest emails you when active products are approaching their average lifespan, so you can reorder before they run out. Opt in via the new **Settings** button in the user-chip toolbar — tick the box, optionally point reminders at a different email, save. The in-app reorder reminders panel is unchanged; the email is just a push version of the same algorithm so you don't have to open the app to know it's time. Backed by a small Cloudflare Worker (`usage-worker`) that runs at 8am US Eastern, computes which actives are at ≥85% of their type's average lifespan, and sends one Resend email — capped at one per week so persistent reminders don't spam. Worker source and deploy steps live in [`usage-worker/`](https://github.com/itsavibecode/usage-worker).
 
 ### v0.15.5 — 2026-04-30
 - **Fixed: Duplicate button text wrapping on mobile cards.** With 5+ action buttons (Edit / Duplicate / History / Share / Delete, plus Finish for active rows), the row was forcing every button to a `min-width: 64px` while "Duplicate" needed ~100px. Result: the label wrapped to two lines mid-button, breaking text centering and stretching the row vertically. Fixed by dropping `min-width`, adding `flex-wrap: wrap` on the actions row, and `white-space: nowrap` on the buttons. Each button now sizes to its label, and if the row can't fit them all on one line, they wrap to a second line cleanly.
