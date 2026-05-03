@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.15.4
+**Version:** v0.15.5
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.15.4)
+## Current status (v0.15.5)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.15.5 — 2026-04-30
+- **Fixed: Duplicate button text wrapping on mobile cards.** With 5+ action buttons (Edit / Duplicate / History / Share / Delete, plus Finish for active rows), the row was forcing every button to a `min-width: 64px` while "Duplicate" needed ~100px. Result: the label wrapped to two lines mid-button, breaking text centering and stretching the row vertically. Fixed by dropping `min-width`, adding `flex-wrap: wrap` on the actions row, and `white-space: nowrap` on the buttons. Each button now sizes to its label, and if the row can't fit them all on one line, they wrap to a second line cleanly.
 
 ### v0.15.4 — 2026-04-30
 - **Fixed: UPC lookup wasn't auto-filling size for many products.** UPCitemdb's dedicated `size` field is empty for a lot of records (e.g. the Old Spice deodorant has `size:""` while the actual `6 oz` is embedded in the title). New title-fallback parser scans for `<number> <unit>` patterns and uses the LAST match — titles almost always end with the size (`"... - 6 oz"`, `"... 4.7 oz"`). Validated against real titles: Old Spice 6 oz, Crest 4.7 oz, Pantene 12 fl oz, "Pack of 3 - 8 oz bottles" (correctly picks 8 oz, not the bare 3). Falls through to the same canonical-unit normalization as the `size` field.

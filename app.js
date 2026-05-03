@@ -1,4 +1,8 @@
-/* Usage Tracker — v0.15.4
+/* Usage Tracker — v0.15.5
+ * v0.15.5: Mobile card actions row wraps + buttons size to content.
+ *   Duplicate button text was wrapping to 2 lines (broken centering,
+ *   stretched height) because min-width:64 + padding:16 couldn't fit the
+ *   9-char "Duplicate" label. Dropped min-width, allow flex-wrap.
  * v0.15.4: UPC lookup auto-fill now parses size from the product TITLE
  *   when item.size is empty (which is common — UPCitemdb's dedicated size
  *   field is unreliable). New findSizeInString helper scans for
@@ -185,7 +189,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.15.4';
+const APP_VERSION = '0.15.5';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

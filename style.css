@@ -2464,16 +2464,26 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
     gap: 8px;
     border-top: 1px solid var(--border);
     padding-top: 10px;
+    /* v0.15.5: allow wrapping. With 5+ buttons (Edit / Duplicate / Share /
+     * History / Delete, plus optional Finish for active rows), the row was
+     * overflowing at typical mobile widths. min-width 64px + the longest
+     * label "Duplicate" was forcing text to wrap inside each button,
+     * breaking text centering and stretching height. Wrapping the row
+     * itself keeps each button at its natural width. */
+    flex-wrap: wrap;
   }
   .mc-actions button {
-    padding: 8px 16px;
+    padding: 7px 12px;
     font-size: 13px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: transparent;
     cursor: pointer;
-    min-height: 38px;
-    min-width: 64px;
+    min-height: 36px;
+    /* v0.15.5: drop min-width and force single-line text so each button
+     * sizes to its label, centered cleanly. */
+    white-space: nowrap;
+    line-height: 1.2;
   }
   .mc-actions button:hover { background: var(--surface-alt); }
   .mc-actions .delete-btn:hover {
