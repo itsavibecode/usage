@@ -1,4 +1,14 @@
-/* Usage Tracker — v0.17.0
+/* Usage Tracker — v0.17.1
+ * v0.17.1: Two table tweaks following the v0.17.0 consolidation:
+ *   - Long product names now wrap onto multiple lines instead of forcing
+ *     the Name column wider. The cell caps at 280px and word-breaks on
+ *     overflow so a 70-char SKU title fills 2-3 lines vertically rather
+ *     than one very wide horizontal line.
+ *   - Row-action buttons (Edit / Finish / Duplicate / History / Share /
+ *     Delete) are now flex-wrap'd. When the cell is narrow they stack
+ *     into a second row instead of forcing horizontal scroll. The row
+ *     is usually already 2 lines tall thanks to the wrapping name, so
+ *     stacking buttons doesn't add overall row height.
  * v0.17.0: Desktop table consolidation pass. Four changes shipped together:
  *   1. STORE + BUYER + CARD merged into a single BOUGHT BY column. Each
  *      piece keeps its own filter-chip behavior; missing pieces are
@@ -224,7 +234,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.0';
+const APP_VERSION = '0.17.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

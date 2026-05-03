@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.0
+**Version:** v0.17.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.0)
+## Current status (v0.17.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.1 — 2026-05-03
+- **Long product names now wrap** onto multiple lines instead of forcing the Name column to grow to fit. The cell caps at 280px and uses word-break, so a long SKU title like *"Old Spice High Endurance Male Deodorant Stick Pure Sport Scent - 6 oz"* fills 2–3 vertical lines instead of one very wide horizontal one.
+- **Row-action buttons** (Edit / Finish / Duplicate / History / Share / Delete) are now flex-wrap'd. When the cell is narrow they stack onto a second row instead of forcing the table to scroll horizontally. Since the row is usually already 2 lines tall thanks to the wrapping name, stacking buttons doesn't add height overall — it just lets the buttons share the existing vertical space and reclaims horizontal width for the data columns.
 
 ### v0.17.0 — 2026-05-03
 - **Desktop table consolidation.** The product table was 18 columns wide and forced horizontal scrolling on most monitors. Four changes shipped together:
