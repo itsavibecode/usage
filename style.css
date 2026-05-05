@@ -2489,6 +2489,14 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   margin-top: 2px;
 }
 
+/* v0.17.4: bundle-aware cost hint. Same .field-hint base, but slightly
+ * tinted toward primary so the live per-item derivation reads as a
+ * computed value (vs. the static gray hints used elsewhere). */
+.cost-bundle-hint {
+  color: var(--primary);
+  font-weight: 500;
+}
+
 /* The `<em class="muted">` variant in field labels — used for "(leave blank
  * for inventory)" hint next to "Start date". Overrides the default em color
  * (red, used for required-field asterisks) since this is informational. */

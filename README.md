@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.3
+**Version:** v0.17.4
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.3)
+## Current status (v0.17.4)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.4 — 2026-05-03
+- **Bundle-aware cost UI in the Add/Edit dialog.** The schema treats `cost` as the FULL bundle price (allocatedCost = cost / bundleSize), but the static label "Cost (pre-tax)" never said so — easy to enter a per-item price by mistake and end up undercounting your spend by a factor of bundleSize. When you tick **Part of a bundle purchase**, the cost-field label rebrands to **Bundle total cost (pre-tax)** and a live helper line shows the per-item derivation as you type: *"Per-item cost: $3.50 each."* Updates on every change to bundle size or cost. The desktop bundle chip in the table also gets a hover tooltip with the per-item cost for confirmation without opening the row. No data-model changes — same math, just transparent.
 
 ### v0.17.3 — 2026-05-03
 - **Fixed: Scan button overflow on mobile.** In the Add product dialog, the UPC field's input + Look up + Scan buttons couldn't all fit on one line at narrow widths — Scan was getting pushed past the right edge, forcing a horizontal scroll inside the dialog. Mobile flex-wrap rule now puts the input on its own first row and the two buttons sharing the second row equally below it.

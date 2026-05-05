@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.17.3">
+  <meta name="version" content="0.17.4">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.17.3</span>
+        <span class="version" id="version">v0.17.4</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -406,15 +406,20 @@
         </label>
 
         <label class="field" data-tracked-only>
-          <span>Cost (pre-tax) <em>*</em></span>
+          <!-- v0.17.4: cost label dynamically rebrands when bundleStatus is
+               checked. The id is so syncBundleCostUI() can swap it. -->
+          <span id="cost-label">Cost (pre-tax) <em>*</em></span>
           <div class="currency-wrap">
             <span class="currency-prefix" data-currency-symbol>$</span>
             <input name="cost" type="number" step="0.01" min="0" required placeholder="0.00">
           </div>
+          <!-- v0.17.4: bundle-only helper text. Hidden when bundleStatus is
+               off; populated live with the per-item derivation when on. -->
+          <small class="field-hint cost-bundle-hint" id="cost-bundle-hint" hidden></small>
         </label>
 
         <label class="field" data-tracked-only>
-          <span>Cost with tax</span>
+          <span id="cost-with-tax-label">Cost with tax</span>
           <div class="currency-wrap">
             <span class="currency-prefix" data-currency-symbol>$</span>
             <input name="costWithTax" type="number" step="0.01" min="0" placeholder="0.00">

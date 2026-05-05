@@ -1,4 +1,16 @@
-/* Usage Tracker — v0.17.3
+/* Usage Tracker — v0.17.4
+ * v0.17.4: Bundle-aware cost UI in the Add/Edit dialog. The cost field's
+ *   schema treats `cost` as the FULL bundle price (allocatedCost = cost
+ *   / bundleSize), but the static label "Cost (pre-tax)" never said so —
+ *   easy to enter the per-item price by mistake and end up undercounting
+ *   spend by a factor of bundleSize. When bundleStatus is checked, the
+ *   label rebrands to "Bundle total cost (pre-tax)" and a live helper
+ *   line below the input shows the per-item derivation as you type:
+ *   "Per-item cost: $3.50 each." Updates on every change to bundleSize
+ *   or cost. The bundle chip in the desktop table row also gets the
+ *   per-item cost in its hover tooltip ("1 of 2 — $3.50 per item") for
+ *   confirmation without opening the row. No data-model changes — just
+ *   transparency over the existing math.
  * v0.17.3: Mobile UPC field fix. The input + Look up + Scan trio
  *   couldn't all fit on one line at narrow widths and Scan was getting
  *   pushed past the right edge, forcing horizontal scroll inside the
@@ -247,7 +259,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.3';
+const APP_VERSION = '0.17.4';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1504,13 +1516,18 @@ function renderRow(p) {
         ? `${escapeHtml(p.bundlePosition)} of ${escapeHtml(p.bundleSize || '?')}`
         : `bundle &times; ${escapeHtml(p.bundleSize || '?')}`;
       const cls = p.bundlePosition ? 'badge-bundle-member' : 'badge-bundle-origin';
+      // v0.17.4: show per-item cost in the tooltip so users hovering over a
+      // bundle chip can confirm the math without opening the row. Computed
+      // from allocatedCost which already handles bundle division correctly.
+      const perItem = allocatedCost(p);
+      const costPart = isFinite(perItem) && perItem > 0 ? ` — ${money(perItem)} per item` : '';
       // v0.7.13: clickable when bundleId is set — opens the slide-out sibling
       // panel below the row. Pre-migration legacy rows (no bundleId yet) fall
       // back to the static span until the migration runs.
       if (p.bundleId) {
-        return `<button type="button" class="badge bundle-chip ${cls}" data-bundle-id="${escapeHtml(p.bundleId)}" data-row-id="${p.id}" title="Click to see all bundle members">${label}</button>`;
+        return `<button type="button" class="badge bundle-chip ${cls}" data-bundle-id="${escapeHtml(p.bundleId)}" data-row-id="${p.id}" title="Click to see all bundle members${costPart}">${label}</button>`;
       }
-      return `<span class="badge ${cls}">${label}</span>`;
+      return `<span class="badge ${cls}" title="Bundle of ${escapeHtml(p.bundleSize || '?')}${costPart}">${label}</span>`;
     })()}</td>
     <td class="col-boughtBy">${(() => {
       // v0.17.0: STORE + BUYER + CARD consolidated into one column to free
@@ -2671,6 +2688,47 @@ function setBundleSizeVisibility() {
     if (f.elements.bundlePosition) f.elements.bundlePosition.value = '';
   }
   updateBundlePositionMax();
+  // v0.17.4: keep the cost label + per-item hint in sync with bundle state.
+  syncBundleCostUI();
+}
+
+// v0.17.4: bundle-aware cost UI. The schema treats `cost` as the FULL
+// bundle price (allocatedCost = cost / bundleSize), but the field label
+// "Cost (pre-tax)" doesn't communicate that. When bundleStatus is on, this
+// rebrands the label to "Bundle total cost (pre-tax)" and shows a live
+// per-item derivation under the input so the user can confirm in real time
+// that the system is interpreting their entry the way they expect.
+//
+// Called on dialog open, on every bundleStatus / bundleSize / cost change.
+// No-op when the elements aren't in the DOM (e.g. shared with mobile-card
+// flows that don't carry the dialog).
+function syncBundleCostUI() {
+  const f = form();
+  if (!f) return;
+  const labelEl = document.getElementById('cost-label');
+  const hintEl = document.getElementById('cost-bundle-hint');
+  if (!labelEl || !hintEl) return;
+
+  const bundled = f.elements.bundleStatus?.checked;
+  if (!bundled) {
+    labelEl.innerHTML = 'Cost (pre-tax) <em>*</em>';
+    hintEl.hidden = true;
+    hintEl.textContent = '';
+    return;
+  }
+
+  labelEl.innerHTML = 'Bundle total cost (pre-tax) <em>*</em>';
+  const size = Number(f.elements.bundleSize?.value);
+  const cost = Number(f.elements.cost?.value);
+  if (!isFinite(size) || size <= 0) {
+    hintEl.textContent = 'Set the bundle size first to see the per-item breakdown.';
+  } else if (!isFinite(cost) || cost <= 0) {
+    hintEl.textContent = `Enter the price for the entire bundle of ${size}. We'll auto-divide it for the per-item cost.`;
+  } else {
+    const perItem = money(cost / size);
+    hintEl.textContent = `Enter the price for the entire bundle of ${size}. Per-item cost: ${perItem} each.`;
+  }
+  hintEl.hidden = false;
 }
 
 function updateBundlePositionMax() {
@@ -4750,6 +4808,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.15.2: re-render the brand logo preview when the brand field is edited.
   if (f.elements.brand) f.elements.brand.addEventListener('input', syncDialogImagePreview);
   f.elements.bundleSize.addEventListener('input', updateBundlePositionMax);
+  // v0.17.4: live-update the bundle-cost helper text as the user types.
+  // Both the bundle size and the cost feed into the per-item derivation.
+  f.elements.bundleSize.addEventListener('input', syncBundleCostUI);
+  f.elements.cost.addEventListener('input', syncBundleCostUI);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
   // v0.15.1: explicit manual Look up button. Force-fresh fetch (bypasses
