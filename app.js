@@ -1,4 +1,9 @@
-/* Usage Tracker — v0.17.2
+/* Usage Tracker — v0.17.3
+ * v0.17.3: Mobile UPC field fix. The input + Look up + Scan trio
+ *   couldn't all fit on one line at narrow widths and Scan was getting
+ *   pushed past the right edge, forcing horizontal scroll inside the
+ *   dialog. Mobile flex-wrap rule: input takes the full first row;
+ *   the two buttons share the second row equally.
  * v0.17.2: Mobile regression fix. v0.17.1's flex-wrap rule on
  *   .actions-cell had higher specificity than the mobile-block
  *   `.products tbody td { display: none }` rule, so on mobile the
@@ -242,7 +247,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.2';
+const APP_VERSION = '0.17.3';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

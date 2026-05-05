@@ -1697,6 +1697,24 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   border-color: var(--primary);
   background: #fff;
 }
+
+/* v0.17.3: On mobile, the UPC field's input + Look up + Scan trio
+ * couldn't all fit on one line at narrow widths — Scan was pushed
+ * past the right edge, forcing a horizontal scroll inside the
+ * dialog. Wrap the row so buttons fall onto a second line below the
+ * input, each taking equal share of the row's width. */
+@media (max-width: 720px) {
+  .input-with-btn {
+    flex-wrap: wrap;
+  }
+  .input-with-btn input {
+    flex: 1 1 100%;
+  }
+  .input-with-btn .btn-scan {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
 .btn-scan:hover {
   background: #eef3ff;
   border-color: var(--primary-hover);
