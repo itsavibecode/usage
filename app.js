@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.17.4
+/* Usage Tracker — v0.17.5
+ * v0.17.5: Hide Density + Columns controls on mobile. Both only affect the
+ *   desktop table (the @media <=720px block flips .products to display:block
+ *   + hides every desktop td except .mobile-card-cell, so a Compact density
+ *   or a hidden Cost column has nothing to act on). The toggles were just
+ *   visual noise on phones. Currency and Pre-tax stay visible — those
+ *   affect numbers in the mobile cards too.
  * v0.17.4: Bundle-aware cost UI in the Add/Edit dialog. The cost field's
  *   schema treats `cost` as the FULL bundle price (allocatedCost = cost
  *   / bundleSize), but the static label "Cost (pre-tax)" never said so —
@@ -259,7 +265,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.4';
+const APP_VERSION = '0.17.5';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

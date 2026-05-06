@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.4
+**Version:** v0.17.5
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.4)
+## Current status (v0.17.5)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.5 — 2026-05-03
+- **Hide Density + Columns controls on mobile.** Both only affect the desktop table — mobile uses the stacked card layout where every desktop `td` is `display: none` and a `.mobile-card-cell` renders the row as a stacked card instead. So a Compact density or a hidden Cost column had nothing to act on, and the toggles were just visual noise above the cards on phones. Currency and Pre-tax stay visible because they affect cost numbers shown in the cards too.
 
 ### v0.17.4 — 2026-05-03
 - **Bundle-aware cost UI in the Add/Edit dialog.** The schema treats `cost` as the FULL bundle price (allocatedCost = cost / bundleSize), but the static label "Cost (pre-tax)" never said so — easy to enter a per-item price by mistake and end up undercounting your spend by a factor of bundleSize. When you tick **Part of a bundle purchase**, the cost-field label rebrands to **Bundle total cost (pre-tax)** and a live helper line shows the per-item derivation as you type: *"Per-item cost: $3.50 each."* Updates on every change to bundle size or cost. The desktop bundle chip in the table also gets a hover tooltip with the per-item cost for confirmation without opening the row. No data-model changes — same math, just transparent.

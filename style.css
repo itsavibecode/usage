@@ -2951,3 +2951,15 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 @media (max-width: 640px) {
   .settings-dialog { max-width: 92vw; }
 }
+
+/* v0.17.5: Density + Columns controls only affect the desktop table.
+ * Mobile uses the stacked card layout (the <= 720px breakpoint flips
+ * .products to display:block + hides every desktop td except the
+ * mobile-card-cell). Hide these two controls on mobile so the
+ * display-controls bar isn't cluttered with toggles that do nothing.
+ * Currency + Pre-tax stay visible because they affect cost numbers
+ * shown in the cards too. */
+@media (max-width: 720px) {
+  .density-toggle,
+  .columns-dropdown { display: none; }
+}
