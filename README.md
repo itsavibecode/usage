@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.5
+**Version:** v0.17.6
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.5)
+## Current status (v0.17.6)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.6 — 2026-05-03
+- **New Finished tab in the row-filter bar.** The filter strip above the table had All / Active / Inventory but no easy way to look at products you've already used up. Added a Finished tab that filters to rows with an end date — useful for sorting through history (e.g. find the longest-lasting toothpaste, see total spend on items you've actually finished). Tab state persists in localStorage like the others, and the empty-state message guides you toward the per-row Finish button on active products.
 
 ### v0.17.5 — 2026-05-03
 - **Hide Density + Columns controls on mobile.** Both only affect the desktop table — mobile uses the stacked card layout where every desktop `td` is `display: none` and a `.mobile-card-cell` renders the row as a stacked card instead. So a Compact density or a hidden Cost column had nothing to act on, and the toggles were just visual noise above the cards on phones. Currency and Pre-tax stay visible because they affect cost numbers shown in the cards too.

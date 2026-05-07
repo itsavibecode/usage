@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.17.5">
+  <meta name="version" content="0.17.6">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
@@ -48,7 +48,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.17.5</span>
+        <span class="version" id="version">v0.17.6</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -173,6 +173,9 @@
         <button type="button" class="row-filter-tab is-active" data-filter="all" role="tab" aria-selected="true" title="Show every product">All</button>
         <button type="button" class="row-filter-tab" data-filter="active" role="tab" aria-selected="false" title="Only products you've started using and not yet finished">Active</button>
         <button type="button" class="row-filter-tab" data-filter="inventory" role="tab" aria-selected="false" title="Only products purchased but not yet started">Inventory</button>
+        <!-- v0.17.6: Finished tab — products you've already used up. Useful
+             for sorting through history (e.g. find the longest-lasting toothpaste). -->
+        <button type="button" class="row-filter-tab" data-filter="finished" role="tab" aria-selected="false" title="Only products you've finished using">Finished</button>
         <button type="button" id="btn-reset-filters" class="btn btn-ghost" title="Clear filters and show all rows">Reset</button>
       </nav>
       <div class="active-filter-bar" id="active-filter-bar" hidden></div>

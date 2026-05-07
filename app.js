@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.17.5
+/* Usage Tracker — v0.17.6
+ * v0.17.6: New Finished tab in the row-filter bar (alongside All / Active /
+ *   Inventory). Filters to products with an end date set — useful for
+ *   sorting through history (e.g. find longest-lasting toothpaste, see
+ *   total spend on items you've actually used up). Persists in
+ *   usage.tableFilter.v1 like the others. Empty-state message guides the
+ *   user toward the Finish button on active rows.
  * v0.17.5: Hide Density + Columns controls on mobile. Both only affect the
  *   desktop table (the @media <=720px block flips .products to display:block
  *   + hides every desktop td except .mobile-card-cell, so a Compact density
@@ -265,7 +271,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.5';
+const APP_VERSION = '0.17.6';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -305,14 +311,16 @@ let unsubProducts = null;
 let unsubTypes = null;
 let firstSnapshotSeen = false;
 let currentView = 'table'; // 'table' | 'dashboard'
-// Row filter for the table view: 'all' | 'active' | 'inventory'.
-// Persisted in localStorage so each user's preferred view survives reloads;
-// reset via the "Reset filters" button.
+// Row filter for the table view: 'all' | 'active' | 'inventory' | 'finished'.
+// v0.17.6: 'finished' added so the user can quickly browse history (e.g.
+// find the longest-lasting toothpaste). Persisted in localStorage so each
+// user's preferred view survives reloads; reset via the "Reset filters"
+// button.
 const FILTER_KEY = 'usage.tableFilter.v1';
 let currentFilter = (() => {
   try {
     const v = localStorage.getItem(FILTER_KEY);
-    return ['all', 'active', 'inventory'].includes(v) ? v : 'all';
+    return ['all', 'active', 'inventory', 'finished'].includes(v) ? v : 'all';
   } catch { return 'all'; }
 })();
 // Pre-tax display mode: when true, all cost calculations ignore costWithTax
@@ -1211,9 +1219,10 @@ function filteredProducts() {
   // v0.15.0: favorites never appear in the main table — they live in the
   // dedicated Favorites view. Stats/charts/aggregates also exclude them.
   let list = trackedOnly();
-  // Row-filter tabs (All / Active / Inventory) — applied first.
+  // Row-filter tabs (All / Active / Inventory / Finished) — applied first.
   if (currentFilter === 'active') list = list.filter(isActive);
   else if (currentFilter === 'inventory') list = list.filter(isInventory);
+  else if (currentFilter === 'finished') list = list.filter(isFinished);
   // Cell-click chip filters (v0.7.10). AND across columns: a row must match
   // every active filter to survive. Empty-string filter values (defensive)
   // are treated as "no filter" for that column.
@@ -1364,6 +1373,8 @@ function renderTable() {
       empty.innerHTML = 'No <strong>active</strong> products right now. Switch to <strong>All</strong> or <strong>Inventory</strong> to see your other items.';
     } else if (currentFilter === 'inventory') {
       empty.innerHTML = 'No products in <strong>inventory</strong>. Add a product and leave the <em>Start date</em> blank to record items you\'ve bought but not started using.';
+    } else if (currentFilter === 'finished') {
+      empty.innerHTML = 'No <strong>finished</strong> products yet. As you use up active items and tap <strong>Finish</strong>, they\'ll show up here.';
     }
   } else {
     empty.hidden = true;
@@ -2424,7 +2435,7 @@ function populateCurrencySelect() {
 }
 
 function setFilter(filter) {
-  if (!['all', 'active', 'inventory'].includes(filter)) return;
+  if (!['all', 'active', 'inventory', 'finished'].includes(filter)) return;
   currentFilter = filter;
   try { localStorage.setItem(FILTER_KEY, filter); } catch {}
   for (const btn of document.querySelectorAll('.row-filter-tab')) {
