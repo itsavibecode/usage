@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.6
+**Version:** v0.17.7
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.6)
+## Current status (v0.17.7)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,13 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.7 — 2026-05-08
+- **PageSpeed pass round 1 (HTML hints).** No JS changes; just markup tweaks the browser uses to overlap network with parsing.
+  - `<link rel="preconnect">` for `www.gstatic.com` (Firebase modules) and `cdn.jsdelivr.net` (Chart.js + later html2canvas/zxing). DNS resolution + TLS handshake start in parallel with HTML parsing instead of waiting for the first import to discover the origin.
+  - `<link rel="dns-prefetch">` for `img.logo.dev` (brand logos shown post-auth) and `identitytoolkit.googleapis.com` (sign-in). Lighter weight than preconnect — just resolves DNS — for origins hit later in the session.
+  - `<meta name="color-scheme" content="light">` so browsers don't transiently apply dark-mode form-control styling during initial paint.
+  - `fetchpriority="high"` + `decoding="async"` on the two LCP-candidate `favicon.svg` references (header brand 36px and auth-card 56px). The browser prioritizes them over deferred resources and decodes off the main thread.
 
 ### v0.17.6 — 2026-05-03
 - **New Finished tab in the row-filter bar.** The filter strip above the table had All / Active / Inventory but no easy way to look at products you've already used up. Added a Finished tab that filters to rows with an end date — useful for sorting through history (e.g. find the longest-lasting toothpaste, see total spend on items you've actually finished). Tab state persists in localStorage like the others, and the empty-state message guides you toward the per-row Finish button on active products.

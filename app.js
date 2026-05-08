@@ -1,4 +1,15 @@
-/* Usage Tracker — v0.17.6
+/* Usage Tracker — v0.17.7
+ * v0.17.7: PageSpeed pass round 1 (HTML hints, no JS changes). Added
+ *   preconnect to gstatic (Firebase modules) and jsdelivr (Chart.js +
+ *   later html2canvas/zxing) so DNS + TLS handshake starts in parallel
+ *   with HTML parse. dns-prefetch for img.logo.dev (brand logos, post-
+ *   auth) and identitytoolkit.googleapis.com (sign-in). color-scheme:
+ *   light meta so browsers don't transiently apply dark-mode styling
+ *   to form controls during initial paint. fetchpriority="high" +
+ *   decoding="async" on the two LCP-candidate favicon.svg refs (header
+ *   brand 36px and auth-card 56px) so the browser prioritizes them over
+ *   deferred resources and decodes off the main thread. v0.17.8 will be
+ *   the bigger lazy-Chart.js refactor.
  * v0.17.6: New Finished tab in the row-filter bar (alongside All / Active /
  *   Inventory). Filters to products with an end date set — useful for
  *   sorting through history (e.g. find longest-lasting toothpaste, see
@@ -271,7 +282,7 @@ import {
 import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
 Chart.register(...registerables);
 
-const APP_VERSION = '0.17.6';
+const APP_VERSION = '0.17.7';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
