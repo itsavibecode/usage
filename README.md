@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.7
+**Version:** v0.17.8
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.7)
+## Current status (v0.17.8)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.17.8 — 2026-05-08
+- **PageSpeed pass round 2 — lazy-load Chart.js.** The ~200KB Chart bundle was being eagerly imported at the top of `app.js` even though it's only used on the Dashboard tab and the per-row price-history dialog. Users who never visit those paths were paying the full parse cost on every load. Replaced the top-level import with a new `ensureChart()` async helper that fetches and registers the module on first call and caches it afterward. `renderDashboard` is now async and awaits `ensureChart()` before drawing the 6 dashboard charts; `renderPriceHistoryChart` similarly awaits before instantiating its line chart. A failed import (CDN hiccup) clears the cached promise so the next call retries fresh. Same lazy pattern already used for html2canvas (PNG export) and @zxing/browser (UPC scanner).
 
 ### v0.17.7 — 2026-05-08
 - **PageSpeed pass round 1 (HTML hints).** No JS changes; just markup tweaks the browser uses to overlap network with parsing.

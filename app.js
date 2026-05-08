@@ -1,4 +1,15 @@
-/* Usage Tracker — v0.17.7
+/* Usage Tracker — v0.17.8
+ * v0.17.8: PageSpeed pass round 2 — lazy-load Chart.js. The ~200KB Chart
+ *   bundle was eagerly imported at the top of app.js even though it's
+ *   only used on the Dashboard tab + the per-row price-history dialog.
+ *   Replaced the top-level import with `let Chart = null; let _chartLoadPromise
+ *   = null;` and a new `ensureChart()` async helper that imports + registers
+ *   on first call and caches the module afterward. `renderDashboard` is now
+ *   async and awaits ensureChart before drawing the 6 dashboard charts;
+ *   `renderPriceHistoryChart` similarly awaits before instantiating its
+ *   line chart. Failed imports null out the cached promise so the next
+ *   call retries fresh. Same lazy pattern already used for html2canvas
+ *   (PNG export) and @zxing/browser (UPC scanner).
  * v0.17.7: PageSpeed pass round 1 (HTML hints, no JS changes). Added
  *   preconnect to gstatic (Firebase modules) and jsdelivr (Chart.js +
  *   later html2canvas/zxing) so DNS + TLS handshake starts in parallel
@@ -279,10 +290,33 @@ import {
 import {
   collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDoc
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
-import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm";
-Chart.register(...registerables);
+// v0.17.8: Chart.js lazy-loaded on first dashboard or price-history open.
+// Saves ~200KB of script parse on initial paint for users who never visit
+// the Dashboard tab. The pattern matches the existing lazy imports for
+// html2canvas (PNG export) and @zxing/browser (UPC scanner).
+//
+// Failed imports (CDN hiccup) clear _chartLoadPromise so the next call
+// retries fresh instead of returning the rejected promise forever.
+let Chart = null;
+let _chartLoadPromise = null;
+async function ensureChart() {
+  if (Chart) return Chart;
+  if (!_chartLoadPromise) {
+    _chartLoadPromise = import('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm')
+      .then(mod => {
+        Chart = mod.Chart;
+        Chart.register(...mod.registerables);
+        return Chart;
+      })
+      .catch(err => {
+        _chartLoadPromise = null; // allow retry on next call
+        throw err;
+      });
+  }
+  return _chartLoadPromise;
+}
 
-const APP_VERSION = '0.17.7';
+const APP_VERSION = '0.17.8';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -1756,7 +1790,7 @@ function renderStats() {
 
 /* ---------- dashboard ---------- */
 
-function renderDashboard() {
+async function renderDashboard() {
   const emptyEl = document.getElementById('dash-empty');
   const chartsWrap = document.querySelector('.dash-charts');
   const cardsWrap = document.querySelector('.dash-cards');
@@ -1772,6 +1806,10 @@ function renderDashboard() {
   // Only actually draw charts when dashboard is visible — avoids laying out into zero-height canvases
   // which causes Chart.js to render at odd sizes. We also re-render on tab switch.
   if (currentView === 'dashboard' && hasData) {
+    // v0.17.8: lazy-load Chart.js on first dashboard render. Subsequent calls
+    // resolve instantly via the cached module. ensureChart() is idempotent
+    // so re-rendering on tab switch / data update is fine.
+    await ensureChart();
     renderChartByType();
     renderChartByStore();
     renderChartFinishedByMonth();
@@ -3542,7 +3580,10 @@ function openPriceHistory(productId) {
   requestAnimationFrame(() => renderPriceHistoryChart(history));
 }
 
-function renderPriceHistoryChart(history) {
+async function renderPriceHistoryChart(history) {
+  // v0.17.8: lazy-load Chart.js if it hasn't been pulled in yet (first use
+  // of price history before any dashboard visit). Cached after first call.
+  await ensureChart();
   if (priceHistoryChart) {
     try { priceHistoryChart.destroy(); } catch {}
     priceHistoryChart = null;
