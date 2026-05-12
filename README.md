@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.18.0
+**Version:** v0.18.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.18.0)
+## Current status (v0.18.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.18.1 — 2026-05-11
+- **Tightened the mirror's privacy scrub.** v0.18.0 sed only rewrote full-hostname matches like `itsavibecode.github.io` → `dev.rizzo.cc`, but the v0.18.0 changelog header in `app.js` itself referenced "the github.io URL" in descriptive prose, which slipped through. Rephrased the comment header to use generic language (primary/secondary deployment), AND added a third sed pass in the workflow that rewrites bare `github.io` → `rizzo.cc` as defense-in-depth so future descriptive references can't accidentally leak the cross-account relationship.
 
 ### v0.18.0 — 2026-05-11
 - **Secondary deployment at `dev.rizzo.cc/usage`.** The github.io URL stays as the source-of-truth deployment. A new GitHub Action (`.github/workflows/mirror-to-dev.yml`) automatically mirrors the static files into a `/usage` subfolder of a second repo on every push to main. After the Pages rebuild on the second repo, `dev.rizzo.cc/usage/` serves the same app.

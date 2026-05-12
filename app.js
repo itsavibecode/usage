@@ -1,18 +1,26 @@
-/* Usage Tracker — v0.18.0
- * v0.18.0: Secondary deployment at dev.rizzo.cc/usage. The github.io URL
+/* Usage Tracker — v0.18.1
+ * v0.18.1: Tighten the mirror's privacy scrub. The v0.18.0 comment header
+ *   itself mentioned the source-hostname by name in descriptive prose
+ *   ("the github.io URL keeps working", etc.), which slipped through the
+ *   v0.18.0 sed pass since the pass only rewrote full-hostname matches.
+ *   Rephrased the header to use generic language (primary deployment /
+ *   secondary deployment), AND beefed up the workflow sed to also catch
+ *   bare "github.io" → "rizzo.cc" as defense-in-depth so future authors
+ *   can't accidentally re-introduce the leak.
+ * v0.18.0: Secondary deployment at dev.rizzo.cc/usage. The primary URL
  *   keeps working as the source-of-truth; a GitHub Action mirror at
  *   .github/workflows/mirror-to-dev.yml syncs the static files into a
  *   /usage subfolder of a second repo on every push to main. Privacy
  *   measures bake the account separation into the mirror: README.md /
  *   .github / firestore.rules excluded from the copy, sed rewrites any
- *   remaining github.io URL refs in HTML/JS to dev.rizzo.cc during the
- *   sync, and commit messages on the target repo are generic ("Update
- *   /usage") with github-actions[bot] as the author. Also scrubbed the
- *   og-image: the URL text rendered at the bottom-right of the share
- *   card is gone (was leaking the github.io origin into every Discord/
- *   Slack/Twitter preview), so the same OG card works at any deployment
- *   URL. og-image.svg edited at the source, og-image.png re-rendered via
- *   sharp-cli.
+ *   remaining primary-URL refs in HTML/JS to the secondary URL during
+ *   the sync, and commit messages on the target repo are generic
+ *   ("Update /usage") with github-actions[bot] as the author. Also
+ *   scrubbed the og-image: the URL text rendered at the bottom-right
+ *   of the share card is gone (was leaking the primary origin into
+ *   every Discord/Slack/Twitter preview), so the same OG card works
+ *   at any deployment URL. og-image.svg edited at the source,
+ *   og-image.png re-rendered via sharp-cli.
  * v0.17.8: PageSpeed pass round 2 — lazy-load Chart.js. The ~200KB Chart
  *   bundle was eagerly imported at the top of app.js even though it's
  *   only used on the Dashboard tab + the per-row price-history dialog.
@@ -330,7 +338,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.18.0';
+const APP_VERSION = '0.18.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
