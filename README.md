@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.18.2
+**Version:** v0.19.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.18.2)
+## Current status (v0.19.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.19.0 — 2026-05-11
+- **Catalog expansion: more product types + seed stores.**
+  - **Six new seed product types** added to the Add-product type dropdown: **Conditioner**, **Razor**, **Skincare**, **Makeup**, **Feminine hygiene**, **Intimate**. Anyone with no custom types yet sees these alongside the original eight (Underarm, Toothbrush, Toothpaste, Floss, Mouthwash, Facewash, Shampoo, Soap). Custom types from existing users are still preserved and merged in.
+  - **Fifteen seed stores** pre-populated in the store dropdown: Amazon, Target, Walmart, Costco, Sam's Club, Walgreens, CVS, Kroger, Jewel-Osco, Mariano's, Meijer, Trader Joe's, Whole Foods, Publix, Wegmans. Stores you've already used in past products are still merged in and the combined list is alphabetized for predictable scanning.
+  - **UPC auto-categorization rules extended** so the productType field auto-fills correctly when scanning items in the new categories. Examples: *moisturizer / lotion / serum / sunscreen / SPF / "skin care"* → Skincare; *tampon / pad / menstrual / "period care"* → Feminine hygiene; *condom / lubricant* → Intimate; *lipstick / mascara / foundation / eyeliner / eyeshadow / concealer / blush / cosmetic* → Makeup; *razor / shaver / shaving cream / shaving gel* → Razor; *conditioner* → Conditioner.
 
 ### v0.18.2 — 2026-05-11
 - **Pre-tax display now defaults ON for new users.** Most cost data entered into the app is the pre-tax price (UPC databases return MSRPs without tax, and shoppers typically remember pre-tax sticker prices). Anyone who has explicitly toggled the switch either direction keeps their choice; only users with no persisted preference yet flip to the new default.

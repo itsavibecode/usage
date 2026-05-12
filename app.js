@@ -1,4 +1,14 @@
-/* Usage Tracker — v0.18.2
+/* Usage Tracker — v0.19.0
+ * v0.19.0: Catalog expansion. Six new seed product types (Conditioner,
+ *   Razor, Skincare, Makeup, Feminine hygiene, Intimate) and 15 seed
+ *   stores (Amazon, Target, Walmart, Costco, Sam's Club, Walgreens, CVS,
+ *   Kroger, Jewel-Osco, Mariano's, Meijer, Trader Joe's, Whole Foods,
+ *   Publix, Wegmans) pre-populated in the Add-product dropdowns.
+ *   Categorization rules in guessProductTypeFromCategory extended so UPC
+ *   auto-fill maps related keywords to the new types (e.g. "moisturizer"
+ *   → Skincare, "tampon" → Feminine hygiene, "lipstick" → Makeup).
+ *   Custom types and the user's own past store entries are still
+ *   merged in, so nothing existing is lost.
  * v0.18.2: Polish pass — three small things shipped together.
  *   1. Pre-tax display defaults ON for users who haven't set a preference.
  *      Anyone who has explicitly toggled either direction keeps their
@@ -352,14 +362,41 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.18.2';
+const APP_VERSION = '0.19.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
 
 const SEED_PRODUCT_TYPES = [
   'Underarm', 'Toothbrush', 'Toothpaste', 'Floss',
-  'Mouthwash', 'Facewash', 'Shampoo', 'Soap'
+  'Mouthwash', 'Facewash', 'Shampoo', 'Soap',
+  // v0.19.0: rounds out the daily-use catalog. Anyone with no custom
+  // types yet sees these in the dropdown out of the gate.
+  'Conditioner', 'Razor', 'Skincare', 'Makeup',
+  'Feminine hygiene', 'Intimate',
+];
+
+// v0.19.0: store dropdown seeds. Currently the store select only shows
+// values pulled from existing products (uniqueValues('store')) — empty for
+// new users. These names appear pre-populated so common chains are one
+// tap away instead of forcing a custom-add for every purchase. Merged in
+// populateRecentSelect for the store field specifically.
+const SEED_STORES = [
+  'Amazon',
+  'Target',
+  'Walmart',
+  'Costco',
+  "Sam's Club",
+  'Walgreens',
+  'CVS',
+  'Kroger',
+  "Jewel-Osco",
+  "Mariano's",
+  'Meijer',
+  "Trader Joe's",
+  'Whole Foods',
+  'Publix',
+  'Wegmans',
 ];
 
 const FIELDS = [
@@ -2855,7 +2892,14 @@ function updateBundlePositionMax() {
 function populateFormSelects(current = {}) {
   const f = form();
   populateTypeSelect(f.elements.productType, current.productType || '');
-  populateRecentSelect(f.elements.store, uniqueValues('store'), current.store || '');
+  // v0.19.0: merge the seed-store list with any stores the user has
+  // already used in past products. Dedupe + sort so the dropdown is
+  // consistent regardless of order they were encountered.
+  const mergedStores = Array.from(new Set([
+    ...SEED_STORES,
+    ...uniqueValues('store'),
+  ])).sort((a, b) => a.localeCompare(b));
+  populateRecentSelect(f.elements.store, mergedStores, current.store || '');
   populateRecentSelect(f.elements.buyer, uniqueValues('buyer'), current.buyer || '');
   populateRecentSelect(f.elements.cardLast4, uniqueValues('cardLast4'),
     current.cardLast4 || '', v => `•••• ${v}`);
@@ -4782,6 +4826,9 @@ function applyUpcItemToForm(item) {
 function guessProductTypeFromCategory(category) {
   const c = (category || '').toLowerCase();
   if (!c) return null;
+  // v0.19.0: rule order matters — earlier rules win when categories
+  // overlap. More-specific rules (e.g. "facial cleanser") sit above
+  // broader ones (e.g. "skincare") so they don't get swallowed.
   const rules = [
     [['toothpaste'], 'Toothpaste'],
     [['toothbrush'], 'Toothbrush'],
@@ -4789,8 +4836,14 @@ function guessProductTypeFromCategory(category) {
     [['mouthwash'], 'Mouthwash'],
     [['face wash', 'facewash', 'facial cleanser'], 'Facewash'],
     [['shampoo'], 'Shampoo'],
+    [['conditioner', 'hair conditioner'], 'Conditioner'],
     [['body wash', 'bar soap', 'hand soap', 'soap'], 'Soap'],
     [['deodorant', 'antiperspirant', 'underarm'], 'Underarm'],
+    [['razor', 'shaver', 'razor blade', 'shaving cream', 'shaving gel'], 'Razor'],
+    [['tampon', 'pad', 'feminine', 'menstrual', 'period care'], 'Feminine hygiene'],
+    [['condom', 'lubricant', 'personal lubricant'], 'Intimate'],
+    [['lipstick', 'mascara', 'foundation', 'eyeliner', 'eyeshadow', 'concealer', 'blush', 'makeup', 'cosmetic'], 'Makeup'],
+    [['moisturizer', 'lotion', 'serum', 'sunscreen', 'spf', 'skincare', 'skin care'], 'Skincare'],
   ];
   for (const [needles, type] of rules) {
     if (needles.some(n => c.includes(n))) {
