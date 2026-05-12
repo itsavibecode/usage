@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.18.1
+**Version:** v0.18.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.18.1)
+## Current status (v0.18.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.18.2 — 2026-05-11
+- **Pre-tax display now defaults ON for new users.** Most cost data entered into the app is the pre-tax price (UPC databases return MSRPs without tax, and shoppers typically remember pre-tax sticker prices). Anyone who has explicitly toggled the switch either direction keeps their choice; only users with no persisted preference yet flip to the new default.
+- **New "Backfill brand & images" button in Settings.** Older products added before the UPC lookup auto-captured brand names (v0.15.2) and product images (v0.7.15) were rendering without a logo or thumbnail. The new button walks your tracked product list, looks each one up in the UPC database, and fills in any missing brand or image data — without ever overwriting fields you've already set yourself. Polite 300ms delay between lookups so we don't hammer the API.
+- **Canonical URLs across all HTML pages now point at `dev.rizzo.cc/usage`.** Search engines and social-media crawlers treat that as the source-of-truth even when the page is reached via the secondary github.io deployment. Added `<link rel="canonical">` to `index.html`, `share.html`, and `404.html`; updated `og:url`, `og:image`, and `twitter:image` everywhere; share previews now show the dev.rizzo.cc URL regardless of which deployment the link was copied from.
 
 ### v0.18.1 — 2026-05-11
 - **Tightened the mirror's privacy scrub.** v0.18.0 sed only rewrote full-hostname matches like `itsavibecode.github.io` → `dev.rizzo.cc`, but the v0.18.0 changelog header in `app.js` itself referenced "the github.io URL" in descriptive prose, which slipped through. Rephrased the comment header to use generic language (primary/secondary deployment), AND added a third sed pass in the workflow that rewrites bare `github.io` → `rizzo.cc` as defense-in-depth so future descriptive references can't accidentally leak the cross-account relationship.

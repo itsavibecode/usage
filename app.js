@@ -1,4 +1,18 @@
-/* Usage Tracker — v0.18.1
+/* Usage Tracker — v0.18.2
+ * v0.18.2: Polish pass — three small things shipped together.
+ *   1. Pre-tax display defaults ON for users who haven't set a preference.
+ *      Anyone who has explicitly toggled either direction keeps their
+ *      choice (the localStorage value is non-null for them).
+ *   2. New "Backfill brand & images" button in the Settings dialog. Walks
+ *      the product list, finds anything missing brand or imageUrl, and
+ *      runs each through the UPC lookup to fill in whatever the database
+ *      knows. Fields the user has already set are never overwritten.
+ *      Polite 300ms delay between lookups so we don't hammer the API.
+ *   3. og:url, og:image, twitter:image, and a new canonical link tag now
+ *      point at dev.rizzo.cc/usage across index.html / share.html /
+ *      404.html. Search engines and social-media crawlers now treat
+ *      dev.rizzo.cc as the source-of-truth even when the page is reached
+ *      via the secondary github.io deployment.
  * v0.18.1: Tighten the mirror's privacy scrub. The v0.18.0 comment header
  *   itself mentioned the source-hostname by name in descriptive prose
  *   ("the github.io URL keeps working", etc.), which slipped through the
@@ -338,7 +352,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.18.1';
+const APP_VERSION = '0.18.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -396,9 +410,15 @@ let currentFilter = (() => {
 // every dollar value in the UI flows through one function. The "w/ Tax"
 // table column is also hidden when this is on. Persists per browser.
 const PRETAX_KEY = 'usage.preTaxMode.v1';
+// v0.18.2: pre-tax display defaults ON for users who haven't set a
+// preference. Anyone who has explicitly toggled it (either direction) keeps
+// their choice because the localStorage value is non-null.
 let preTaxMode = (() => {
-  try { return localStorage.getItem(PRETAX_KEY) === '1'; }
-  catch { return false; }
+  try {
+    const v = localStorage.getItem(PRETAX_KEY);
+    if (v === null) return true; // new user: default to pre-tax
+    return v === '1';
+  } catch { return true; }
 })();
 
 // v0.17.0: table density mode. 'comfortable' is the original layout;
@@ -3517,6 +3537,77 @@ async function handleSettingsSave() {
   }
 }
 
+// v0.18.2: one-shot backfill for older products that don't have brand or
+// imageUrl set. UPC auto-capture for those fields was added in v0.7.15
+// (imageUrl) and v0.15.2 (brand); products created before then are missing
+// the data, and the desktop name cell / mobile thumb fall back to no
+// image. This walks the current product list, runs each through
+// lookupUpc, and applies any brand/imageUrl the UPC database returns
+// — without overwriting fields the user has already filled in.
+async function handleBackfillBrandImages() {
+  const btn = document.getElementById('settings-backfill-btn');
+  const status = document.getElementById('settings-backfill-status');
+  if (!btn || !status) return;
+
+  // Candidates: tracked products with a UPC that are missing brand OR
+  // imageUrl. Favorites are excluded (they have their own catalog flow).
+  const candidates = products.filter(p =>
+    !p.favorite && p.upc && (!p.brand || !p.imageUrl)
+  );
+
+  if (candidates.length === 0) {
+    status.textContent = 'Nothing to backfill — every product already has brand and image data.';
+    status.className = 'settings-status is-success';
+    return;
+  }
+
+  btn.disabled = true;
+  let updated = 0, skipped = 0;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const p = candidates[i];
+    status.textContent = `Looking up ${i + 1} of ${candidates.length}…`;
+    status.className = 'settings-status';
+
+    try {
+      const item = await lookupUpc(p.upc, { forceFresh: false });
+      if (!item) { skipped++; continue; }
+
+      const updates = {};
+      if (!p.brand && item.brand) {
+        const cleaned = String(item.brand).trim();
+        if (cleaned) updates.brand = cleaned;
+      }
+      if (!p.imageUrl && Array.isArray(item.images)) {
+        const httpsImage = item.images.find(u => /^https:\/\//i.test(u || ''));
+        if (httpsImage) updates.imageUrl = httpsImage;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        // UPC matched but the entry doesn't have brand/image data either
+        skipped++;
+        continue;
+      }
+
+      await saveProduct({ ...p, ...updates });
+      updated++;
+    } catch (e) {
+      console.warn('Backfill failed for', p.upc, e);
+      skipped++;
+    }
+
+    // Be polite to the UPC database between requests.
+    if (i < candidates.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }
+
+  btn.disabled = false;
+  status.textContent = `Done. Updated ${updated}, skipped ${skipped}.`;
+  status.className = 'settings-status is-success';
+  toast(`Backfill complete: ${updated} updated, ${skipped} skipped.`);
+}
+
 /* ---------- v0.8.0 price history per UPC ---------- */
 
 let priceHistoryChart = null;
@@ -5142,6 +5233,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('settings-close')?.addEventListener('click', closeSettingsDialog);
   document.getElementById('settings-cancel')?.addEventListener('click', closeSettingsDialog);
   document.getElementById('settings-save')?.addEventListener('click', handleSettingsSave);
+  // v0.18.2: backfill brand + product-image data for older products that
+  // pre-date the UPC auto-capture of those fields.
+  document.getElementById('settings-backfill-btn')?.addEventListener('click', handleBackfillBrandImages);
 
   // v0.8.0: price history dialog close handlers
   document.getElementById('price-history-close')?.addEventListener('click', closePriceHistory);
