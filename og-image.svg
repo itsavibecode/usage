@@ -24,6 +24,7 @@
   <text x="80" y="430" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="32" font-weight="400" fill="#bcd0f5">Personal product usage tracker</text>
   <!-- secondary line -->
   <text x="80" y="478" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="400" fill="#7a9ad9">Log everyday products &#8226; see $/day cost &#8226; track lifespans</text>
-  <!-- domain in bottom-right -->
-  <text x="1120" y="580" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="500" fill="#ffffff" opacity="0.6">itsavibecode.github.io/usage</text>
+  <!-- v0.18.0: domain text removed so the same OG card works at any
+       deployment URL without leaking origin identifiers. Re-render the
+       PNG after editing: `npx sharp-cli -i og-image.svg -o . -f png`. -->
 </svg>

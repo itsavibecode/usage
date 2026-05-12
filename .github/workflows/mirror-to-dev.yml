@@ -1,0 +1,83 @@
+# Mirror static files from this repo into the /usage subfolder of a
+# second repo (which serves dev.rizzo.cc). Runs on every push to main.
+#
+# Privacy notes (intentional — see project_usage_tracker.md memory):
+#   - The target repo is on a separate GitHub account that should NOT
+#     be linkable back to this one in public history. Measures:
+#       1. README.md, .github/, firestore.rules excluded from the copy
+#          so source-only files don't leak.
+#       2. Sed rewrites any remaining itsavibecode.github.io/usage refs
+#          in HTML/JS to dev.rizzo.cc/usage (catches og:url, twitter:image,
+#          source comments). The og-image text was scrubbed at the
+#          source level in v0.18.0.
+#       3. Commit messages on the target repo are generic ("Update /usage")
+#          and never reference the source repo by name.
+#       4. Committer is github-actions[bot], no personal email.
+#
+# Setup (one-time):
+#   1. Create a fine-grained PAT owned by the target account with
+#      Contents: Read and Write on the target repo only.
+#   2. Add it as a repo secret here named MIRROR_TO_DEV_PAT.
+#   3. Either push (triggers automatically) or click "Run workflow" on
+#      the Actions tab to mirror on demand.
+
+name: Mirror /usage to secondary deployment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # allow manual trigger from Actions tab
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: yada-yoda/dev
+          token: ${{ secrets.MIRROR_TO_DEV_PAT }}
+          path: dst
+
+      - name: Sync static files into dst/usage/
+        run: |
+          # Wipe and re-create so deletions in source propagate.
+          rm -rf dst/usage
+          mkdir -p dst/usage
+          # Copy everything except dev-only / source-specific files.
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'README.md' \
+            --exclude 'firestore.rules' \
+            src/ dst/usage/
+
+      - name: Rewrite hardcoded origin refs to dev.rizzo.cc
+        run: |
+          # OG/Twitter meta tags + any source-comment URL references.
+          # Sed rewrites in-place; affects only the mirrored copy.
+          find dst/usage -type f \( -name '*.html' -o -name '*.js' \) -print0 |
+            xargs -0 sed -i 's|https://itsavibecode\.github\.io/usage|https://dev.rizzo.cc/usage|g'
+          # Catch bare-hostname references too (without /usage suffix), in
+          # case any markup has them.
+          find dst/usage -type f \( -name '*.html' -o -name '*.js' \) -print0 |
+            xargs -0 sed -i 's|itsavibecode\.github\.io|dev.rizzo.cc|g'
+
+      - name: Commit and push if changed
+        working-directory: dst
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add usage/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          # Intentionally generic — no source-repo name, no app version.
+          git commit -m "Update /usage"
+          git push

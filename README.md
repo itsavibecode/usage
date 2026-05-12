@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.17.8
+**Version:** v0.18.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.17.8)
+## Current status (v0.18.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.18.0 — 2026-05-11
+- **Secondary deployment at `dev.rizzo.cc/usage`.** The github.io URL stays as the source-of-truth deployment. A new GitHub Action (`.github/workflows/mirror-to-dev.yml`) automatically mirrors the static files into a `/usage` subfolder of a second repo on every push to main. After the Pages rebuild on the second repo, `dev.rizzo.cc/usage/` serves the same app.
+- **Scrubbed the OG share-card image.** The `og-image` had `itsavibecode.github.io/usage` rendered into the bottom-right corner — when someone shared a `dev.rizzo.cc/usage/` link to Discord/Slack/X, the preview image leaked the github.io origin. Removed the URL text from `og-image.svg` and re-rendered `og-image.png` with `npx sharp-cli`. Same card now works at any deployment URL.
+- **Mirror workflow privacy measures.** `README.md`, `.github/`, and `firestore.rules` are excluded from the copy. A sed pass rewrites any remaining `itsavibecode.github.io/usage` references in HTML / JS source comments to `dev.rizzo.cc/usage` for the mirrored copy only (the source repo keeps its github.io refs since those still work at the github.io deployment). Commit messages on the target repo are generic ("Update /usage") with `github-actions[bot]` as the author — no source-repo or personal identifiers in the commit history.
 
 ### v0.17.8 — 2026-05-08
 - **PageSpeed pass round 2 — lazy-load Chart.js.** The ~200KB Chart bundle was being eagerly imported at the top of `app.js` even though it's only used on the Dashboard tab and the per-row price-history dialog. Users who never visit those paths were paying the full parse cost on every load. Replaced the top-level import with a new `ensureChart()` async helper that fetches and registers the module on first call and caches it afterward. `renderDashboard` is now async and awaits `ensureChart()` before drawing the 6 dashboard charts; `renderPriceHistoryChart` similarly awaits before instantiating its line chart. A failed import (CDN hiccup) clears the cached promise so the next call retries fresh. Same lazy pattern already used for html2canvas (PNG export) and @zxing/browser (UPC scanner).
