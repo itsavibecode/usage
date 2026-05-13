@@ -1,4 +1,17 @@
-/* Usage Tracker — v0.19.0
+/* Usage Tracker — v0.20.0
+ * v0.20.0: User-facing changelog ("What's new" modal). Clicking the
+ *   version chip in the header opens a modal with filter tabs (All /
+ *   New feature / Improvement / Fix), a vertical timeline of past
+ *   entries, and short plain-English bodies for each. New CHANGELOG
+ *   const in this file holds the entries — separate from the README
+ *   changelog (which is verbose / technical) so user-facing copy can
+ *   stay short and action-oriented. Backfilled with ~11 entries
+ *   covering v0.14.1 → v0.20.0. Status pills follow theme: NEW =
+ *   primary blue, Improvement = success green, Fix = amber. Unread
+ *   indicator: a small primary-blue dot on the version chip when the
+ *   latest entry's version > localStorage.lastChangelogVersionSeen.
+ *   Dot clears the moment the user opens the modal. Mobile-friendly
+ *   layout with a stacked filter strip + tighter card padding.
  * v0.19.0: Catalog expansion. Six new seed product types (Conditioner,
  *   Razor, Skincare, Makeup, Feminine hygiene, Intimate) and 15 seed
  *   stores (Amazon, Target, Walmart, Costco, Sam's Club, Walgreens, CVS,
@@ -362,7 +375,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.19.0';
+const APP_VERSION = '0.20.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -501,6 +514,119 @@ let columnVisibility = (() => {
     return { ...defaults, ...parsed };
   } catch { return defaults; }
 })();
+
+// v0.20.0: user-facing changelog. Plain-English entries shown in a
+// "What's new" dialog accessed by clicking the version chip in the header.
+// Separate from the README changelog (which is verbose / technical, for
+// future-Claude / future-me); these are short and action-oriented for
+// the actual user. Newest entries first — the rendering function shows
+// them in array order.
+//
+// Tag mapping drives the colored status pills:
+//   'new'         → primary blue   (#2b5fd9)
+//   'improvement' → success green  (#2d8a5f)
+//   'fix'         → amber          (#d98f2b)
+// An entry can have multiple tags (e.g. ['new', 'improvement']).
+const CHANGELOG = [
+  {
+    version: '0.20.0',
+    date: '2026-05-11',
+    tags: ['new'],
+    title: "What's new modal",
+    body: 'Quick way to see what changed recently in the app. Click the version number any time to open this list. Filter by New feature / Improvement / Fix to scan for a specific kind of change.',
+  },
+  {
+    version: '0.19.0',
+    date: '2026-05-11',
+    tags: ['new', 'improvement'],
+    title: 'More product types and stores',
+    body: "Six new product type seeds (Conditioner, Razor, Skincare, Makeup, Feminine hygiene, Intimate) and 15 store seeds (Target, Walmart, Costco, Sam's Club, Walgreens, CVS, Kroger, Trader Joe's, Whole Foods, and more) now pre-populated in the Add-product dropdowns. UPC auto-fill recognizes the new types too.",
+  },
+  {
+    version: '0.18.2',
+    date: '2026-05-11',
+    tags: ['new', 'improvement'],
+    title: 'Backfill brand & images',
+    body: 'New button in Settings to look up missing brand names and product images for older products in one pass — no overwriting fields you\'ve already set. Pre-tax display now defaults to ON for new users.',
+  },
+  {
+    version: '0.18.0',
+    date: '2026-05-11',
+    tags: ['new'],
+    title: 'Now at dev.rizzo.cc/usage',
+    body: 'The app is also accessible at dev.rizzo.cc/usage — same Firebase backend, same data, just a friendlier URL. The previous URL still works.',
+  },
+  {
+    version: '0.17.6',
+    date: '2026-05-03',
+    tags: ['new'],
+    title: 'Finished tab',
+    body: 'New filter tab next to All / Active / Inventory that shows just products you\'ve used up — useful for sorting through history. Try clicking it then sorting by Duration to find your longest-lasting products.',
+  },
+  {
+    version: '0.17.0',
+    date: '2026-05-03',
+    tags: ['new', 'improvement'],
+    title: 'Slimmer table layout',
+    body: 'Store / Buyer / Card merged into a single Bought by column. New Density toggle (Comfortable / Compact) and Columns dropdown let you customize the table to fit your monitor. Notes column auto-hides when nothing has notes.',
+  },
+  {
+    version: '0.16.0',
+    date: '2026-05-03',
+    tags: ['new'],
+    title: 'Email reorder reminders',
+    body: 'A daily digest emails you when products are running low. Opt in via the new Settings button (next to Sign out). Capped at one email per week so persistent reminders don\'t spam.',
+  },
+  {
+    version: '0.15.2',
+    date: '2026-04-30',
+    tags: ['new'],
+    title: 'Company logos',
+    body: 'Products now show a circular brand-logo icon in the table, mobile cards, and the Edit dialog. Auto-fills when you look up a UPC; editable manually too.',
+  },
+  {
+    version: '0.15.1',
+    date: '2026-04-29',
+    tags: ['new', 'fix'],
+    title: 'Last 30 days cost tile',
+    body: 'New stat in the summary bar showing what your tracked products cost you over the past 30 days. Also fixed: purchase date no longer rolls to tomorrow late at night.',
+  },
+  {
+    version: '0.15.0',
+    date: '2026-04-29',
+    tags: ['new'],
+    title: 'Favorites tab',
+    body: 'New top-level tab to remember products you liked but aren\'t actively tracking. Cross-references with your tracked products by UPC to show last used / times used per favorite.',
+  },
+  {
+    version: '0.14.1',
+    date: '2026-04-27',
+    tags: ['new'],
+    title: 'One-tap Finish button',
+    body: "Marking an active product as finished used to require opening the Edit dialog and typing the end date. Now there's a single Finish button on each active row (mobile too) that opens a tiny dialog with today's date pre-filled — confirm and done.",
+  },
+];
+
+// v0.20.0: track the latest version the user has seen in the changelog
+// modal. Drives the unread-dot indicator on the version chip — if the
+// current top entry's version > lastSeen, a small primary-blue dot
+// shows on the chip until the user opens the dialog.
+const CHANGELOG_SEEN_KEY = 'usage.changelogLastSeen.v1';
+function getLastChangelogSeen() {
+  try { return localStorage.getItem(CHANGELOG_SEEN_KEY) || ''; }
+  catch { return ''; }
+}
+function setLastChangelogSeen(version) {
+  try { localStorage.setItem(CHANGELOG_SEEN_KEY, version); } catch {}
+}
+function hasUnreadChangelog() {
+  if (!CHANGELOG.length) return false;
+  const latest = CHANGELOG[0].version;
+  return getLastChangelogSeen() !== latest;
+}
+
+// Active filter tab in the changelog dialog. Reset to 'all' each open.
+let changelogFilter = 'all'; // 'all' | 'new' | 'improvement' | 'fix'
 // Mobile cards collapse Where + Notes by default to save vertical space.
 // Per-product expansion state survives re-renders (in-memory only — no
 // localStorage; users open detail temporarily, re-collapses on reload is fine).
@@ -3652,6 +3778,128 @@ async function handleBackfillBrandImages() {
   toast(`Backfill complete: ${updated} updated, ${skipped} skipped.`);
 }
 
+/* ---------- v0.20.0 What's new (user-facing changelog) ---------- */
+
+// Opens the changelog modal, marks the latest version as seen (which
+// clears the unread-dot on the version chip), resets the filter to All,
+// and renders the entries.
+function openChangelog() {
+  const dlg = document.getElementById('changelog-dialog');
+  if (!dlg) return;
+  changelogFilter = 'all';
+  syncChangelogFilterUI();
+  renderChangelogEntries();
+  // Mark the latest version as seen — clears the unread dot.
+  if (CHANGELOG.length) {
+    setLastChangelogSeen(CHANGELOG[0].version);
+    applyChangelogUnreadDot();
+  }
+  if (!dlg.open) dlg.showModal();
+}
+
+function closeChangelog() {
+  const dlg = document.getElementById('changelog-dialog');
+  if (dlg && dlg.open) dlg.close();
+}
+
+// Toggle the .is-active class on the right filter tab so it visually
+// reflects the current changelogFilter state.
+function syncChangelogFilterUI() {
+  for (const btn of document.querySelectorAll('.changelog-filter-tab')) {
+    const active = btn.dataset.filter === changelogFilter;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  }
+}
+
+// Called from filter-tab click handlers. Updates state + re-renders.
+function setChangelogFilter(filter) {
+  if (!['all', 'new', 'improvement', 'fix'].includes(filter)) return;
+  changelogFilter = filter;
+  syncChangelogFilterUI();
+  renderChangelogEntries();
+}
+
+// Re-render the entries body based on the current filter. Groups by
+// date (month + year) so multiple same-day entries stack under one date
+// header — mirrors the Harvest reference pattern.
+function renderChangelogEntries() {
+  const host = document.getElementById('changelog-body');
+  if (!host) return;
+
+  const entries = changelogFilter === 'all'
+    ? CHANGELOG
+    : CHANGELOG.filter(e => Array.isArray(e.tags) && e.tags.includes(changelogFilter));
+
+  if (entries.length === 0) {
+    host.innerHTML = `<p class="changelog-empty">No ${escapeHtml(changelogFilter)} entries yet.</p>`;
+    return;
+  }
+
+  // Group consecutive entries sharing the same date for a single
+  // date header. CHANGELOG is already in newest-first order, so we just
+  // walk linearly and start a new group when the date changes.
+  const groups = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === e.date) {
+      last.entries.push(e);
+    } else {
+      groups.push({ date: e.date, entries: [e] });
+    }
+  }
+
+  host.innerHTML = groups.map(g => `
+    <div class="changelog-date-group">
+      <div class="changelog-date">${escapeHtml(formatChangelogDate(g.date))}</div>
+      <div class="changelog-entries">
+        ${g.entries.map(e => renderChangelogEntry(e)).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// Single entry as a card with timeline-dot indicator, pills, title, body.
+function renderChangelogEntry(e) {
+  const pills = (e.tags || []).map(t => {
+    const label = t === 'new' ? 'NEW'
+      : t === 'improvement' ? 'Improvement'
+      : t === 'fix' ? 'Fix' : String(t);
+    return `<span class="changelog-pill changelog-pill-${escapeHtml(t)}">${escapeHtml(label)}</span>`;
+  }).join('');
+  return `
+    <article class="changelog-entry">
+      <div class="changelog-entry-dot" aria-hidden="true"></div>
+      <div class="changelog-entry-content">
+        ${pills ? `<div class="changelog-entry-pills">${pills}</div>` : ''}
+        <h3 class="changelog-entry-title">${escapeHtml(e.title)}</h3>
+        <p class="changelog-entry-body">${escapeHtml(e.body)}</p>
+        <div class="changelog-entry-version">v${escapeHtml(e.version)}</div>
+      </div>
+    </article>
+  `;
+}
+
+// Format YYYY-MM-DD → "MAY 11, 2026" (Harvest style). Uses local
+// timezone parsing so dates don't shift across midnight UTC.
+function formatChangelogDate(iso) {
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric'
+  }).toUpperCase();
+}
+
+// Toggle the .has-unread class on the version chip so CSS can show /
+// hide the small primary-blue indicator dot.
+function applyChangelogUnreadDot() {
+  const chip = document.getElementById('version');
+  if (!chip) return;
+  chip.classList.toggle('has-unread', hasUnreadChangelog());
+}
+
 /* ---------- v0.8.0 price history per UPC ---------- */
 
 let priceHistoryChart = null;
@@ -5009,9 +5257,24 @@ async function doSignOut() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('version').textContent = `v${APP_VERSION}`;
   document.querySelector('meta[name="version"]')?.setAttribute('content', APP_VERSION);
+  // v0.20.0: apply the unread-dot to the version chip on load so users
+  // see at a glance that there's a new changelog entry waiting.
+  applyChangelogUnreadDot();
 
   document.getElementById('btn-signin').addEventListener('click', doSignIn);
   document.getElementById('btn-signout').addEventListener('click', doSignOut);
+
+  // v0.20.0: version chip opens the "What's new" changelog modal.
+  // Stop propagation so clicks inside the chip don't bubble into the
+  // header brand area.
+  document.getElementById('version')?.addEventListener('click', e => {
+    e.stopPropagation();
+    openChangelog();
+  });
+  document.getElementById('changelog-close')?.addEventListener('click', closeChangelog);
+  document.querySelectorAll('.changelog-filter-tab').forEach(btn => {
+    btn.addEventListener('click', () => setChangelogFilter(btn.dataset.filter));
+  });
 
   document.getElementById('btn-add').addEventListener('click', openAddDialog);
   document.getElementById('dialog-close').addEventListener('click', closeDialog);

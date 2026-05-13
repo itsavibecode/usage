@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.19.0
+**Version:** v0.20.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.19.0)
+## Current status (v0.20.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.20.0 — 2026-05-11
+- **New "What's new" modal.** Inspired by the Harvest changelog pattern (per user reference screenshot). Clicking the version chip in the header opens a modal with filter tabs (All / New feature / Improvement / Fix), a vertical primary-blue dotted timeline, and short plain-English entries with status pills (NEW = primary blue, Improvement = success green, Fix = amber). Data lives in a new `CHANGELOG` const in `app.js` — separate from this verbose technical changelog so user-facing copy can stay short and action-oriented. Backfilled with 11 entries covering v0.14.1 → v0.20.0.
+- **Unread indicator.** A small primary-blue dot appears on the version chip when the latest changelog entry's version is newer than what the user has previously seen (`usage.changelogLastSeen.v1` in localStorage). The dot clears the moment the user opens the modal. Encourages discovery without nagging.
+- **Version chip is now a button** (was a `<span>`), with hover/focus states matching the theme. Keyboard-accessible by default.
 
 ### v0.19.0 — 2026-05-11
 - **Catalog expansion: more product types + seed stores.**

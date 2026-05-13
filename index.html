@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.19.0">
+  <meta name="version" content="0.20.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -70,7 +70,11 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36" fetchpriority="high" decoding="async">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.19.0</span>
+        <!-- v0.20.0: version chip is now a button that opens the "What's
+             new" changelog dialog. .has-unread class is toggled by JS to
+             show a small primary-blue dot when there's a newer entry
+             than the user has previously viewed. -->
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.20.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -696,6 +700,27 @@
       <button type="button" class="btn" id="settings-cancel">Cancel</button>
       <button type="button" class="btn btn-primary" id="settings-save">Save</button>
     </footer>
+  </dialog>
+
+  <!-- v0.20.0: What's new (user-facing changelog) modal. Triggered by
+       clicking the version chip in the header. Filter tabs let the user
+       focus on New / Improvement / Fix entries. Vertical timeline layout
+       with date headers, status pills, and short plain-English bodies.
+       Data lives in the CHANGELOG const in app.js — keep that as the
+       single source for user-facing entries (the README's changelog is
+       for technical history). -->
+  <dialog id="changelog-dialog" class="changelog-dialog">
+    <header class="dialog-header">
+      <h2>What's new</h2>
+      <button type="button" class="icon-btn" id="changelog-close" aria-label="Close">&times;</button>
+    </header>
+    <nav class="changelog-filter-tabs" role="tablist" aria-label="Filter changelog">
+      <button type="button" class="changelog-filter-tab is-active" data-filter="all" role="tab" aria-selected="true">All</button>
+      <button type="button" class="changelog-filter-tab" data-filter="new" role="tab" aria-selected="false">New feature</button>
+      <button type="button" class="changelog-filter-tab" data-filter="improvement" role="tab" aria-selected="false">Improvement</button>
+      <button type="button" class="changelog-filter-tab" data-filter="fix" role="tab" aria-selected="false">Fix</button>
+    </nav>
+    <div class="changelog-body" id="changelog-body"></div>
   </dialog>
 
   <!-- v0.15.5: <dialog> instead of <div> so toasts render in the browser's

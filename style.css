@@ -71,11 +71,43 @@ html, body {
   letter-spacing: -0.01em;
 }
 
+/* v0.20.0: version chip is now a clickable <button> that opens the
+ * "What's new" changelog modal. Strip default button chrome and keep
+ * the same compact look the previous span had. .has-unread adds a
+ * small primary-blue dot to signal there's a newer entry than the user
+ * has previously seen. */
 .version {
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: inherit;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.version:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.version:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.version.has-unread::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  background: var(--primary);
+  border-radius: 50%;
+  border: 1px solid var(--surface, #fff);
 }
 
 .toolbar {
@@ -2950,6 +2982,181 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 
 @media (max-width: 640px) {
   .settings-dialog { max-width: 92vw; }
+}
+
+/* v0.20.0 What's new (user-facing changelog) modal. Layout inspired by
+ * Harvest's "What's new" pattern: filter-tab strip at the top, vertical
+ * timeline below with date headers and entry cards. Each entry has a
+ * small dot on the timeline + colored tag pills + plain-English body. */
+.changelog-dialog {
+  max-width: 680px;
+  width: 92vw;
+  max-height: 90vh;
+  padding: 0;
+}
+.changelog-dialog .dialog-header {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 2;
+}
+.changelog-filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 56px; /* under the dialog header */
+  z-index: 1;
+  flex-wrap: wrap;
+}
+.changelog-filter-tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.changelog-filter-tab:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.changelog-filter-tab.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.changelog-body {
+  padding: 16px 20px 24px;
+  overflow-y: auto;
+  max-height: calc(90vh - 130px);
+}
+.changelog-empty {
+  margin: 24px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.changelog-date-group {
+  margin-bottom: 18px;
+}
+.changelog-date-group:last-child { margin-bottom: 0; }
+.changelog-date {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 12px 28px; /* left-indent to clear the timeline column */
+}
+.changelog-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+/* The dotted vertical timeline behind the entry dots. Drawn as a
+ * pseudo-element so it spans the full height of the entries cluster. */
+.changelog-entries::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background-image: linear-gradient(to bottom, var(--primary) 50%, transparent 50%);
+  background-size: 2px 6px;
+  background-repeat: repeat-y;
+  opacity: 0.4;
+}
+.changelog-entry {
+  display: flex;
+  gap: 14px;
+  position: relative;
+}
+.changelog-entry-dot {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: 14px;
+  border: 3px solid var(--surface, #fff);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.changelog-entry-content {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.04));
+}
+.changelog-entry-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.changelog-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.changelog-pill-new {
+  background: #e3edff;
+  color: var(--primary);
+}
+.changelog-pill-improvement {
+  background: #e3f5ec;
+  color: var(--success);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.changelog-pill-fix {
+  background: #fff3d6;
+  color: #8a5a00;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.changelog-entry-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+.changelog-entry-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.changelog-entry-version {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .changelog-dialog { max-width: 96vw; max-height: 92vh; }
+  .changelog-body { padding: 12px 14px 20px; max-height: calc(92vh - 130px); }
+  .changelog-date { margin-left: 24px; }
+  .changelog-entry-content { padding: 12px 14px; }
+  .changelog-entry-title { font-size: 15px; }
+  .changelog-entry-body { font-size: 13px; }
 }
 
 /* v0.17.5: Density + Columns controls only affect the desktop table.
