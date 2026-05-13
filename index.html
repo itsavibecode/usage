@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.20.1">
+  <meta name="version" content="0.21.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -24,6 +24,8 @@
        sign-in). Lighter weight than preconnect — just resolves DNS. -->
   <link rel="dns-prefetch" href="https://img.logo.dev">
   <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+  <!-- v0.21.0: FDA recall API, hit once per 24h after first products snapshot. -->
+  <link rel="dns-prefetch" href="https://api.fda.gov">
   <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
        (scales perfectly); PNG fallbacks for everything else. apple-touch
        drives iOS home-screen icon. manifest enables Android Add-to-Home.
@@ -74,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.20.1</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.21.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -127,6 +129,13 @@
 
   <main id="main-wrap" hidden>
     <section class="trends-panel" id="trends-panel" aria-live="polite" hidden></section>
+
+    <!-- v0.21.0: Possible-recall alerts. Brand-name match against FDA's
+         drug-enforcement endpoint. Populated asynchronously after first
+         data snapshot lands; 24h localStorage cache keeps API calls minimal.
+         User can dismiss individual recalls or all at once. Stays hidden
+         when there are no current matches (or everything's been dismissed). -->
+    <section class="recalls-panel" id="recalls-panel" aria-label="Possible product recalls" hidden></section>
 
     <!-- v0.12.0: Reorder reminders. For each currently-active product whose
          duration is approaching or past the average lifespan of its same-type

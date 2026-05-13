@@ -1,4 +1,15 @@
-/* Usage Tracker — v0.20.1
+/* Usage Tracker — v0.21.0
+ * v0.21.0: Possible-recall alerts (Minimal v1, client-side). New banner
+ *   at the top of the page surfaces any open FDA recalls for brands in
+ *   the user's tracked products. Architecture: brand-match query against
+ *   `api.fda.gov/drug/enforcement.json` per unique brand, filter to
+ *   Ongoing/Pending status + <=12mo old, dedupe by recall_number, sort
+ *   by severity (Class I → II → III). Results cached 24h in
+ *   `usage.recallCheck.v1`. Dismissals tracked in `usage.recallDismissed.v1`
+ *   (Set of recall_numbers, persists across reloads). Brand-only matching
+ *   is noisy — the banner header explicitly says "verify on the FDA
+ *   page before acting." No email side (that's the future v2 server-side
+ *   cron). Falls through silently if FDA is unreachable.
  * v0.20.1: One-tap Start button for inventory products. Mirror of the
  *   v0.14.1 Finish flow: each inventory row (desktop + mobile) gets a
  *   Start button. Clicking it opens a tiny dialog with today's date
@@ -384,7 +395,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.20.1';
+const APP_VERSION = '0.21.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -537,6 +548,13 @@ let columnVisibility = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.21.0',
+    date: '2026-05-12',
+    tags: ['new'],
+    title: 'Possible-recall alerts',
+    body: 'A new banner at the top of the page surfaces any open FDA recalls for brands in your tracked products. Severity-tinted cards (Class I red / Class II amber / Class III blue) with a Dismiss button per card and Dismiss all for the panel. Brand-only matching is imprecise so the banner is explicit about that — always verify on the FDA page before acting. Checked once per day per browser; results cache for 24 hours.',
+  },
   {
     version: '0.20.1',
     date: '2026-05-11',
@@ -1027,6 +1045,7 @@ function subscribeData(uid) {
   unsubProducts = onSnapshot(productsColl(uid), snap => {
     const next = [];
     snap.forEach(d => next.push({ id: d.id, ...d.data() }));
+    const wasFirstSnapshot = !firstSnapshotSeen;
     products = next;
     firstSnapshotSeen = true;
     render();
@@ -1040,6 +1059,9 @@ function subscribeData(uid) {
     // localStorage entries on first run after this version. Guarded by
     // activityLoaded so it only runs once per session.
     if (!activityLoaded) initActivityForSession(uid);
+    // v0.21.0: fire the FDA recall check once on first snapshot. Cached
+    // for 24h in localStorage so we don't hit the API on every page load.
+    if (wasFirstSnapshot) kickoffRecallCheck();
   }, err => {
     console.error('Products subscription error:', err);
     toast('Sync error: ' + err.message);
@@ -1600,6 +1622,9 @@ function renderActiveFilterBar() {
 
 function render() {
   renderTrendsPanel();
+  // v0.21.0: recall alerts sit above reminders — safety beats convenience.
+  // Cheap render from localStorage cache; no API call here.
+  renderRecallsPanel();
   renderReorderReminders();
   renderTable();
   renderStats();
@@ -2490,6 +2515,260 @@ function renderReorderReminders() {
     </div>
     <div class="reminders-list">${items}</div>
   `;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// v0.21.0 — RECALL ALERTS (FDA Enforcement Reports API)
+// Minimal v1: client-side check on app load, brand match against FDA
+// drug-enforcement endpoint, 24h localStorage cache, in-app banner with
+// Dismiss / View details. No email side yet (that would be v2 server-
+// side cron). Brand-only matching is noisy — we surface as "possibly
+// affects you" rather than confident hits.
+// ═════════════════════════════════════════════════════════════════════
+
+const RECALL_CACHE_KEY = 'usage.recallCheck.v1';
+const RECALL_DISMISSED_KEY = 'usage.recallDismissed.v1';
+const RECALL_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const RECALL_MAX_AGE_MONTHS = 12; // ignore recalls older than 1 year
+const RECALL_FETCH_DELAY_MS = 200; // between per-brand API calls
+const RECALL_MAX_PER_BRAND = 10; // limit API page size
+
+// In-memory mirror of the dismissed set. Loaded once on first access,
+// persisted to localStorage on every change. Stored as a JSON array of
+// recall_number strings.
+let _dismissedRecallsCache = null;
+function getDismissedRecalls() {
+  if (_dismissedRecallsCache) return _dismissedRecallsCache;
+  try {
+    const raw = localStorage.getItem(RECALL_DISMISSED_KEY);
+    _dismissedRecallsCache = new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    _dismissedRecallsCache = new Set();
+  }
+  return _dismissedRecallsCache;
+}
+function saveDismissedRecalls() {
+  if (!_dismissedRecallsCache) return;
+  try {
+    localStorage.setItem(RECALL_DISMISSED_KEY, JSON.stringify([..._dismissedRecallsCache]));
+  } catch {}
+}
+
+// Read the 24h cache. Returns the cached array if valid; null otherwise.
+function readRecallCache() {
+  try {
+    const raw = localStorage.getItem(RECALL_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.checkedAt) return null;
+    if (Date.now() - parsed.checkedAt > RECALL_CACHE_TTL_MS) return null;
+    return Array.isArray(parsed.recalls) ? parsed.recalls : [];
+  } catch { return null; }
+}
+function writeRecallCache(recalls) {
+  try {
+    localStorage.setItem(RECALL_CACHE_KEY, JSON.stringify({
+      checkedAt: Date.now(),
+      recalls,
+    }));
+  } catch {}
+}
+
+// FDA recall_initiation_date is "YYYYMMDD" — parse to a Date in local
+// timezone so age-in-months math is sane.
+function parseFdaDate(s) {
+  if (!s) return null;
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(String(s).trim());
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+// Build the FDA Reports details URL for a given recall_number. The
+// public-facing IRES portal has slightly different URL conventions for
+// drug vs food vs device, but the /Recalls/ entry point handles routing.
+function fdaRecallUrl(recallNumber) {
+  return `https://www.accessdata.fda.gov/scripts/ires/index.cfm?Product=${encodeURIComponent(recallNumber || '')}`;
+}
+
+// Severity tier label + CSS class suffix.
+function recallSeverityInfo(classification) {
+  const c = String(classification || '').toLowerCase();
+  if (c.includes('class i') && !c.includes('class ii') && !c.includes('class iii')) {
+    return { label: 'Class I · severe', cls: 'recall-severe' };
+  }
+  if (c.includes('class ii')) return { label: 'Class II · moderate', cls: 'recall-moderate' };
+  if (c.includes('class iii')) return { label: 'Class III · low', cls: 'recall-low' };
+  return { label: 'Recall', cls: 'recall-moderate' };
+}
+
+// Query FDA's drug enforcement endpoint for a single brand. Returns an
+// array of recall records (possibly empty). 404 from FDA = "no matches"
+// which is a successful negative — return [] not throw.
+async function fetchRecallsForBrand(brand) {
+  const safeBrand = String(brand || '').trim();
+  if (!safeBrand) return [];
+  // FDA Elasticsearch syntax: quote the value, escape inner quotes by
+  // dropping them entirely (rare in brand names; safer than escaping).
+  const query = `recalling_firm:"${safeBrand.replace(/"/g, '')}"`;
+  const url = `https://api.fda.gov/drug/enforcement.json?search=${encodeURIComponent(query)}&limit=${RECALL_MAX_PER_BRAND}`;
+  try {
+    const resp = await fetch(url);
+    if (resp.status === 404) return [];
+    if (!resp.ok) {
+      console.warn(`FDA recall check failed for "${safeBrand}": ${resp.status}`);
+      return [];
+    }
+    const data = await resp.json();
+    return Array.isArray(data.results) ? data.results : [];
+  } catch (e) {
+    console.warn(`FDA recall fetch error for "${safeBrand}":`, e);
+    return [];
+  }
+}
+
+// Walk the tracked product list, gather unique brands, query FDA for
+// each, filter results to "recent + ongoing", de-dupe by recall_number.
+// Caches successful results for 24h so the page-load check doesn't
+// hammer the API on every visit.
+async function checkRecalls() {
+  // Honor cache first.
+  const cached = readRecallCache();
+  if (cached) return cached;
+
+  const brands = new Set();
+  for (const p of products) {
+    if (isFavorite(p)) continue; // favorites are catalog refs, not tracked usage
+    const b = (p.brand || '').trim();
+    if (b) brands.add(b);
+  }
+  if (brands.size === 0) {
+    writeRecallCache([]); // still cache the negative result
+    return [];
+  }
+
+  const matches = [];
+  const seen = new Set();
+  const cutoff = Date.now() - RECALL_MAX_AGE_MONTHS * 30 * 86400000;
+
+  for (const brand of brands) {
+    const results = await fetchRecallsForBrand(brand);
+    for (const r of results) {
+      if (seen.has(r.recall_number)) continue;
+      // Status filter — only "Ongoing" or "Pending"; skip "Terminated" /
+      // "Completed". FDA capitalizes inconsistently so case-insensitive.
+      const status = String(r.status || '').toLowerCase();
+      if (status !== 'ongoing' && status !== 'pending') continue;
+      // Age filter — older than RECALL_MAX_AGE_MONTHS gets skipped.
+      const date = parseFdaDate(r.recall_initiation_date);
+      if (!date || date.getTime() < cutoff) continue;
+      seen.add(r.recall_number);
+      matches.push({
+        recallNumber: r.recall_number || '',
+        brand,
+        productDescription: r.product_description || '',
+        reason: r.reason_for_recall || '',
+        date: r.recall_initiation_date || '',
+        classification: r.classification || '',
+        recallingFirm: r.recalling_firm || '',
+        fdaUrl: fdaRecallUrl(r.recall_number),
+      });
+    }
+    // Politeness delay so we don't burn the unauth 240/min quota.
+    if (brand !== Array.from(brands).pop()) {
+      await new Promise(res => setTimeout(res, RECALL_FETCH_DELAY_MS));
+    }
+  }
+
+  // Severity order: Class I first, then II, then III.
+  matches.sort((a, b) => {
+    const ord = c => /class i\b/i.test(c) ? 0 : /class ii\b/i.test(c) ? 1 : 2;
+    return ord(a.classification) - ord(b.classification);
+  });
+
+  writeRecallCache(matches);
+  return matches;
+}
+
+// Render the recalls panel based on currently-known matches minus
+// dismissals. Hides the panel if everything's been dismissed (or there
+// are no matches). Called from kickoffRecallCheck after the API returns
+// AND from dismissRecall after a user dismissal.
+function renderRecallsPanel() {
+  const panel = document.getElementById('recalls-panel');
+  if (!panel) return;
+  const all = readRecallCache() || [];
+  const dismissed = getDismissedRecalls();
+  const visible = all.filter(r => !dismissed.has(r.recallNumber));
+
+  if (visible.length === 0) {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    return;
+  }
+
+  const items = visible.map(r => {
+    const sev = recallSeverityInfo(r.classification);
+    const date = parseFdaDate(r.date);
+    const dateStr = date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    // Truncate long product descriptions to keep cards scannable.
+    const desc = r.productDescription.length > 140
+      ? r.productDescription.slice(0, 140) + '…'
+      : r.productDescription;
+    return `<article class="recall-item ${sev.cls}">
+      <div class="recall-head">
+        <span class="recall-severity">${escapeHtml(sev.label)}</span>
+        <button type="button" class="recall-dismiss" data-recall-id="${escapeHtml(r.recallNumber)}" title="Dismiss this alert">&times;</button>
+      </div>
+      <h3 class="recall-brand">${escapeHtml(r.brand)}</h3>
+      <p class="recall-product">${escapeHtml(desc)}</p>
+      <p class="recall-reason">${escapeHtml(r.reason)}</p>
+      <div class="recall-meta">
+        ${dateStr ? `Issued ${escapeHtml(dateStr)} · ` : ''}<a href="${escapeHtml(r.fdaUrl)}" target="_blank" rel="noopener">View FDA details &#x2197;</a>
+      </div>
+    </article>`;
+  }).join('');
+
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="recalls-head">
+      <div>
+        <span class="recalls-tag">Possible recall match</span>
+        <span class="recalls-sub">FDA has open recalls for brands in your products. Brand-only matches are imprecise — confirm on the FDA page before acting.</span>
+      </div>
+      <button type="button" class="recalls-dismiss-all" id="recalls-dismiss-all">Dismiss all</button>
+    </div>
+    <div class="recalls-list">${items}</div>
+  `;
+}
+
+// Mark a single recall as dismissed and re-render.
+function dismissRecall(recallNumber) {
+  if (!recallNumber) return;
+  const set = getDismissedRecalls();
+  set.add(recallNumber);
+  saveDismissedRecalls();
+  renderRecallsPanel();
+}
+
+// Bulk-dismiss every currently-visible recall.
+function dismissAllRecalls() {
+  const all = readRecallCache() || [];
+  const set = getDismissedRecalls();
+  for (const r of all) set.add(r.recallNumber);
+  saveDismissedRecalls();
+  renderRecallsPanel();
+}
+
+// Kicked off after first products snapshot lands. Async fire-and-forget;
+// the panel updates whenever the fetch resolves. Falls through silently
+// if FDA is unreachable (no panel rendered).
+async function kickoffRecallCheck() {
+  try {
+    await checkRecalls();
+    renderRecallsPanel();
+  } catch (e) {
+    console.warn('Recall check failed:', e);
+  }
 }
 
 // v0.7.11 charts ---------------------------------------------------------
@@ -5598,6 +5877,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reminders-panel')?.addEventListener('click', e => {
     const item = e.target.closest('.reminder-item');
     if (item) openEditDialog(item.dataset.id);
+  });
+
+  // v0.21.0: recall panel handlers. Dismiss × on a card removes that
+  // specific recall (persists to localStorage). "Dismiss all" button in
+  // the panel header bulk-dismisses everything currently visible.
+  document.getElementById('recalls-panel')?.addEventListener('click', e => {
+    const dismissAll = e.target.closest('#recalls-dismiss-all');
+    if (dismissAll) { dismissAllRecalls(); return; }
+    const dismissBtn = e.target.closest('.recall-dismiss');
+    if (dismissBtn) { dismissRecall(dismissBtn.dataset.recallId); return; }
   });
 
   // v0.15.0: favorites view handlers

@@ -298,6 +298,149 @@ main {
   }
 }
 
+/* v0.21.0 — Recall alerts panel. Sits above the reorder reminders panel
+ * because recalls are higher priority than reorder reminders. Severity
+ * tints the card border + small severity pill: Class I = danger red,
+ * Class II = amber, Class III = info blue. Brand-only matches are noisy;
+ * the panel header is explicit about that. Dismiss × button on each
+ * card + Dismiss all in the header — both persist in localStorage so
+ * dismissals survive reloads. */
+.recalls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #fdf4f4 0%, #fff8f8 100%);
+  border: 1px solid #f0c0c0;
+  border-radius: var(--radius);
+}
+.recalls-panel[hidden] { display: none; }
+.recalls-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.recalls-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.recalls-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 640px;
+}
+.recalls-dismiss-all {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.recalls-dismiss-all:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.recalls-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.recall-item {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 10px 14px 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+.recall-item.recall-severe { border-left-color: var(--danger); }
+.recall-item.recall-moderate { border-left-color: #d98f2b; }
+.recall-item.recall-low { border-left-color: var(--primary); }
+.recall-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.recall-severity {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.recall-item.recall-severe .recall-severity { background: #fbeaea; color: var(--danger); }
+.recall-item.recall-moderate .recall-severity { background: #fff3d6; color: #8a5a00; }
+.recall-item.recall-low .recall-severity { background: #e3edff; color: var(--primary); }
+.recall-dismiss {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.recall-dismiss:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--border);
+}
+.recall-brand {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.recall-product {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.recall-reason {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.recall-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.recall-meta a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.recall-meta a:hover { text-decoration: underline; }
+
 /* v0.15.0 — Favorites view. Card grid (one per favorite) with cross-ref
  * usage stats inline. Distinct visual treatment from the main table cards
  * to signal "this is the catalog, not your tracked rotation." */

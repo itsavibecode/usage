@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.20.1
+**Version:** v0.21.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.20.1)
+## Current status (v0.21.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.21.0 — 2026-05-12
+- **Possible-recall alerts (Minimal v1).** A new banner at the top of the page surfaces any open FDA recalls for brands in your tracked products. Architecture: per-unique-brand query against `api.fda.gov/drug/enforcement.json` (free, no key, 1000 req/day quota), filter to `Ongoing`/`Pending` status + ≤12 months old, dedupe by `recall_number`, sort by severity. Results cached for 24 hours in `usage.recallCheck.v1`; dismissals persist in `usage.recallDismissed.v1`. Severity-tinted cards: Class I (red, severe) / Class II (amber, moderate) / Class III (blue, low). Each card has a `×` dismiss; panel header has a `Dismiss all`. Brand-only matching is imprecise — the panel explicitly says "verify on the FDA page before acting" and links each card to the FDA Reports portal. Polite 200ms delay between per-brand requests. Falls through silently when FDA is unreachable. No email side yet — that's the future v2 server-side cron in usage-worker.
 
 ### v0.20.1 — 2026-05-11
 - **One-tap Start button for inventory products.** Mirror of the v0.14.1 Finish flow: each inventory row (desktop + mobile) now shows a Start button alongside the other row actions. Tapping it opens a small dialog with today's date pre-filled (bounded by `purchaseDate` if set, and capped at today so you can't start in the future). Confirming saves the product with that `startDate`, flipping it from inventory → active. Saves you from opening the full Edit dialog just to set one field. Mobile gets a primary-blue Start button (visually distinct from Finish's success-green) to differentiate "begin tracking" from "complete tracking."
