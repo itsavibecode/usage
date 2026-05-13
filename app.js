@@ -1,4 +1,17 @@
-/* Usage Tracker — v0.21.0
+/* Usage Tracker — v0.22.0
+ * v0.22.0: Demo mode via `?demo=1` URL flag. Bypasses Firebase Auth,
+ *   loads 10 hardcoded sample products covering Underarm / Toothpaste /
+ *   Shampoo / Toothbrush / Floss with a realistic active/inventory/
+ *   finished mix and bundle relationships so the dashboard charts +
+ *   reorder reminders fire on the sample data. Save / Delete /
+ *   saveCustomTypes intercept demo mode to be in-memory no-ops with
+ *   a "Demo mode — changes only last for this session" toast. Recall
+ *   API check skipped in demo (don't burn quota / pollute UI with real
+ *   recalls for fictional products). Body.is-demo-mode + a visible
+ *   banner at the top of main-wrap keep the demo state obvious.
+ *   "Sign out" button relabels to "Exit demo" and strips ?demo=1 from
+ *   the URL on click. Auth-gate page gets a low-key "Or try the demo"
+ *   link below the Google sign-in CTA.
  * v0.21.0: Possible-recall alerts (Minimal v1, client-side). New banner
  *   at the top of the page surfaces any open FDA recalls for brands in
  *   the user's tracked products. Architecture: brand-match query against
@@ -395,7 +408,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.21.0';
+const APP_VERSION = '0.22.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -535,6 +548,108 @@ let columnVisibility = (() => {
   } catch { return defaults; }
 })();
 
+// v0.22.0: demo mode (?demo=1) — bypass Firebase Auth, load sample data
+// into memory, intercept save/delete to be no-ops with toast. Lets people
+// see the app without signing in. Same pattern as the `sick` repo's
+// demo mode. Detected once at load; rest of the app checks `isDemoMode`
+// to branch behavior.
+const isDemoMode = (() => {
+  try { return new URLSearchParams(location.search).get('demo') === '1'; }
+  catch { return false; }
+})();
+
+// Hardcoded sample products for demo mode. Realistic mix:
+//   - 4 actives at varying lifecycle points (one close to reorder
+//     threshold, one mid-life, two early)
+//   - 2 inventory (one is a bundle sibling of an active toothpaste)
+//   - 4 finished pairs that establish a meaningful per-type mean
+//     lifespan (2 Underarms, 2 Toothpastes) so the reorder reminders
+//     panel actually fires on the active ones
+// Dates are computed relative to today so the demo always feels fresh.
+const DEMO_PRODUCTS = (() => {
+  const today = new Date();
+  const daysAgo = (d) => {
+    const t = new Date(today);
+    t.setDate(t.getDate() - d);
+    return t.toISOString().slice(0, 10);
+  };
+  const createdAt = (d) => new Date(today.getTime() - d * 86400000).toISOString();
+  return [
+    // Active — Old Spice ~40d in, type mean is ~92d, so ~43% through (no reminder yet).
+    { id: 'demo-1', productType: 'Underarm', productName: 'Old Spice High Endurance Pure Sport Deodorant',
+      brand: 'Old Spice', size: 3.0, unit: 'oz',
+      startDate: daysAgo(40), endDate: '', cost: 6.99, costWithTax: 7.71,
+      bundleStatus: false, store: 'Amazon', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(45), upc: '012044039540', notes: '',
+      createdAt: createdAt(45) },
+    // Active — Crest toothpaste at ~80d into a ~107d mean (~75%, just under reminder threshold).
+    { id: 'demo-2', productType: 'Toothpaste', productName: 'Crest 3D White Luminous Mint',
+      brand: 'Crest', size: 3.7, unit: 'oz',
+      startDate: daysAgo(95), endDate: '', cost: 14.01, costWithTax: 15.41,
+      bundleStatus: true, bundleSize: 4, bundlePosition: 1, bundleId: 'demo-bundle-toothpaste',
+      store: 'Amazon', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(98), upc: '037000878940', notes: '',
+      createdAt: createdAt(98) },
+    // Active — Head & Shoulders, just started (very early).
+    { id: 'demo-3', productType: 'Shampoo', productName: 'Head & Shoulders Classic Clean',
+      brand: 'Head & Shoulders', size: 12.8, unit: 'fl oz',
+      startDate: daysAgo(10), endDate: '', cost: 8.99, costWithTax: 9.89,
+      bundleStatus: false, store: 'Target', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(12), upc: '', notes: '',
+      createdAt: createdAt(12) },
+    // Active — Floss, mid-life.
+    { id: 'demo-4', productType: 'Floss', productName: 'Reach Mint Waxed Floss',
+      brand: 'Reach', size: 200, unit: 'ft',
+      startDate: daysAgo(20), endDate: '', cost: 3.49, costWithTax: 3.84,
+      bundleStatus: false, store: 'CVS', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(25), upc: '', notes: '',
+      createdAt: createdAt(25) },
+    // Inventory — Toothpaste 2 of 4 (bundle sibling of demo-2).
+    { id: 'demo-5', productType: 'Toothpaste', productName: 'Crest 3D White Luminous Mint',
+      brand: 'Crest', size: 3.7, unit: 'oz',
+      startDate: '', endDate: '', cost: 14.01, costWithTax: 15.41,
+      bundleStatus: true, bundleSize: 4, bundlePosition: 2, bundleId: 'demo-bundle-toothpaste',
+      store: 'Amazon', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(98), upc: '037000878940', notes: '',
+      createdAt: createdAt(98) },
+    // Inventory — Oral-B brush head waiting.
+    { id: 'demo-6', productType: 'Toothbrush', productName: 'Oral-B Pro 1000 Replacement Head',
+      brand: 'Oral-B', size: 1, unit: 'count',
+      startDate: '', endDate: '', cost: 9.99, costWithTax: 10.99,
+      bundleStatus: false, store: 'Costco', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(15), upc: '', notes: '',
+      createdAt: createdAt(15) },
+    // Finished — Underarm #1 (90 days).
+    { id: 'demo-7', productType: 'Underarm', productName: 'Old Spice High Endurance Pure Sport Deodorant',
+      brand: 'Old Spice', size: 3.0, unit: 'oz',
+      startDate: daysAgo(140), endDate: daysAgo(50), cost: 6.99, costWithTax: 7.71,
+      bundleStatus: false, store: 'Amazon', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(145), upc: '012044039540', notes: '',
+      createdAt: createdAt(145) },
+    // Finished — Underarm #2 (93 days). Combined mean = ~92d.
+    { id: 'demo-8', productType: 'Underarm', productName: 'Old Spice Swagger',
+      brand: 'Old Spice', size: 3.0, unit: 'oz',
+      startDate: daysAgo(250), endDate: daysAgo(157), cost: 6.49, costWithTax: 7.16,
+      bundleStatus: false, store: 'Walgreens', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(255), upc: '', notes: 'Liked this scent better',
+      createdAt: createdAt(255) },
+    // Finished — Toothpaste #1 (110 days).
+    { id: 'demo-9', productType: 'Toothpaste', productName: 'Crest Pro-Health',
+      brand: 'Crest', size: 4.6, unit: 'oz',
+      startDate: daysAgo(220), endDate: daysAgo(110), cost: 4.49, costWithTax: 4.94,
+      bundleStatus: false, store: 'Target', buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(225), upc: '', notes: '',
+      createdAt: createdAt(225) },
+    // Finished — Toothpaste #2 (105 days). Combined mean = ~107d.
+    { id: 'demo-10', productType: 'Toothpaste', productName: 'Sensodyne Pronamel',
+      brand: 'Sensodyne', size: 4.0, unit: 'oz',
+      startDate: daysAgo(330), endDate: daysAgo(225), cost: 7.99, costWithTax: 8.79,
+      bundleStatus: false, store: "Sam's Club", buyer: 'You', cardLast4: '1234',
+      purchaseDate: daysAgo(335), upc: '', notes: '',
+      createdAt: createdAt(335) },
+  ];
+})();
+
 // v0.20.0: user-facing changelog. Plain-English entries shown in a
 // "What's new" dialog accessed by clicking the version chip in the header.
 // Separate from the README changelog (which is verbose / technical, for
@@ -548,6 +663,13 @@ let columnVisibility = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.22.0',
+    date: '2026-05-12',
+    tags: ['new'],
+    title: 'Demo mode',
+    body: 'Append "?demo=1" to the URL to try the app without signing in. Ten sample products are pre-loaded covering the main categories, with mixed active / inventory / finished states so all the dashboard charts and reorder reminders have something to chew on. Changes only last for the session — nothing saves to a real account. There\'s also a "Try the demo" link on the sign-in screen.',
+  },
   {
     version: '0.21.0',
     date: '2026-05-12',
@@ -997,16 +1119,35 @@ function typesDoc(uid = currentUser?.uid) {
 }
 
 async function saveProduct(product) {
+  if (isDemoMode) {
+    // Demo: update in-memory products + re-render; no Firestore write.
+    const idx = products.findIndex(p => p.id === product.id);
+    if (idx >= 0) products[idx] = { ...products[idx], ...product };
+    else products.push(product);
+    render();
+    toast('Demo mode — changes only last for this session.');
+    return;
+  }
   try { await setDoc(productDoc(product.id), product); }
   catch (e) { toast('Save failed: ' + e.message); throw e; }
 }
 
 async function deleteProduct(id) {
+  if (isDemoMode) {
+    products = products.filter(p => p.id !== id);
+    render();
+    toast('Demo mode — changes only last for this session.');
+    return;
+  }
   try { await deleteDoc(productDoc(id)); }
   catch (e) { toast('Delete failed: ' + e.message); throw e; }
 }
 
 async function saveCustomTypes(list) {
+  if (isDemoMode) {
+    customTypesCache = list.slice();
+    return;
+  }
   try { await setDoc(typesDoc(), { types: list }); }
   catch (e) { toast('Could not save custom types: ' + e.message); }
 }
@@ -1040,6 +1181,10 @@ async function saveEmailPrefs({ enabled, email }) {
 }
 
 function subscribeData(uid) {
+  // v0.22.0: demo mode runs entirely off in-memory DEMO_PRODUCTS — no
+  // Firestore subscription would do anything useful (the demo user has
+  // no data there). Bail before opening any onSnapshot listeners.
+  if (isDemoMode) return;
   unsubscribeData();
 
   unsubProducts = onSnapshot(productsColl(uid), snap => {
@@ -2763,6 +2908,10 @@ function dismissAllRecalls() {
 // the panel updates whenever the fetch resolves. Falls through silently
 // if FDA is unreachable (no panel rendered).
 async function kickoffRecallCheck() {
+  // v0.22.0: skip FDA in demo mode — sample products are fictional and
+  // we don't want demo sessions burning the user's API quota or polluting
+  // the demo UI with real recall data. The panel just stays hidden.
+  if (isDemoMode) return;
   try {
     await checkRecalls();
     renderRecallsPanel();
@@ -5601,6 +5750,46 @@ function showSignedOut() {
   document.getElementById('user-chip').hidden = true;
 }
 
+// v0.22.0: enter demo mode. Bypasses Firebase Auth entirely, populates
+// `products` with the in-memory DEMO_PRODUCTS, shows the main UI, and
+// flips a body class so CSS can mark the page as a demo. Subscriptions
+// are skipped (subscribeData early-returns when isDemoMode), and the
+// save/delete/customTypes paths are intercepted to be in-memory no-ops.
+// Sign-out becomes "Exit demo" — strips the ?demo=1 flag and reloads.
+function enterDemoMode() {
+  // Fake user object so the rest of the app code (which reads
+  // currentUser.uid for store paths, currentUser.displayName for the
+  // header chip, etc.) has something to work with. The uid is a stable
+  // placeholder; no Firestore reads/writes will hit it anyway.
+  currentUser = {
+    uid: 'demo-user',
+    displayName: 'Demo session',
+    email: '',
+    photoURL: null,
+  };
+  showSignedIn(currentUser);
+  document.body.classList.add('is-demo-mode');
+
+  // Re-label the Sign out button so demo users know it returns to the
+  // sign-in screen rather than ending a real session.
+  const signoutBtn = document.getElementById('btn-signout');
+  if (signoutBtn) {
+    signoutBtn.textContent = 'Exit demo';
+    signoutBtn.title = 'Exit demo mode and return to the sign-in screen';
+  }
+
+  // Show the demo banner inside main-wrap.
+  const banner = document.getElementById('demo-banner');
+  if (banner) banner.hidden = false;
+
+  // Seed the in-memory state. Subscriptions are skipped in demo, so this
+  // is the only data source for the session.
+  products = DEMO_PRODUCTS.slice();
+  customTypesCache = [];
+  firstSnapshotSeen = true;
+  render();
+}
+
 async function doSignIn() {
   const btn = document.getElementById('btn-signin');
   btn.disabled = true;
@@ -5616,6 +5805,16 @@ async function doSignIn() {
 }
 
 async function doSignOut() {
+  // v0.22.0: "Sign out" in demo mode means strip ?demo=1 from the URL
+  // and reload back to the auth gate. There's no Firebase session to
+  // tear down, so calling signOut(auth) would throw with "no current
+  // user." Reloading is the cleanest exit.
+  if (isDemoMode) {
+    const url = new URL(location.href);
+    url.searchParams.delete('demo');
+    location.href = url.toString();
+    return;
+  }
   try { await signOut(auth); }
   catch (e) { toast('Sign-out failed: ' + e.message); }
 }
@@ -6133,6 +6332,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (file) handleImportFile(file);
     e.target.value = '';
   });
+
+  // v0.22.0: short-circuit Firebase Auth in demo mode. Demo bypasses the
+  // sign-in gate entirely and runs off in-memory DEMO_PRODUCTS.
+  if (isDemoMode) {
+    enterDemoMode();
+    return;
+  }
 
   // Auth state listener — drives everything
   onAuthStateChanged(auth, async user => {

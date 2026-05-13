@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.21.0
+**Version:** v0.22.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.21.0)
+## Current status (v0.22.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.22.0 — 2026-05-12
+- **Demo mode via `?demo=1`.** Adding `?demo=1` to the URL bypasses Firebase Auth and loads the app with 10 hardcoded sample products (Underarm / Toothpaste / Shampoo / Toothbrush / Floss) in a realistic mix of active / inventory / finished — including a 4-pack toothpaste bundle and finished pairs that establish a meaningful per-type mean lifespan, so the dashboard charts and reorder reminders panel both fire on the sample data. `saveProduct` / `deleteProduct` / `saveCustomTypes` intercept demo mode to be in-memory no-ops with a `Demo mode — changes only last for this session` toast; nothing reaches Firestore. Recall API check is skipped (don't burn quota or pollute the UI with real recall data on fictional products). Visible banner at the top of `main-wrap` keeps the demo state obvious; "Sign out" relabels to "Exit demo" and strips the `?demo=1` flag on click. Auth-gate page gets a low-key "Or try the demo" link below the Google sign-in CTA. Pattern matches the `sick` repo's demo mode.
 
 ### v0.21.0 — 2026-05-12
 - **Possible-recall alerts (Minimal v1).** A new banner at the top of the page surfaces any open FDA recalls for brands in your tracked products. Architecture: per-unique-brand query against `api.fda.gov/drug/enforcement.json` (free, no key, 1000 req/day quota), filter to `Ongoing`/`Pending` status + ≤12 months old, dedupe by `recall_number`, sort by severity. Results cached for 24 hours in `usage.recallCheck.v1`; dismissals persist in `usage.recallDismissed.v1`. Severity-tinted cards: Class I (red, severe) / Class II (amber, moderate) / Class III (blue, low). Each card has a `×` dismiss; panel header has a `Dismiss all`. Brand-only matching is imprecise — the panel explicitly says "verify on the FDA page before acting" and links each card to the FDA Reports portal. Polite 200ms delay between per-brand requests. Falls through silently when FDA is unreachable. No email side yet — that's the future v2 server-side cron in usage-worker.

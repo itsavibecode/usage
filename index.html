@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.21.0">
+  <meta name="version" content="0.22.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.21.0</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.22.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -124,10 +124,25 @@
         Sign in with Google
       </button>
       <p class="auth-note">By signing in you accept that product data is stored in Firebase Firestore under your account only.</p>
+      <!-- v0.22.0: low-key entry into the demo. Adds ?demo=1 to the
+           current URL so the load logic picks it up after navigation. -->
+      <p class="auth-demo-link">
+        Or <a href="?demo=1">try the demo</a> first — no sign-in needed, sample products only.
+      </p>
     </div>
   </section>
 
   <main id="main-wrap" hidden>
+    <!-- v0.22.0: visible banner whenever the user is in demo mode. Hidden
+         by default; enterDemoMode() flips the hidden attribute. Stays
+         pinned at the top of main-wrap so the user can't lose track of
+         the fact that nothing they do will persist. -->
+    <section class="demo-banner" id="demo-banner" aria-live="polite" hidden>
+      <span class="demo-banner-tag">Demo</span>
+      <span class="demo-banner-text">You're exploring with sample products. Changes only last for this session — nothing saves to a real account.</span>
+      <a class="demo-banner-link" href="?">Exit demo &rsaquo;</a>
+    </section>
+
     <section class="trends-panel" id="trends-panel" aria-live="polite" hidden></section>
 
     <!-- v0.21.0: Possible-recall alerts. Brand-name match against FDA's
