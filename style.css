@@ -2804,6 +2804,16 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   color: #fff;
 }
 
+/* v0.22.1: hide the Dashboard tab on mobile. The dashboard is chart-
+ * heavy (6 Chart.js canvases) and charts don't compress usefully at
+ * narrow widths — they end up cramped and hard to read. Hiding the tab
+ * also means Chart.js (lazy-loaded since v0.17.8) never fetches on
+ * mobile-only sessions, saving ~200KB of script. Desktop still has the
+ * full Dashboard view available. */
+@media (max-width: 720px) {
+  .view-tab[data-view="dashboard"] { display: none; }
+}
+
 .view[hidden] { display: none; }
 
 /* Dashboard */

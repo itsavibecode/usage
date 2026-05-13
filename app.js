@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.22.0
+/* Usage Tracker — v0.22.1
+ * v0.22.1: Hide the Dashboard tab on mobile. Charts don't render
+ *   usefully at narrow widths — six Chart.js canvases compress into
+ *   illegible cramped boxes. Hiding the tab also keeps the lazy-loaded
+ *   Chart.js bundle (~200KB) from ever fetching on mobile-only sessions.
+ *   CSS-only change via `@media (max-width: 720px) { .view-tab
+ *   [data-view="dashboard"] { display: none } }`. Desktop is unchanged.
  * v0.22.0: Demo mode via `?demo=1` URL flag. Bypasses Firebase Auth,
  *   loads 10 hardcoded sample products covering Underarm / Toothpaste /
  *   Shampoo / Toothbrush / Floss with a realistic active/inventory/
@@ -408,7 +414,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.22.0';
+const APP_VERSION = '0.22.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
