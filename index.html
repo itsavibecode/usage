@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.20.0">
+  <meta name="version" content="0.20.1">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -74,7 +74,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.20.0</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.20.1</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -563,6 +563,28 @@
     <footer class="dialog-footer">
       <button type="button" class="btn" id="finish-cancel">Cancel</button>
       <button type="button" class="btn btn-primary" id="finish-confirm">Mark finished</button>
+    </footer>
+  </dialog>
+
+  <!-- v0.20.1: Start dialog — mirror of the Finish dialog, but for the
+       inventory → active transition. Same compact "one date + confirm"
+       pattern. Sets startDate on the product, flipping it from inventory
+       to active. -->
+  <dialog id="start-dialog" class="start-dialog">
+    <header class="dialog-header">
+      <h2>Start product</h2>
+      <button type="button" class="icon-btn" id="start-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="start-body">
+      <p class="start-lead" id="start-lead">When did you start using this?</p>
+      <label class="field">
+        <span>Start date</span>
+        <input type="date" id="start-date" required>
+      </label>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="start-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="start-confirm">Mark started</button>
     </footer>
   </dialog>
 

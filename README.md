@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.20.0
+**Version:** v0.20.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.20.0)
+## Current status (v0.20.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.20.1 — 2026-05-11
+- **One-tap Start button for inventory products.** Mirror of the v0.14.1 Finish flow: each inventory row (desktop + mobile) now shows a Start button alongside the other row actions. Tapping it opens a small dialog with today's date pre-filled (bounded by `purchaseDate` if set, and capped at today so you can't start in the future). Confirming saves the product with that `startDate`, flipping it from inventory → active. Saves you from opening the full Edit dialog just to set one field. Mobile gets a primary-blue Start button (visually distinct from Finish's success-green) to differentiate "begin tracking" from "complete tracking."
 
 ### v0.20.0 — 2026-05-11
 - **New "What's new" modal.** Inspired by the Harvest changelog pattern (per user reference screenshot). Clicking the version chip in the header opens a modal with filter tabs (All / New feature / Improvement / Fix), a vertical primary-blue dotted timeline, and short plain-English entries with status pills (NEW = primary blue, Improvement = success green, Fix = amber). Data lives in a new `CHANGELOG` const in `app.js` — separate from this verbose technical changelog so user-facing copy can stay short and action-oriented. Backfilled with 11 entries covering v0.14.1 → v0.20.0.

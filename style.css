@@ -993,6 +993,39 @@ body.density-compact .bought-by {
   }
 }
 
+/* v0.20.1: Start dialog — mirror of Finish, same compact pattern.
+ * Sets startDate, flipping a product from inventory → active. */
+.start-dialog { max-width: 420px; }
+.start-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.start-lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.start-body .field { gap: 4px; }
+
+/* v0.20.1: Start button on mobile gets primary blue (the brand color
+ * for "begin tracking") to differentiate from Finish's success green
+ * ("complete tracking"). Two different actions, two different colors,
+ * both clearly important for the row. Desktop keeps neutral default. */
+@media (max-width: 720px) {
+  .mc-actions .start-btn-primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    font-weight: 600;
+  }
+  .mc-actions .start-btn-primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+}
+
 /* Notes chip — replaces the raw note text in the desktop table cell when
  * notes are longer than the preview length. Click to expand inline. The
  * .is-expanded variant shows the full text and grows the cell vertically

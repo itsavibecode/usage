@@ -1,4 +1,13 @@
-/* Usage Tracker — v0.20.0
+/* Usage Tracker — v0.20.1
+ * v0.20.1: One-tap Start button for inventory products. Mirror of the
+ *   v0.14.1 Finish flow: each inventory row (desktop + mobile) gets a
+ *   Start button. Clicking it opens a tiny dialog with today's date
+ *   pre-filled; confirming saves the product with that startDate set,
+ *   flipping it from inventory → active. Date input is bounded by
+ *   purchaseDate (can't start using before you bought it) and today
+ *   (can't start in the future). Saves the user from opening the full
+ *   Edit dialog just to set one date. Mobile primary-blue button color
+ *   to differentiate from Finish's success-green ("begin" vs "complete").
  * v0.20.0: User-facing changelog ("What's new" modal). Clicking the
  *   version chip in the header opens a modal with filter tabs (All /
  *   New feature / Improvement / Fix), a vertical timeline of past
@@ -375,7 +384,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.20.0';
+const APP_VERSION = '0.20.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -528,6 +537,13 @@ let columnVisibility = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.20.1',
+    date: '2026-05-11',
+    tags: ['new'],
+    title: 'One-tap Start button',
+    body: 'Inventory products now show a Start button on each row (same place as the Finish button on active rows). Tap it, confirm today\'s date or pick a different one, and the product flips from inventory to active without opening the full Edit dialog.',
+  },
   {
     version: '0.20.0',
     date: '2026-05-11',
@@ -1742,6 +1758,7 @@ function renderMobileCard(p) {
       ${(p.bundleId && expandedBundleRow === p.id) ? renderBundleSiblingsInline(p) : ''}
       <div class="mc-actions">
         <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+        ${isInventory(p) ? `<button type="button" class="start-btn start-btn-primary" data-id="${p.id}" title="Start using this product">Start</button>` : ''}
         ${isActive(p) ? `<button type="button" class="finish-btn finish-btn-primary" data-id="${p.id}" title="Mark as finished">Finish</button>` : ''}
         <button type="button" class="duplicate-btn" data-id="${p.id}">Duplicate</button>
         ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC">History</button>` : ''}
@@ -1829,6 +1846,7 @@ function renderRow(p) {
     })()}</td>
     <td class="actions-cell col-actions">
       <button type="button" class="edit-btn" data-id="${p.id}">Edit</button>
+      ${isInventory(p) ? `<button type="button" class="start-btn" data-id="${p.id}" title="Start using this product — sets start date">Start</button>` : ''}
       ${isActive(p) ? `<button type="button" class="finish-btn" data-id="${p.id}" title="Mark as finished — sets end date">Finish</button>` : ''}
       <button type="button" class="duplicate-btn" data-id="${p.id}" title="Duplicate this product as a new entry">Duplicate</button>
       ${priceHistoryCount(p.upc) >= 2 ? `<button type="button" class="history-btn" data-id="${p.id}" title="Price history for this UPC across all purchases">History</button>` : ''}
@@ -3548,6 +3566,77 @@ async function confirmFinish() {
     toast(`"${p.productName || 'Product'}" marked finished.`);
     logActivity('edit', updated, 'finished via quick-finish');
     closeFinishDialog();
+  } catch {
+    // toast already shown by saveProduct
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ---------- v0.20.1 quick Start (inventory → active) ---------- */
+
+// Mirror of the Finish dialog flow, but for the inventory → active
+// transition. Inventory products have no startDate; clicking Start opens
+// a tiny dialog with today pre-filled, confirm sets startDate and the
+// product flips to active. Saves the user from opening the full Edit
+// dialog just to set one date.
+
+let pendingStartId = null;
+
+function openStartDialog(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+  if (!isInventory(p)) {
+    // Defensive — Start is only rendered on inventory rows, but if
+    // something fires it on a non-inventory product, fall back to Edit.
+    openEditDialog(productId);
+    return;
+  }
+  pendingStartId = productId;
+  const dlg = document.getElementById('start-dialog');
+  const lead = document.getElementById('start-lead');
+  const dateInput = document.getElementById('start-date');
+  if (!dlg || !lead || !dateInput) return;
+  lead.textContent = `When did you start using "${p.productName || 'this product'}"?`;
+  dateInput.value = todayLocalISODate();
+  // Can't start using something before you bought it.
+  dateInput.min = p.purchaseDate || '';
+  // Can't start in the future.
+  dateInput.max = todayLocalISODate();
+  if (!dlg.open) dlg.showModal();
+  // Focus so the user can immediately tap to change or hit Enter to confirm.
+  requestAnimationFrame(() => { try { dateInput.focus(); } catch {} });
+}
+
+function closeStartDialog() {
+  pendingStartId = null;
+  const dlg = document.getElementById('start-dialog');
+  if (dlg && dlg.open) dlg.close();
+}
+
+async function confirmStart() {
+  const id = pendingStartId;
+  if (!id) return;
+  const p = products.find(x => x.id === id);
+  if (!p) { closeStartDialog(); return; }
+  const dateInput = document.getElementById('start-date');
+  const startDate = dateInput?.value || todayLocalISODate();
+  if (p.purchaseDate && startDate < p.purchaseDate) {
+    toast('Start date can\'t be before the purchase date.');
+    return;
+  }
+  if (startDate > todayLocalISODate()) {
+    toast('Start date can\'t be in the future.');
+    return;
+  }
+  const btn = document.getElementById('start-confirm');
+  if (btn) btn.disabled = true;
+  try {
+    const updated = { ...p, startDate };
+    await saveProduct(updated);
+    toast(`"${p.productName || 'Product'}" marked active.`);
+    logActivity('edit', updated, 'started via quick-start');
+    closeStartDialog();
   } catch {
     // toast already shown by saveProduct
   } finally {
@@ -5383,6 +5472,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyBtn = e.target.closest('.history-btn');
     const shareBtn = e.target.closest('.share-btn');
     const finishBtn = e.target.closest('.finish-btn');
+    const startBtn = e.target.closest('.start-btn');
     if (cellChip) {
       addFilter(cellChip.dataset.filterCol, cellChip.dataset.filterVal);
       return;
@@ -5408,6 +5498,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (historyBtn) { openPriceHistory(historyBtn.dataset.id); return; }
     if (shareBtn) { openShareDialog(shareBtn.dataset.id); return; }
     if (finishBtn) { openFinishDialog(finishBtn.dataset.id); return; }
+    if (startBtn) { openStartDialog(startBtn.dataset.id); return; }
     if (editBtn) openEditDialog(editBtn.dataset.id);
     else if (dupBtn) openDuplicateDialog(dupBtn.dataset.id);
     else if (nameLink) openEditDialog(nameLink.dataset.id);
@@ -5540,6 +5631,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('finish-close')?.addEventListener('click', closeFinishDialog);
   document.getElementById('finish-cancel')?.addEventListener('click', closeFinishDialog);
   document.getElementById('finish-confirm')?.addEventListener('click', confirmFinish);
+
+  // v0.20.1: Start dialog (inventory → active quick path)
+  document.getElementById('start-close')?.addEventListener('click', closeStartDialog);
+  document.getElementById('start-cancel')?.addEventListener('click', closeStartDialog);
+  document.getElementById('start-confirm')?.addEventListener('click', confirmStart);
+  document.getElementById('start-date')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); confirmStart(); }
+  });
   document.getElementById('finish-date')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); confirmFinish(); }
   });
