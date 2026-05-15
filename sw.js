@@ -25,16 +25,16 @@
  * a single-user personal tool this is acceptable; the alternative is a
  * toast prompting the user to refresh, which is more polish than needed.)
  *
- * The mirror workflow in itsavibecode/usage copies this file unchanged to
- * yada-yoda/dev/usage/sw.js. The sed rewrite catches itsavibecode.github.io
- * → dev.rizzo.cc references, but we use relative paths here so the
- * scope inference works at both origins (/usage/) without edits.
+ * The mirror workflow copies this file unchanged from the primary
+ * deployment to the secondary one. Relative paths throughout so the
+ * same SW works at both origins — scope is inferred from the SW's own
+ * URL (/usage/sw.js → /usage/ scope), no edits needed.
  */
 
-const SHELL_VERSION = 'usage-shell-v0.23.0';
+const SHELL_VERSION = 'usage-shell-v0.23.1';
 
 // Files cached on SW install. Listed as relative paths so the same SW
-// works at both itsavibecode.github.io/usage/ and dev.rizzo.cc/usage/.
+// works at both deployments (primary + secondary) without edits.
 // Keep this list tight — adding too many files just to "be thorough"
 // bloats the install step and slows the install / update.
 const SHELL_URLS = [

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.23.0
+**Version:** v0.23.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.23.0)
+## Current status (v0.23.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.23.1 — 2026-05-15
+- **Mirror privacy fix.** The v0.23.0 `sw.js` comment header named both the primary and secondary repos in prose, and the existing 3-pass sed scrub in the mirror workflow only caught `github.io` references — bare account names slipped through. Rewrote the comment to use generic language (primary / secondary deployment) AND added pass 4 + 5 to the workflow that rewrite bare account-name strings as defense-in-depth so future contributors can't accidentally re-introduce the leak. `SHELL_VERSION` in `sw.js` bumped so the service worker re-caches the cleaned-up shell on next visit.
 
 ### v0.23.0 — 2026-05-12
 - **PWA installability.** New service worker at `sw.js` enables the `beforeinstallprompt` event on Chrome / Edge / Android Chrome — those browsers require an active SW with a fetch handler before they'll surface the install banner. (Manifest, icons, theme-color, apple-touch-icon were already in place since v0.14.4 but installability was missing without the SW.) On Chrome / Edge / Android: an **"Install app"** button now appears in the user-chip toolbar whenever the browser deems the page installable and it's not already running standalone — clicking calls the saved prompt. On iPhone: Safari users add to home via the share menu as before; Safari never fires `beforeinstallprompt`, so the button stays hidden there.

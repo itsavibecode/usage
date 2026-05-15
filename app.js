@@ -1,4 +1,15 @@
-/* Usage Tracker — v0.23.0
+/* Usage Tracker — v0.23.1
+ * v0.23.1: Plug a privacy leak in the mirror. The v0.23.0 sw.js comment
+ *   block named both the primary and secondary repos in prose ("The
+ *   mirror workflow in itsavibecode/usage copies this file unchanged
+ *   to yada-yoda/dev/usage/sw.js"). The existing 3-pass sed scrub only
+ *   caught github.io references — bare account names slipped through.
+ *   Two-part fix: rewrote the comment to use generic language (primary
+ *   / secondary deployment), AND added pass 4 + 5 to the workflow that
+ *   rewrite bare "itsavibecode" → "primary" and "yada-yoda" → "secondary"
+ *   as defense-in-depth so a future contributor can't accidentally
+ *   re-introduce the leak. SHELL_VERSION bumped to v0.23.1 so the SW
+ *   re-caches the cleaned-up shell on next visit.
  * v0.23.0: PWA installability. New service worker at `sw.js` enables the
  *   `beforeinstallprompt` event on Chrome / Edge / Android Chrome — those
  *   browsers require an active SW with a fetch handler before they'll
@@ -430,7 +441,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.23.0';
+const APP_VERSION = '0.23.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

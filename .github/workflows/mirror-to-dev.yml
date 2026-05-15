@@ -59,9 +59,9 @@ jobs:
 
       - name: Rewrite hardcoded origin refs to dev.rizzo.cc
         run: |
-          # Defense-in-depth: three passes catching progressively looser
-          # forms of the source-hostname so descriptive prose in comments
-          # can't leak the cross-account relationship either.
+          # Defense-in-depth: five passes catching progressively looser
+          # forms of source-side identifiers so descriptive prose in
+          # comments can't leak the cross-account relationship either.
           # Pass 1: full URL with /usage suffix (og:url, twitter:image, etc.)
           find dst/usage -type f \( -name '*.html' -o -name '*.js' \) -print0 |
             xargs -0 sed -i 's|https://itsavibecode\.github\.io/usage|https://dev.rizzo.cc/usage|g'
@@ -73,6 +73,21 @@ jobs:
           # these files — it's always referring to the deployment origin.
           find dst/usage -type f \( -name '*.html' -o -name '*.js' \) -print0 |
             xargs -0 sed -i 's|github\.io|rizzo.cc|g'
+          # Pass 4 (v0.23.1): bare account names in prose. Caught a leak
+          # in sw.js where the comment said "The mirror workflow in
+          # itsavibecode/usage copies this file unchanged to
+          # yada-yoda/dev/usage/sw.js" — both account names by name.
+          # Source comment now uses generic language, but this pass
+          # guarantees future leaks get scrubbed even if a contributor
+          # forgets. Neither account name has any legitimate non-identity
+          # usage in these files.
+          find dst/usage -type f \( -name '*.html' -o -name '*.js' \) -print0 |
+            xargs -0 sed -i 's|itsavibecode|primary|g'
+          # Pass 5 (v0.23.1): scrub the target account name too — also
+          # caught in the sw.js leak. Replaced with "secondary" so prose
+          # like "yada-yoda/dev" → "secondary/dev" still reads.
+          find dst/usage -type f \( -name '*.html' -o -name '*.js' \) -print0 |
+            xargs -0 sed -i 's|yada-yoda|secondary|g'
 
       - name: Commit and push if changed
         working-directory: dst
