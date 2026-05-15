@@ -1,3 +1,4 @@
+// MIRROR_HEALTH_TEST 2026-05-15T21:15 (this line auto-reverted after verifying the secondary deployment picks it up)
 /* Usage Tracker — v0.23.1
  * v0.23.1: Plug a privacy leak in the mirror. The v0.23.0 sw.js comment
  *   block named both the primary and secondary repos in prose ("The
