@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.22.1
+**Version:** v0.23.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.22.1)
+## Current status (v0.23.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.23.0 — 2026-05-12
+- **PWA installability.** New service worker at `sw.js` enables the `beforeinstallprompt` event on Chrome / Edge / Android Chrome — those browsers require an active SW with a fetch handler before they'll surface the install banner. (Manifest, icons, theme-color, apple-touch-icon were already in place since v0.14.4 but installability was missing without the SW.) On Chrome / Edge / Android: an **"Install app"** button now appears in the user-chip toolbar whenever the browser deems the page installable and it's not already running standalone — clicking calls the saved prompt. On iPhone: Safari users add to home via the share menu as before; Safari never fires `beforeinstallprompt`, so the button stays hidden there.
+- **Cache-first app shell.** SW caches `index.html`, `style.css`, `app.js`, `firebase-init.js`, `manifest.webmanifest`, favicons, and OG images. Subsequent loads are instant. `SHELL_VERSION` constant drives cache invalidation — bumped on each release that touches the shell. Cross-origin requests (Firebase modules from gstatic, Chart.js from jsdelivr, FDA recall API, logo.dev, Identity Toolkit, the UPC Apps Script proxy) pass through untouched so live data stays live.
+- **Offline-friendly demo mode.** Bonus side-effect: `?demo=1` now works fully offline once the shell is cached, since demo doesn't need network for any of its features.
+- **Idle-deferred SW registration.** Service worker registration uses `requestIdleCallback` (with `setTimeout(…, 1500)` fallback) so the SW install doesn't compete with first-paint resource fetches.
 
 ### v0.22.1 — 2026-05-12
 - **Hide the Dashboard tab on mobile.** Charts don't render usefully at narrow widths — six Chart.js canvases compress into illegible cramped boxes. Hiding the tab also keeps the lazy-loaded Chart.js bundle (~200KB) from ever fetching on mobile-only sessions. CSS-only change. Desktop is unchanged — all four tabs still show there.

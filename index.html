@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.22.1">
+  <meta name="version" content="0.23.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.22.1</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.23.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -100,6 +100,13 @@
       <div class="user-chip" id="user-chip" hidden>
         <img id="user-avatar" alt="" referrerpolicy="no-referrer">
         <span id="user-name"></span>
+        <!-- v0.23.0: PWA install button. Hidden by default; shown only
+             when the browser fires `beforeinstallprompt` AND the app
+             isn't already running standalone. Clicking calls the saved
+             prompt. iOS Safari users add-to-home via the share menu;
+             this button never appears for them (Safari doesn't fire
+             beforeinstallprompt). -->
+        <button type="button" id="btn-install-app" class="btn btn-ghost" title="Install Usage Tracker on this device" hidden>Install app</button>
         <!-- v0.16.0: Settings dialog houses email-reminder opt-in for the
              usage-worker daily digest. Kept in the user chip so it sits
              alongside Sign out (account-level prefs cluster). -->

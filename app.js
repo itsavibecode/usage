@@ -1,4 +1,20 @@
-/* Usage Tracker — v0.22.1
+/* Usage Tracker — v0.23.0
+ * v0.23.0: PWA installability. New service worker at `sw.js` enables the
+ *   `beforeinstallprompt` event on Chrome / Edge / Android Chrome — those
+ *   browsers require an active SW with a fetch handler before they'll
+ *   surface the install banner. The SW takes a cache-first strategy for
+ *   the same-origin shell (HTML / CSS / JS / icons / manifest), with
+ *   passthrough for cross-origin requests (Firebase, Chart.js, FDA,
+ *   logo.dev, Apps Script proxy) so live data stays live. SHELL_VERSION
+ *   constant in sw.js drives cache invalidation — bumped on each release
+ *   that touches the shell. Bonus: ?demo=1 now works fully offline once
+ *   the shell is cached, since demo doesn't need network. New "Install
+ *   app" button in the user-chip toolbar listens for the deferred prompt
+ *   event and surfaces only when the browser deems the app installable
+ *   AND it's not already running standalone. iOS Safari users still
+ *   add-to-home via the share menu (Safari doesn't fire beforeinstallprompt).
+ *   SW registration is deferred via requestIdleCallback so it doesn't
+ *   compete with first-paint resource fetches.
  * v0.22.1: Hide the Dashboard tab on mobile. Charts don't render
  *   usefully at narrow widths — six Chart.js canvases compress into
  *   illegible cramped boxes. Hiding the tab also keeps the lazy-loaded
@@ -414,7 +430,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.22.1';
+const APP_VERSION = '0.23.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -669,6 +685,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.23.0',
+    date: '2026-05-12',
+    tags: ['new'],
+    title: 'Install as an app',
+    body: 'Usage Tracker is now installable as a Progressive Web App. On Chrome / Edge / Android, look for an "Install app" button in the toolbar (next to Settings) or your browser\'s install prompt. On iPhone, use Safari\'s share menu → "Add to Home Screen." Once installed, it opens in its own window without browser chrome — and the app shell is cached so it loads instantly even on a slow connection.',
+  },
   {
     version: '0.22.0',
     date: '2026-05-12',
@@ -5825,6 +5848,63 @@ async function doSignOut() {
   catch (e) { toast('Sign-out failed: ' + e.message); }
 }
 
+/* ---------- v0.23.0 PWA install + service-worker registration ---------- */
+
+// Captured `beforeinstallprompt` event for deferred prompting. The
+// browser fires it when the page meets installability criteria
+// (manifest + active SW + first-time visit); we save it so the user
+// can trigger install on their schedule via the in-app button instead
+// of the browser's omnibox icon. Cleared after the prompt is shown
+// (single-use per session per browser spec).
+let _deferredInstallPrompt = null;
+
+function applyInstallButtonVisibility() {
+  const btn = document.getElementById('btn-install-app');
+  if (!btn) return;
+  // Hide once the app is running in standalone mode (already installed
+  // OR launched from the home screen). display-mode media query catches
+  // Chrome / Android / Edge; navigator.standalone catches iOS Safari.
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  const show = !!_deferredInstallPrompt && !standalone;
+  btn.hidden = !show;
+}
+
+async function handleInstallClick() {
+  const prompt = _deferredInstallPrompt;
+  if (!prompt) return;
+  // Browser spec: each beforeinstallprompt event is single-use. Clear
+  // BEFORE awaiting so a double-click can't fire it twice.
+  _deferredInstallPrompt = null;
+  applyInstallButtonVisibility();
+  try {
+    prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice && choice.outcome === 'accepted') {
+      toast('App installed. Open it from your home screen anytime.');
+    }
+  } catch (e) {
+    console.warn('Install prompt failed:', e);
+  }
+}
+
+// Register the service worker. Demo mode still benefits — offline
+// shell caching lets ?demo=1 work fully offline. The SW lives at the
+// app root so its scope is `/usage/` automatically.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  // Defer registration past the first paint so the SW install (which
+  // pre-caches the shell) doesn't compete with the page's own resource
+  // fetches. requestIdleCallback when available, setTimeout fallback.
+  const schedule = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+  schedule(() => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => {
+      // Non-fatal — the app works fine without an SW, just not installable.
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+
 /* ---------- init ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -5833,6 +5913,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.20.0: apply the unread-dot to the version chip on load so users
   // see at a glance that there's a new changelog entry waiting.
   applyChangelogUnreadDot();
+
+  // v0.23.0: PWA wiring. Register SW (idle-deferred so it doesn't
+  // compete with first-paint fetches). Listen for the install prompt
+  // event and show our own button when it fires. Also listen for the
+  // app-installed event to hide the button after the install completes.
+  registerServiceWorker();
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    applyInstallButtonVisibility();
+  });
+  window.addEventListener('appinstalled', () => {
+    _deferredInstallPrompt = null;
+    applyInstallButtonVisibility();
+    toast('Usage Tracker installed.');
+  });
+  document.getElementById('btn-install-app')?.addEventListener('click', handleInstallClick);
+  applyInstallButtonVisibility();
 
   document.getElementById('btn-signin').addEventListener('click', doSignIn);
   document.getElementById('btn-signout').addEventListener('click', doSignOut);
