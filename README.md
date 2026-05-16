@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.24.0
+**Version:** v0.24.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.24.0)
+## Current status (v0.24.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.24.1 — 2026-05-15
+- **Mobile card layout fix.** The brand logo / product thumbnail was sitting in the `mc-head` flex row at 32px, stacked above the wrapping product name like its own banner. Moved it into a new `.mc-title-row` that flows inline with the title at 22px (matches the 17px / 1.3 line-height of `mc-name`). `mc-head` now just contains the product-type chip and status pill. Reads as part of the title now.
+- **Backfill report split by reason.** "Updated N, skipped M" with no explanation was confusing. Now categorizes M into: **"not found in UPC database"** (actionable — open the row and type the Brand manually for a logo), **"matched but no new data"** (rare; database has the UPC but no brand/image string), and **"errors"** (network/auth/proxy failures). Skipped products are also console.groupCollapsed'd with names + UPCs so future debug sessions can spot patterns (mistyped UPCs, store-brand items, etc.). Explains the v0.24.0 case of "I clicked backfill but 15 are still skipped" — those are UPCs that genuinely aren't in UPCitemdb + OpenFoodFacts (typically store brands like Target Up&Up, Walmart Equate, or older SKUs).
 
 ### v0.24.0 — 2026-05-15
 - **Backfill bypasses the cached-miss trap.** Previously, the "Backfill brand & images" button in Settings called `lookupUpc(p.upc, { forceFresh: false })` which honored the L1/L2 cache — and that included cached *misses*. So any product whose UPC was looked up once when UPCitemdb was rate-limited or returned an error got cached as `source: 'miss'` and silently skipped on every subsequent backfill. Flipped to `forceFresh: true` so each backfill retries every candidate product from scratch.

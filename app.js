@@ -1,4 +1,21 @@
-/* Usage Tracker — v0.24.0
+/* Usage Tracker — v0.24.1
+ * v0.24.1: Two follow-ups to v0.24.0:
+ *   1. Mobile card layout: thumb moved out of mc-head (where it sat at
+ *      32px stacked above the wrapping title as its own visual block)
+ *      and into a new .mc-title-row that puts it inline with the title
+ *      at 22px (matches the title's line-height). Reads as part of the
+ *      title, not a separate banner. mc-head now just contains the
+ *      product-type chip and status pill.
+ *   2. Backfill report split by reason. Was "Updated N, skipped M" with
+ *      no explanation. Now categorizes M into: "not found in UPC database"
+ *      (the actionable signal — manual Brand entry is the fix), "matched
+ *      but no new data" (rare; database has the UPC but no brand/image
+ *      string for it), and "errors" (network/auth/proxy failures). Skipped
+ *      products are also console.groupCollapsed'd with names + UPCs so a
+ *      future debug session can spot patterns (typed UPCs, store brands).
+ *      Helps clarify the v0.24.0 "I clicked backfill but 15 are still
+ *      skipped" case — those are UPCs that genuinely aren't in
+ *      UPCitemdb + OpenFoodFacts.
  * v0.24.0: Backfill + logo improvements for products missing brand/image
  *   data. Two fixes for "I clicked Backfill and these products STILL don't
  *   have logos":
@@ -466,7 +483,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.24.0';
+const APP_VERSION = '0.24.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -2016,19 +2033,24 @@ function renderMobileCard(p) {
   const expanded = expandedCards.has(p.id);
   const hasExtras = !!(metaRows || p.notes);
 
+  // v0.24.1: thumb moved out of mc-head and into the title row so it sits
+  // inline with the product name at a size matching the line height,
+  // instead of stacking above the wrapping name as its own block.
+  const thumbHtml = (() => {
+    if (p.brand) return `<img class="mc-thumb mc-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" onerror="this.remove()">`;
+    if (p.imageUrl) return `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
+    return '';
+  })();
   return `
     <div class="mc${expanded ? ' mc-expanded' : ''}">
       <div class="mc-head">
-        ${(() => {
-          // v0.15.2: brand logo preferred; fallback to UPC product image.
-          if (p.brand) return `<img class="mc-thumb mc-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" onerror="this.remove()">`;
-          if (p.imageUrl) return `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
-          return '';
-        })()}
         ${p.productType ? `<button type="button" class="cell-chip mc-type-chip" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Tap to filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '<span class="mc-type">—</span>'}
         <span class="mc-status">${endLabel}</span>
       </div>
-      <button type="button" class="mc-name name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button>
+      <div class="mc-title-row">
+        ${thumbHtml}
+        <button type="button" class="mc-name name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button>
+      </div>
       <dl class="mc-grid">
         <div class="mc-row"><dt>Started</dt><dd>${startLabel}${durationStr}</dd></div>
         <div class="mc-row"><dt>Cost</dt><dd>${costPrimary}${perDayStr}</dd></div>
@@ -4361,7 +4383,18 @@ async function handleBackfillBrandImages() {
   }
 
   btn.disabled = true;
-  let updated = 0, skipped = 0;
+  // v0.24.1: track skip reasons separately so the report tells the user
+  // what's actually happening. Three categories:
+  //   - skippedNoMatch: UPCitemdb + OpenFoodFacts both have no record for
+  //     this UPC. Most common cause for store-brand items (Target Up&Up,
+  //     Walmart Equate) and older SKUs. Manual Brand entry is the path.
+  //   - skippedNoNewData: UPC matched but the database entry has no
+  //     brand string AND no HTTPS image — nothing to add to this product.
+  //   - skippedError: network/auth/proxy error. Logged for debugging.
+  let updated = 0;
+  const skippedNoMatch = [];
+  const skippedNoNewData = [];
+  const skippedError = [];
 
   for (let i = 0; i < candidates.length; i++) {
     const p = candidates[i];
@@ -4371,11 +4404,13 @@ async function handleBackfillBrandImages() {
     try {
       // v0.24.0: bypass the L1/L2 cache (forceFresh: true) so prior
       // cached misses don't permanently exclude a product from backfill.
-      // Older products often have a cached miss from a UPC lookup that
-      // failed (UPCitemdb rate-limited, network blip) — without forceFresh
-      // the backfill button silently skipped them every run.
+      // v0.24.1: lookup goes UPCitemdb → OpenFoodFacts fallback → null.
+      // Null means BOTH databases miss; we log to skippedNoMatch.
       const item = await lookupUpc(p.upc, { forceFresh: true });
-      if (!item) { skipped++; continue; }
+      if (!item) {
+        skippedNoMatch.push({ id: p.id, name: p.productName, upc: p.upc });
+        continue;
+      }
 
       const updates = {};
       if (!p.brand && item.brand) {
@@ -4388,8 +4423,8 @@ async function handleBackfillBrandImages() {
       }
 
       if (Object.keys(updates).length === 0) {
-        // UPC matched but the entry doesn't have brand/image data either
-        skipped++;
+        // UPC matched but the entry didn't carry useful data.
+        skippedNoNewData.push({ id: p.id, name: p.productName, upc: p.upc });
         continue;
       }
 
@@ -4397,7 +4432,7 @@ async function handleBackfillBrandImages() {
       updated++;
     } catch (e) {
       console.warn('Backfill failed for', p.upc, e);
-      skipped++;
+      skippedError.push({ id: p.id, name: p.productName, upc: p.upc, err: e?.message || String(e) });
     }
 
     // Be polite to the UPC database between requests.
@@ -4407,9 +4442,43 @@ async function handleBackfillBrandImages() {
   }
 
   btn.disabled = false;
-  status.textContent = `Done. Updated ${updated}, skipped ${skipped}.`;
+  const totalSkipped = skippedNoMatch.length + skippedNoNewData.length + skippedError.length;
+
+  // v0.24.1: split the report by reason so the user knows what to do
+  // next. "No match in UPC database" is the most actionable signal —
+  // manual Brand entry is the path forward for those.
+  const reportLines = [];
+  reportLines.push(`Updated ${updated}.`);
+  if (skippedNoMatch.length) {
+    reportLines.push(`${skippedNoMatch.length} not found in UPC database — open each row and type the Brand manually to get a logo.`);
+  }
+  if (skippedNoNewData.length) {
+    reportLines.push(`${skippedNoNewData.length} matched but the database entry had no brand/image data.`);
+  }
+  if (skippedError.length) {
+    reportLines.push(`${skippedError.length} failed due to errors (see browser console).`);
+  }
+  status.textContent = reportLines.join(' ');
   status.className = 'settings-status is-success';
-  toast(`Backfill complete: ${updated} updated, ${skipped} skipped.`);
+  toast(`Backfill: ${updated} updated, ${totalSkipped} skipped.`);
+
+  // v0.24.1: log skipped products to console so the user (or future me)
+  // can inspect WHICH products didn't fill in. Helps spot patterns
+  // (mistyped UPCs, store-brand items, etc.) and decide whether to
+  // manually fix them in the Edit dialog.
+  if (totalSkipped) {
+    console.groupCollapsed(`Backfill skipped ${totalSkipped} products (click to expand)`);
+    if (skippedNoMatch.length) {
+      console.info(`No UPC database match (${skippedNoMatch.length}):`, skippedNoMatch);
+    }
+    if (skippedNoNewData.length) {
+      console.info(`Matched but no new data (${skippedNoNewData.length}):`, skippedNoNewData);
+    }
+    if (skippedError.length) {
+      console.warn(`Errors (${skippedError.length}):`, skippedError);
+    }
+    console.groupEnd();
+  }
 }
 
 /* ---------- v0.20.0 What's new (user-facing changelog) ---------- */
