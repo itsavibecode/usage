@@ -2746,6 +2746,37 @@ body.is-demo-mode .site-footer { display: none; }
  * Visually subtler than the top-level view tabs since they're a secondary
  * filter, not a navigation. Uses a pill background instead of a solid primary
  * fill for the active state. */
+/* v0.25.1: unified table toolbar. Filter tabs (left), search bar
+ * (middle, flex-grows to fill available space), display controls
+ * (right) — all on a single horizontal row. Wraps cleanly on narrow
+ * widths so phones still get a sensible stacked layout. */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.table-toolbar .row-filter-tabs,
+.table-toolbar .row-search-wrap,
+.table-toolbar .display-controls {
+  margin-bottom: 0; /* parent toolbar owns the bottom gap */
+}
+.table-toolbar .row-search-wrap {
+  flex: 1 1 220px; /* grow to fill, minimum 220px before wrapping */
+}
+.table-toolbar .row-filter-tabs,
+.table-toolbar .display-controls {
+  flex-shrink: 0;
+}
+/* Reset button inside filter tabs doesn't need to push to the far
+ * right anymore (the toolbar layout puts the display controls there
+ * instead). Override the v0.14.0 margin-left: auto so Reset sits
+ * naturally after Finished. */
+.table-toolbar .row-filter-tabs #btn-reset-filters {
+  margin-left: 4px;
+}
+
 .row-filter-tabs {
   display: flex;
   align-items: center;

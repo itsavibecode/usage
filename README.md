@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.25.0
+**Version:** v0.25.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.25.0)
+## Current status (v0.25.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.25.1 — 2026-05-15
+- **Unified table toolbar.** Filter tabs (All / Active / Inventory / Finished / Reset), the search bar, and the display controls (Currency / Pre-tax / Density / Columns) now share a single horizontal row instead of stacking on three. Filter tabs sit on the left, search grows to fill the middle, display controls anchor the right. Wraps cleanly on narrow widths so mobile still gets a sensible stacked layout. Frees ~80px of vertical space at the top of the table view — the products list now starts much closer to the stats bar.
 
 ### v0.25.0 — 2026-05-15
 - **Clickable stat tiles.** Each tile in the stats bar now drills down. Count-based tiles (Tracked / Active / Inventory / Finished) switch the Table view + apply the matching row filter. Amount-based tiles (Total spend / YTD / Last 30 days) open a new stat-detail modal listing every contributing product + its individual contribution to the total, sorted descending. Click any row in the breakdown to open that product's Edit dialog. YTD daily cost stays non-clickable — it's a category-rate sum, not a per-product breakdown, so a drill-down list wouldn't read cleanly.

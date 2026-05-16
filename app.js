@@ -1,4 +1,11 @@
-/* Usage Tracker — v0.25.0
+/* Usage Tracker — v0.25.1
+ * v0.25.1: Unified table toolbar. Filter tabs (All / Active / Inventory /
+ *   Finished / Reset) + search bar + display controls (Currency / Pre-tax /
+ *   Density / Columns) now share a single horizontal row instead of
+ *   stacking on three. Filter tabs sit on the left, search grows to
+ *   fill the middle, display controls anchor the right. Wraps cleanly
+ *   on narrow widths so mobile still gets a sensible stacked layout.
+ *   Frees ~80px of vertical space at the top of the table view.
  * v0.25.0: Layout overhaul + drill-down + demo polish. Five things
  *   shipped together:
  *   1. Clickable stat tiles. Count-based tiles (Tracked / Active /
@@ -512,7 +519,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.25.0';
+const APP_VERSION = '0.25.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
