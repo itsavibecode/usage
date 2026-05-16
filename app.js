@@ -1,4 +1,10 @@
-/* Usage Tracker — v0.23.1
+/* Usage Tracker — v0.23.2
+ * v0.23.2: Pin the demo link to a site footer. Small footer at the
+ *   bottom of main-wrap with a "Try the demo →" link so signed-in users
+ *   have an easy share-with-a-friend path without hunting through
+ *   Settings. Hidden in demo mode (body.is-demo-mode .site-footer) since
+ *   the demo banner already pins an Exit link. Auth-gate's existing
+ *   "Or try the demo first" link is unchanged.
  * v0.23.1: Plug a privacy leak in the mirror. The v0.23.0 sw.js comment
  *   block named both the primary and secondary repos in prose ("The
  *   mirror workflow in itsavibecode/usage copies this file unchanged
@@ -441,7 +447,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.23.1';
+const APP_VERSION = '0.23.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

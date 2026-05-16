@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.23.1
+**Version:** v0.23.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.23.1)
+## Current status (v0.23.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.23.2 — 2026-05-15
+- **Site footer with the demo link.** Pinned a small `<footer>` at the bottom of `main-wrap` with a *"Try the demo →"* link so signed-in users have a quick "share this with a friend" path without hunting through Settings. Hidden in demo mode itself via `body.is-demo-mode .site-footer { display: none }` since the demo banner already pins an Exit link there. Auth-gate's existing "Or try the demo first" link is unchanged — that one's targeted at signed-out visitors.
 
 ### v0.23.1 — 2026-05-15
 - **Mirror privacy fix.** The v0.23.0 `sw.js` comment header named both the primary and secondary repos in prose, and the existing 3-pass sed scrub in the mirror workflow only caught `github.io` references — bare account names slipped through. Rewrote the comment to use generic language (primary / secondary deployment) AND added pass 4 + 5 to the workflow that rewrite bare account-name strings as defense-in-depth so future contributors can't accidentally re-introduce the leak. `SHELL_VERSION` in `sw.js` bumped so the service worker re-caches the cleaned-up shell on next visit.
