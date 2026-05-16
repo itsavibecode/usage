@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.23.2
+**Version:** v0.24.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.23.2)
+## Current status (v0.24.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,13 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.24.0 — 2026-05-15
+- **Backfill bypasses the cached-miss trap.** Previously, the "Backfill brand & images" button in Settings called `lookupUpc(p.upc, { forceFresh: false })` which honored the L1/L2 cache — and that included cached *misses*. So any product whose UPC was looked up once when UPCitemdb was rate-limited or returned an error got cached as `source: 'miss'` and silently skipped on every subsequent backfill. Flipped to `forceFresh: true` so each backfill retries every candidate product from scratch.
+- **Smarter brand → logo.dev domain mapping.** The v0.15.2 MVP heuristic — lowercase + strip non-alphanumerics + append `.com` — silently failed for a bunch of common brands. Examples: "Head & Shoulders" → `headshoulders.com` (real is `headandshoulders.com`); "Sam's Club" → `sam'sclub.com` (real is `samsclub.com`); "Oral-B" → `oral-b.com` (real is `oralb.com`). Two-part fix:
+  - **Algorithm rewrite:** insert "and" for `" & "` *before* stripping, then strip apostrophes (curly + straight), strip periods, preserve hyphens, strip anything else. Order matters — ampersand needs to become "and" before the strip pass catches it.
+  - **`BRAND_ALIASES` table** for ~15 personal-care brands whose actual domain doesn't follow the obvious pattern: Head & Shoulders, P&G, St. Ives, Mr. Clean, Dr. Pepper, Dr. Bronner's, Oral-B variants, Q-Tips, L'Oréal variants, Estée Lauder, Always, Tampax.
+- **How to apply:** open **Settings → "Backfill brand & images"** to retry your older products. Logos that were missing should now resolve for the alias'd brands.
 
 ### v0.23.2 — 2026-05-15
 - **Site footer with the demo link.** Pinned a small `<footer>` at the bottom of `main-wrap` with a *"Try the demo →"* link so signed-in users have a quick "share this with a friend" path without hunting through Settings. Hidden in demo mode itself via `body.is-demo-mode .site-footer { display: none }` since the demo banner already pins an Exit link there. Auth-gate's existing "Or try the demo first" link is unchanged — that one's targeted at signed-out visitors.

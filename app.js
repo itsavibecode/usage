@@ -1,4 +1,23 @@
-/* Usage Tracker — v0.23.2
+/* Usage Tracker — v0.24.0
+ * v0.24.0: Backfill + logo improvements for products missing brand/image
+ *   data. Two fixes for "I clicked Backfill and these products STILL don't
+ *   have logos":
+ *   1. Backfill now uses `forceFresh: true` on each lookup so cached
+ *      misses (UPC was looked up once, came back empty, got cached as
+ *      `source: 'miss'`) get retried instead of permanently skipped. The
+ *      v0.18.2 backfill honored those cached misses, which meant any
+ *      product that lost its first lookup to a rate-limit or network blip
+ *      stayed permanently un-backfilled regardless of how many times the
+ *      user clicked.
+ *   2. brandToDomain got a real punctuation + alias pass. The MVP
+ *      heuristic ("Head & Shoulders" → strip ampersand → "headshoulders.com")
+ *      didn't match real domains. Now: " & " → "and" before stripping,
+ *      apostrophes + periods stripped, hyphens preserved, plus a
+ *      BRAND_ALIASES table for the 15 personal-care brands where the
+ *      synthesized domain genuinely doesn't match the real site (P&G,
+ *      St. Ives, L'Oréal, Oral-B variants, etc.). Logo coverage should
+ *      now hit a lot more of the "brand was captured but no logo
+ *      appeared" cases.
  * v0.23.2: Pin the demo link to a site footer. Small footer at the
  *   bottom of main-wrap with a "Try the demo →" link so signed-in users
  *   have an easy share-with-a-friend path without hunting through
@@ -447,7 +466,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.23.2';
+const APP_VERSION = '0.24.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -703,6 +722,13 @@ const DEMO_PRODUCTS = (() => {
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
   {
+    version: '0.24.0',
+    date: '2026-05-15',
+    tags: ['fix', 'improvement'],
+    title: 'Better brand logos + backfill',
+    body: 'Two fixes for older products missing logos and thumbnails. The Backfill button in Settings now retries products that had a previously-failed UPC lookup (was silently skipping them before). Brand-logo lookup also got smarter — "Head & Shoulders," "Oral-B," "St. Ives," and similar brands that don\'t follow the obvious `brandname.com` pattern now resolve correctly, plus the algorithm handles ampersands and punctuation properly. Click Settings → "Backfill brand & images" to retry your older products.',
+  },
+  {
     version: '0.23.0',
     date: '2026-05-12',
     tags: ['new'],
@@ -894,16 +920,56 @@ const CHART_PALETTE = [
 
 // v0.15.2: company logo via logo.dev. Same publishable token used in the
 // stocks repo (`pk_` prefix = client-safe by logo.dev's convention).
-// Brand-name → domain heuristic: lowercase, strip spaces, append .com. Works
-// for most well-known consumer brands ("Crest" → crest.com, "Old Spice" →
-// oldspice.com, "Pantene" → pantene.com). Misses are silent (the rendered
-// <img> uses onerror to hide). For more reliability we'd need a brand→domain
-// mapping table, but the simple guess is acceptable for an MVP.
+// v0.24.0: smarter brand → domain mapping. The MVP heuristic (lowercase +
+// strip non-alphanumerics + append .com) silently failed for brands with
+// ampersands, periods, or whose real website doesn't follow the obvious
+// "brandname.com" pattern. Two improvements:
+//   1. BRAND_ALIASES table for brands whose actual domain doesn't match
+//      the synthesized one. Curated to personal-care since that's what
+//      this app tracks.
+//   2. Algorithm: " & " → "and" BEFORE stripping (so Head & Shoulders
+//      becomes "headandshoulders.com", not "headshoulders.com"); strip
+//      apostrophes (smart + straight) and periods within names; preserve
+//      hyphens (Coca-Cola, Oral-B); strip anything else.
 const LOGO_DEV_TOKEN = 'pk_X-1ZO13GSgeOoUrIuJ6GMQ';
+const BRAND_ALIASES = {
+  // Brands whose synthesized domain misses the real site. Keyed by
+  // lowercased brand name (whitespace preserved, special chars kept so
+  // the lookup matches what the user typed exactly).
+  'head & shoulders': 'headandshoulders.com',
+  'procter & gamble': 'pg.com',
+  'p&g': 'pg.com',
+  'st. ives': 'stives.com',
+  'mr. clean': 'mrclean.com',
+  'dr. pepper': 'drpepper.com',
+  'dr. bronner\'s': 'drbronner.com',
+  'oral-b': 'oralb.com',
+  'oral b': 'oralb.com',
+  'q-tips': 'qtips.com',
+  'l\'oreal': 'loreal.com',
+  'l\'oréal': 'loreal.com',
+  'estée lauder': 'esteelauder.com',
+  'estee lauder': 'esteelauder.com',
+  // P&G family — some have their own domains, others redirect to pg.com.
+  'always': 'always.com',
+  'tampax': 'tampax.com',
+};
 function brandToDomain(brand) {
-  const s = String(brand || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9.-]/g, '');
+  const raw = String(brand || '').trim().toLowerCase();
+  if (!raw) return '';
+  // 1. Alias hit short-circuits everything else.
+  if (BRAND_ALIASES[raw]) return BRAND_ALIASES[raw];
+  // 2. Algorithm: insert "and" for ampersands, strip punctuation, keep
+  //    hyphens. Order matters — ampersand needs to become "and" BEFORE
+  //    we strip non-alphanumerics, otherwise it gets silently dropped.
+  const s = raw
+    .replace(/\s*&\s*/g, 'and')            // "Head & Shoulders" → "headandshoulders"
+    .replace(/[’']/g, '')             // strip apostrophes (curly + straight)
+    .replace(/\./g, '')                     // strip periods (St. Ives → stives)
+    .replace(/\s+/g, '')                    // strip whitespace
+    .replace(/[^a-z0-9-]/g, '');            // strip anything else; keep hyphen for Oral-B/Coca-Cola
   if (!s) return '';
-  return s.includes('.') ? s : s + '.com';
+  return s + '.com';
 }
 function brandLogoUrl(brand, size = 64) {
   const domain = brandToDomain(brand);
@@ -4303,7 +4369,12 @@ async function handleBackfillBrandImages() {
     status.className = 'settings-status';
 
     try {
-      const item = await lookupUpc(p.upc, { forceFresh: false });
+      // v0.24.0: bypass the L1/L2 cache (forceFresh: true) so prior
+      // cached misses don't permanently exclude a product from backfill.
+      // Older products often have a cached miss from a UPC lookup that
+      // failed (UPCitemdb rate-limited, network blip) — without forceFresh
+      // the backfill button silently skipped them every run.
+      const item = await lookupUpc(p.upc, { forceFresh: true });
       if (!item) { skipped++; continue; }
 
       const updates = {};
