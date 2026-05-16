@@ -1,4 +1,33 @@
-/* Usage Tracker — v0.24.1
+/* Usage Tracker — v0.25.0
+ * v0.25.0: Layout overhaul + drill-down + demo polish. Five things
+ *   shipped together:
+ *   1. Clickable stat tiles. Count-based tiles (Tracked / Active /
+ *      Inventory / Finished) switch the Table view + apply that filter.
+ *      Amount-based tiles (Total spend / YTD / Last 30 days) open a new
+ *      stat-detail modal listing each product's contribution to the
+ *      total, sorted descending. Clicking a row in the modal opens that
+ *      product's Edit dialog. YTD daily cost stays non-clickable (it's a
+ *      category-rate sum, not a per-product breakdown).
+ *   2. Display controls moved. Currency / Pre-tax / Density / Columns
+ *      now live inside view-table directly above the search bar, instead
+ *      of at the top of the page. Frees the page top for the stats bar
+ *      (the more important UI). Density + Columns stay hidden on mobile
+ *      per v0.17.5.
+ *   3. Demo banner reworked. Was a soft primary-tinted in-page panel;
+ *      now fixed at top of the viewport in solid primary blue with white
+ *      text, like a real "you're in a mode" indicator. body.is-demo-mode
+ *      adds top padding (44px desktop / 64px mobile) so the fixed banner
+ *      doesn't overlay the site header.
+ *   4. Demo data fully fictional. DEMO_PRODUCTS no longer references
+ *      real consumer brands — replaced with made-up names: FreshGuard
+ *      / BrightSmile / ScalpClear / MintGlide / DentalGuard / GumShield.
+ *      Reserved UPC range (000000-prefix) for the demo entries so they
+ *      can't collide with real products. "Demo user" / card 0000 for
+ *      buyer/card fields. Reads as clearly synthetic.
+ *   5. Thumb size HTML attrs. Added width/height to the desktop and
+ *      mobile thumb img tags so the browser sizes them correctly even
+ *      if the SW is serving a stale CSS. Belt-and-suspenders against
+ *      the "thumb renders at natural 64px" failure mode.
  * v0.24.1: Two follow-ups to v0.24.0:
  *   1. Mobile card layout: thumb moved out of mc-head (where it sat at
  *      32px stacked above the wrapping title as its own visual block)
@@ -483,7 +512,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.24.1';
+const APP_VERSION = '0.25.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -649,77 +678,85 @@ const DEMO_PRODUCTS = (() => {
     return t.toISOString().slice(0, 10);
   };
   const createdAt = (d) => new Date(today.getTime() - d * 86400000).toISOString();
+  // v0.25.0: fully fictional product names and brands. The previous demo
+  // dataset used real consumer brands (Old Spice, Crest, etc.) which
+  // could have read as endorsement and accidentally mirrored the user's
+  // own tracked products. Made-up brand names now — no real-world
+  // collisions, clearly synthetic. Demo names use "Demo:" prefix on a
+  // couple of products so it's even more obvious this is sample data.
+  // Demo-fake UPCs use the 000000-prefix range that the EAN authority
+  // reserves for internal use, so they never collide with a real product.
   return [
-    // Active — Old Spice ~40d in, type mean is ~92d, so ~43% through (no reminder yet).
-    { id: 'demo-1', productType: 'Underarm', productName: 'Old Spice High Endurance Pure Sport Deodorant',
-      brand: 'Old Spice', size: 3.0, unit: 'oz',
+    // Active — fictional deodorant ~40d in, type mean is ~92d, ~43% through.
+    { id: 'demo-1', productType: 'Underarm', productName: 'FreshGuard Sport Deodorant',
+      brand: 'FreshGuard', size: 3.0, unit: 'oz',
       startDate: daysAgo(40), endDate: '', cost: 6.99, costWithTax: 7.71,
-      bundleStatus: false, store: 'Amazon', buyer: 'You', cardLast4: '1234',
-      purchaseDate: daysAgo(45), upc: '012044039540', notes: '',
+      bundleStatus: false, store: 'Amazon', buyer: 'Demo user', cardLast4: '0000',
+      purchaseDate: daysAgo(45), upc: '000000010001', notes: '',
       createdAt: createdAt(45) },
-    // Active — Crest toothpaste at ~80d into a ~107d mean (~75%, just under reminder threshold).
-    { id: 'demo-2', productType: 'Toothpaste', productName: 'Crest 3D White Luminous Mint',
-      brand: 'Crest', size: 3.7, unit: 'oz',
+    // Active — fictional toothpaste at ~95d into a ~107d mean (~89%, OVER reminder threshold).
+    { id: 'demo-2', productType: 'Toothpaste', productName: 'BrightSmile Whitening Mint',
+      brand: 'BrightSmile', size: 3.7, unit: 'oz',
       startDate: daysAgo(95), endDate: '', cost: 14.01, costWithTax: 15.41,
       bundleStatus: true, bundleSize: 4, bundlePosition: 1, bundleId: 'demo-bundle-toothpaste',
-      store: 'Amazon', buyer: 'You', cardLast4: '1234',
-      purchaseDate: daysAgo(98), upc: '037000878940', notes: '',
+      store: 'Target', buyer: 'Demo user', cardLast4: '0000',
+      purchaseDate: daysAgo(98), upc: '000000020002', notes: '',
       createdAt: createdAt(98) },
-    // Active — Head & Shoulders, just started (very early).
-    { id: 'demo-3', productType: 'Shampoo', productName: 'Head & Shoulders Classic Clean',
-      brand: 'Head & Shoulders', size: 12.8, unit: 'fl oz',
+    // Active — shampoo, just started (very early).
+    { id: 'demo-3', productType: 'Shampoo', productName: 'ScalpClear Daily Shampoo',
+      brand: 'ScalpClear', size: 12.8, unit: 'fl oz',
       startDate: daysAgo(10), endDate: '', cost: 8.99, costWithTax: 9.89,
-      bundleStatus: false, store: 'Target', buyer: 'You', cardLast4: '1234',
+      bundleStatus: false, store: 'Walmart', buyer: 'Demo user', cardLast4: '0000',
       purchaseDate: daysAgo(12), upc: '', notes: '',
       createdAt: createdAt(12) },
-    // Active — Floss, mid-life.
-    { id: 'demo-4', productType: 'Floss', productName: 'Reach Mint Waxed Floss',
-      brand: 'Reach', size: 200, unit: 'ft',
+    // Active — floss, mid-life.
+    { id: 'demo-4', productType: 'Floss', productName: 'MintGlide Waxed Floss',
+      brand: 'MintGlide', size: 200, unit: 'ft',
       startDate: daysAgo(20), endDate: '', cost: 3.49, costWithTax: 3.84,
-      bundleStatus: false, store: 'CVS', buyer: 'You', cardLast4: '1234',
+      bundleStatus: false, store: 'CVS', buyer: 'Demo user', cardLast4: '0000',
       purchaseDate: daysAgo(25), upc: '', notes: '',
       createdAt: createdAt(25) },
-    // Inventory — Toothpaste 2 of 4 (bundle sibling of demo-2).
-    { id: 'demo-5', productType: 'Toothpaste', productName: 'Crest 3D White Luminous Mint',
-      brand: 'Crest', size: 3.7, unit: 'oz',
+    // Inventory — toothpaste 2 of 4 (bundle sibling of demo-2).
+    { id: 'demo-5', productType: 'Toothpaste', productName: 'BrightSmile Whitening Mint',
+      brand: 'BrightSmile', size: 3.7, unit: 'oz',
       startDate: '', endDate: '', cost: 14.01, costWithTax: 15.41,
       bundleStatus: true, bundleSize: 4, bundlePosition: 2, bundleId: 'demo-bundle-toothpaste',
-      store: 'Amazon', buyer: 'You', cardLast4: '1234',
-      purchaseDate: daysAgo(98), upc: '037000878940', notes: '',
+      store: 'Target', buyer: 'Demo user', cardLast4: '0000',
+      purchaseDate: daysAgo(98), upc: '000000020002', notes: '',
       createdAt: createdAt(98) },
-    // Inventory — Oral-B brush head waiting.
-    { id: 'demo-6', productType: 'Toothbrush', productName: 'Oral-B Pro 1000 Replacement Head',
-      brand: 'Oral-B', size: 1, unit: 'count',
+    // Inventory — brush head waiting.
+    { id: 'demo-6', productType: 'Toothbrush', productName: 'DentalGuard Pro Brush Head',
+      brand: 'DentalGuard', size: 1, unit: 'count',
       startDate: '', endDate: '', cost: 9.99, costWithTax: 10.99,
-      bundleStatus: false, store: 'Costco', buyer: 'You', cardLast4: '1234',
+      bundleStatus: false, store: 'Costco', buyer: 'Demo user', cardLast4: '0000',
       purchaseDate: daysAgo(15), upc: '', notes: '',
       createdAt: createdAt(15) },
-    // Finished — Underarm #1 (90 days).
-    { id: 'demo-7', productType: 'Underarm', productName: 'Old Spice High Endurance Pure Sport Deodorant',
-      brand: 'Old Spice', size: 3.0, unit: 'oz',
+    // Finished — deodorant #1 (90 days).
+    { id: 'demo-7', productType: 'Underarm', productName: 'FreshGuard Sport Deodorant',
+      brand: 'FreshGuard', size: 3.0, unit: 'oz',
       startDate: daysAgo(140), endDate: daysAgo(50), cost: 6.99, costWithTax: 7.71,
-      bundleStatus: false, store: 'Amazon', buyer: 'You', cardLast4: '1234',
-      purchaseDate: daysAgo(145), upc: '012044039540', notes: '',
+      bundleStatus: false, store: 'Amazon', buyer: 'Demo user', cardLast4: '0000',
+      purchaseDate: daysAgo(145), upc: '000000010001', notes: '',
       createdAt: createdAt(145) },
-    // Finished — Underarm #2 (93 days). Combined mean = ~92d.
-    { id: 'demo-8', productType: 'Underarm', productName: 'Old Spice Swagger',
-      brand: 'Old Spice', size: 3.0, unit: 'oz',
+    // Finished — deodorant #2 (93 days). Combined mean = ~92d.
+    { id: 'demo-8', productType: 'Underarm', productName: 'FreshGuard Bold Scent Deodorant',
+      brand: 'FreshGuard', size: 3.0, unit: 'oz',
       startDate: daysAgo(250), endDate: daysAgo(157), cost: 6.49, costWithTax: 7.16,
-      bundleStatus: false, store: 'Walgreens', buyer: 'You', cardLast4: '1234',
-      purchaseDate: daysAgo(255), upc: '', notes: 'Liked this scent better',
+      bundleStatus: false, store: 'Walgreens', buyer: 'Demo user', cardLast4: '0000',
+      purchaseDate: daysAgo(255), upc: '', notes: 'Liked the bolder scent',
       createdAt: createdAt(255) },
-    // Finished — Toothpaste #1 (110 days).
-    { id: 'demo-9', productType: 'Toothpaste', productName: 'Crest Pro-Health',
-      brand: 'Crest', size: 4.6, unit: 'oz',
+    // Finished — toothpaste #1 (110 days).
+    { id: 'demo-9', productType: 'Toothpaste', productName: 'BrightSmile Pro-Health',
+      brand: 'BrightSmile', size: 4.6, unit: 'oz',
       startDate: daysAgo(220), endDate: daysAgo(110), cost: 4.49, costWithTax: 4.94,
-      bundleStatus: false, store: 'Target', buyer: 'You', cardLast4: '1234',
+      bundleStatus: false, store: 'Target', buyer: 'Demo user', cardLast4: '0000',
       purchaseDate: daysAgo(225), upc: '', notes: '',
       createdAt: createdAt(225) },
-    // Finished — Toothpaste #2 (105 days). Combined mean = ~107d.
-    { id: 'demo-10', productType: 'Toothpaste', productName: 'Sensodyne Pronamel',
-      brand: 'Sensodyne', size: 4.0, unit: 'oz',
+    // Finished — toothpaste #2 (105 days). Combined mean = ~107d.
+    { id: 'demo-10', productType: 'Toothpaste', productName: 'GumShield Sensitive Care',
+      brand: 'GumShield', size: 4.0, unit: 'oz',
       startDate: daysAgo(330), endDate: daysAgo(225), cost: 7.99, costWithTax: 8.79,
-      bundleStatus: false, store: "Sam's Club", buyer: 'You', cardLast4: '1234',
+      bundleStatus: false, store: "Sam's Club", buyer: 'Demo user', cardLast4: '0000',
       purchaseDate: daysAgo(335), upc: '', notes: '',
       createdAt: createdAt(335) },
   ];
@@ -738,6 +775,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.25.0',
+    date: '2026-05-15',
+    tags: ['new', 'improvement'],
+    title: 'Click any stat to drill down',
+    body: 'The stat tiles at the top of the page are now clickable. Tap Active / Inventory / Finished / Tracked to jump to that filter on the table. Tap Total spend, YTD, or Last 30 days to open a breakdown showing each product\'s individual contribution to that number — biggest contributors first. Click a row in the breakdown to open that product. Also moved Currency / Pre-tax / Density / Columns to above the search bar so the stats get more room at the top.',
+  },
   {
     version: '0.24.0',
     date: '2026-05-15',
@@ -2037,8 +2081,9 @@ function renderMobileCard(p) {
   // inline with the product name at a size matching the line height,
   // instead of stacking above the wrapping name as its own block.
   const thumbHtml = (() => {
-    if (p.brand) return `<img class="mc-thumb mc-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" onerror="this.remove()">`;
-    if (p.imageUrl) return `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
+    // v0.25.0: explicit width/height attrs for the mobile thumb too.
+    if (p.brand) return `<img class="mc-thumb mc-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" width="22" height="22" onerror="this.remove()">`;
+    if (p.imageUrl) return `<img class="mc-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" width="22" height="22" onerror="this.remove()">`;
     return '';
   })();
   return `
@@ -2086,8 +2131,12 @@ function renderRow(p) {
       // v0.15.2: prefer brand company logo (consistent visual scanning by
       // brand). If no brand, fall back to UPC product image. Both onerror
       // handlers self-remove on load failure.
-      if (p.brand) return `<img class="name-thumb name-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" onerror="this.remove()">`;
-      if (p.imageUrl) return `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" onerror="this.remove()">`;
+      // v0.25.0: explicit width/height attrs so the browser sizes the
+      // thumb correctly even before CSS loads (or if the SW serves a
+      // stale style.css from cache). Belt-and-suspenders against the
+      // "thumb renders at natural 64px" stale-cache failure mode.
+      if (p.brand) return `<img class="name-thumb name-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" width="24" height="24" onerror="this.remove()">`;
+      if (p.imageUrl) return `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" width="24" height="24" onerror="this.remove()">`;
       return '';
     })()}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num col-size">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
@@ -2313,6 +2362,140 @@ function renderStats() {
   document.getElementById('stat-ytd-perday').textContent = money(ytdPerDay);
   // v0.15.1: rolling 30-day cost
   document.getElementById('stat-rolling30').textContent = money(rolling30);
+}
+
+/* ---------- v0.25.0 clickable stat tiles → drill-down ---------- */
+
+// Router: count-based stats switch the table view + filter. Amount-based
+// stats open the new stat-detail modal listing contributing products.
+// YTD daily cost isn't wired (intentionally non-clickable in the HTML).
+function handleStatClick(statKey) {
+  switch (statKey) {
+    case 'count':     setView('table'); setFilter('all');       return;
+    case 'active':    setView('table'); setFilter('active');    return;
+    case 'inventory': setView('table'); setFilter('inventory'); return;
+    case 'finished':  setView('table'); setFilter('finished');  return;
+    case 'total':
+    case 'ytd':
+    case 'rolling30': openStatDetail(statKey); return;
+  }
+}
+
+// Build the per-product contribution breakdown for an amount-based stat.
+// Mirrors the math in renderStats so totals match exactly; the only
+// difference is we collect per-product amounts as we go instead of
+// summing into a single number. Returned items are pre-sorted descending
+// by amount so the biggest contributors surface first.
+function computeStatDetail(key) {
+  const tracked = trackedOnly();
+  if (key === 'total') {
+    const items = tracked
+      .filter(p => !isInventory(p))
+      .map(p => ({ product: p, amount: allocatedCost(p) || 0 }))
+      .filter(x => x.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+    return {
+      title: 'Total spend breakdown',
+      lead: 'Sum of allocated cost across every product you\'ve started using. Bundle items contribute their per-item share. Inventory items are excluded until you start using them.',
+      items,
+    };
+  }
+  if (key === 'ytd') {
+    const year = new Date().getFullYear();
+    const items = tracked
+      .filter(p => {
+        if (isInventory(p)) return false;
+        const purchase = parseLocalDate(p.purchaseDate || p.startDate);
+        return purchase && purchase.getFullYear() === year;
+      })
+      .map(p => ({ product: p, amount: allocatedCost(p) || 0 }))
+      .filter(x => x.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+    return {
+      title: `${year} spend breakdown`,
+      lead: `Products purchased or started in ${year}. Bundle items contribute their per-item share. Inventory items are excluded.`,
+      items,
+    };
+  }
+  if (key === 'rolling30') {
+    const now = new Date();
+    const windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    const items = [];
+    for (const p of tracked) {
+      if (isInventory(p)) continue;
+      const lifespanDays = calcDuration(p);
+      if (lifespanDays == null || lifespanDays <= 0) continue;
+      const start = parseLocalDate(p.startDate);
+      const end = p.endDate ? parseLocalDate(p.endDate) : now;
+      if (!start || !end) continue;
+      const overlapStart = start > windowStart ? start : windowStart;
+      const overlapEnd = end < now ? end : now;
+      if (overlapEnd < overlapStart) continue;
+      const overlapDays = Math.max(1, Math.round((overlapEnd - overlapStart) / 86400000) + 1);
+      const cost = allocatedCost(p);
+      if (!isFinite(cost) || cost <= 0) continue;
+      const contribution = (cost / lifespanDays) * Math.min(overlapDays, lifespanDays);
+      if (contribution > 0) items.push({ product: p, amount: contribution });
+    }
+    items.sort((a, b) => b.amount - a.amount);
+    return {
+      title: 'Last 30 days breakdown',
+      lead: 'Each product\'s proportional contribution to the past 30-day window. A product used for the full 30 days contributes its full pro-rata daily rate × 30; a product used for half the window contributes half.',
+      items,
+    };
+  }
+  return null;
+}
+
+// Opens the stat-detail dialog with the contributions list. Renders the
+// list as buttons so clicking a row opens that product's Edit dialog —
+// matches the row-action pattern used by the reorder reminders panel.
+function openStatDetail(key) {
+  const detail = computeStatDetail(key);
+  if (!detail) return;
+  const dlg = document.getElementById('stat-detail-dialog');
+  const titleEl = document.getElementById('stat-detail-title');
+  const leadEl = document.getElementById('stat-detail-lead');
+  const totalEl = document.getElementById('stat-detail-total');
+  const listEl = document.getElementById('stat-detail-list');
+  const emptyEl = document.getElementById('stat-detail-empty');
+  if (!dlg || !titleEl || !leadEl || !totalEl || !listEl) return;
+
+  titleEl.textContent = detail.title;
+  leadEl.textContent = detail.lead;
+  const total = detail.items.reduce((s, x) => s + x.amount, 0);
+
+  if (detail.items.length === 0) {
+    totalEl.hidden = true;
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.hidden = false;
+  } else {
+    totalEl.hidden = false;
+    totalEl.innerHTML = `<span class="stat-detail-total-label">Total</span><span class="stat-detail-total-value">${escapeHtml(money(total))}</span>`;
+    if (emptyEl) emptyEl.hidden = true;
+    listEl.innerHTML = detail.items.map(({ product: p, amount }) => {
+      const type = escapeHtml(p.productType || '');
+      const datePart = (() => {
+        const d = parseLocalDate(p.purchaseDate || p.startDate);
+        return d ? formatDate(d.toISOString().slice(0, 10)) : '';
+      })();
+      const subBits = [type, datePart].filter(Boolean).join(' · ');
+      return `<button type="button" class="stat-detail-item" data-id="${escapeHtml(p.id)}" title="Click to open ${escapeHtml(p.productName || '')}">
+        <div class="stat-detail-item-main">
+          <div class="stat-detail-item-name">${escapeHtml(p.productName || '(unnamed)')}</div>
+          ${subBits ? `<div class="stat-detail-item-sub">${subBits}</div>` : ''}
+        </div>
+        <div class="stat-detail-item-amount">${escapeHtml(money(amount))}</div>
+      </button>`;
+    }).join('');
+  }
+
+  if (!dlg.open) dlg.showModal();
+}
+
+function closeStatDetail() {
+  const dlg = document.getElementById('stat-detail-dialog');
+  if (dlg && dlg.open) dlg.close();
 }
 
 /* ---------- dashboard ---------- */
@@ -6337,6 +6520,25 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reminders-panel')?.addEventListener('click', e => {
     const item = e.target.closest('.reminder-item');
     if (item) openEditDialog(item.dataset.id);
+  });
+
+  // v0.25.0: stat tile clicks → drill-down. Count-based tiles switch
+  // the table view + apply that filter; amount-based tiles open the
+  // stat-detail modal. YTD daily cost stays non-clickable (rendered
+  // as a <div class="stat-static"> instead of a button).
+  document.getElementById('stats-bar')?.addEventListener('click', e => {
+    const tile = e.target.closest('button.stat[data-stat-key]');
+    if (!tile) return;
+    handleStatClick(tile.dataset.statKey);
+  });
+  document.getElementById('stat-detail-close')?.addEventListener('click', closeStatDetail);
+  // Click a product in the drill-down list → close detail + open edit
+  document.getElementById('stat-detail-list')?.addEventListener('click', e => {
+    const item = e.target.closest('.stat-detail-item');
+    if (!item) return;
+    const id = item.dataset.id;
+    closeStatDetail();
+    if (id) openEditDialog(id);
   });
 
   // v0.21.0: recall panel handlers. Dismiss × on a card removes that

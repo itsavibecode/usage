@@ -978,6 +978,11 @@ body.density-compact .bought-by {
   margin-bottom: 20px;
 }
 
+/* v0.25.0: .stat is now a <button> on tiles that drill down — but the
+ * tile look should be unchanged. Strip default button chrome + add a
+ * hover/focus state that reads as "this is clickable" without
+ * shouting. .stat-static covers the one tile we keep as a non-clickable
+ * <div> (YTD daily cost). */
 .stat {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -986,6 +991,119 @@ body.density-compact .bought-by {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.06s ease;
+}
+button.stat:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 6px rgba(43, 95, 217, 0.10);
+}
+button.stat:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+button.stat:active { transform: translateY(1px); }
+.stat-static { cursor: default; }
+.stat-static:hover { border-color: var(--border); box-shadow: none; }
+
+/* v0.25.0: stat-detail drill-down modal. Used by amount-based stat
+ * tiles (Total spend / YTD / Last 30 days). Lists each contributing
+ * product with its share of the total. Count-based stats use the
+ * row-filter tabs instead so they don't need a modal. */
+.stat-detail-dialog {
+  max-width: 560px;
+  width: 92vw;
+  max-height: 88vh;
+}
+.stat-detail-body {
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+  max-height: calc(88vh - 56px);
+}
+.stat-detail-lead {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.stat-detail-total {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.stat-detail-total-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
+}
+.stat-detail-total-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.stat-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stat-detail-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.stat-detail-item:hover { border-color: var(--primary); }
+.stat-detail-item-main {
+  min-width: 0;
+}
+.stat-detail-item-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-detail-item-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.stat-detail-item-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.stat-detail-empty {
+  margin: 24px 0 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .stat-detail-dialog { max-width: 96vw; }
 }
 
 .stat-label {
@@ -2492,28 +2610,36 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
 }
 .auth-demo-link a:hover { text-decoration: underline; }
 
-/* v0.22.0: demo-mode banner pinned at the top of main-wrap so the user
- * never forgets nothing persists. Soft primary-tinted background, small
- * pill tag, plain-text explanation, and an "Exit demo" link that strips
- * the ?demo flag and reloads. */
+/* v0.25.0: demo-mode banner reworked to sit fixed at the very top of
+ * the viewport in solid primary-blue with white text, so it reads as
+ * "you're in a mode, not part of the website" instead of looking like
+ * a normal in-page panel. body.is-demo-mode also adds top padding so
+ * the fixed banner doesn't overlay the site header. Stronger color
+ * treatment than the v0.22.0 soft-tinted background. */
 .demo-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  background: linear-gradient(135deg, #e3edff 0%, #f0f4ff 100%);
-  border: 1px solid #c5d6ff;
-  border-radius: var(--radius);
+  padding: 8px 16px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
   flex-wrap: wrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 .demo-banner[hidden] { display: none; }
 .demo-banner-tag {
   flex-shrink: 0;
   padding: 2px 10px;
   border-radius: 999px;
-  background: var(--primary);
-  color: #fff;
+  background: #fff;
+  color: var(--primary);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2523,17 +2649,25 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   flex: 1;
   min-width: 200px;
   font-size: 13px;
-  color: var(--text);
+  color: #fff;
   line-height: 1.45;
 }
 .demo-banner-link {
   flex-shrink: 0;
-  color: var(--primary);
-  text-decoration: none;
+  color: #fff;
+  text-decoration: underline;
   font-weight: 600;
   font-size: 13px;
 }
-.demo-banner-link:hover { text-decoration: underline; }
+.demo-banner-link:hover { text-decoration: none; }
+/* Push the rest of the page down so the fixed banner doesn't cover
+ * the site header. 44px matches the banner's intrinsic height (single
+ * line + padding); falls back to extra room when the text wraps on
+ * narrow viewports. */
+body.is-demo-mode { padding-top: 44px; }
+@media (max-width: 720px) {
+  body.is-demo-mode { padding-top: 64px; } /* banner often wraps to 2 lines on phone */
+}
 
 /* v0.23.2: site footer pinned to the bottom of main-wrap. Hosts the
  * demo link so signed-in users have a quick "share with a friend"

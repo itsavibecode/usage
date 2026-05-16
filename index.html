@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.24.1">
+  <meta name="version" content="0.25.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.24.1</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.25.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -164,49 +164,23 @@
          finished siblings, surface a small alert. Hidden when none apply. -->
     <section class="reminders-panel" id="reminders-panel" aria-label="Reorder reminders" hidden></section>
 
-    <div class="display-controls" aria-label="Display controls">
-      <!-- v0.12.0: currency selector -->
-      <label class="currency-selector" title="Display all costs in this currency">
-        <span class="currency-selector-label">Currency</span>
-        <select id="currency-select"></select>
-      </label>
-      <label class="pretax-toggle" title="Show all costs with or without tax">
-        <input type="checkbox" id="pretax-toggle">
-        <span class="pretax-track" aria-hidden="true"><span class="pretax-thumb"></span></span>
-        <span class="pretax-label">Show pre-tax prices</span>
-      </label>
-      <!-- v0.17.0: density + column visibility controls. Persist per
-           browser via localStorage. Affect the desktop table only — the
-           mobile card layout has its own column subset already. -->
-      <label class="density-toggle" title="Switch table row spacing">
-        <span>Density</span>
-        <select id="density-select" aria-label="Table density">
-          <option value="comfortable">Comfortable</option>
-          <option value="compact">Compact</option>
-        </select>
-      </label>
-      <div class="columns-dropdown">
-        <button type="button" id="btn-columns" class="columns-trigger" aria-haspopup="true" aria-expanded="false" title="Show or hide table columns">Columns &#9662;</button>
-        <div class="columns-menu" id="columns-menu" role="menu">
-          <div class="columns-menu-title">Show columns</div>
-          <div id="columns-menu-rows"></div>
-          <div class="columns-menu-actions">
-            <button type="button" class="columns-menu-action" id="columns-show-all">Show all</button>
-            <button type="button" class="columns-menu-action" id="columns-reset">Reset</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <!-- v0.25.0: stat tiles converted from <div> to <button>. Clickable
+         tiles drill down into the products contributing to that stat —
+         count-based tiles switch the Table view to the matching filter,
+         amount-based tiles open the new stat-detail modal showing each
+         product's contribution. YTD daily cost stays non-interactive
+         (composed across multiple categories — drill-down wouldn't make
+         actionable sense). -->
     <section class="stats-bar" id="stats-bar" aria-label="Summary">
-      <div class="stat"><span class="stat-label">Tracked products</span><span class="stat-value" id="stat-count">0</span></div>
-      <div class="stat" title="Items you've started using and not yet finished"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></div>
-      <div class="stat" title="Items purchased but not yet started — sitting in inventory"><span class="stat-label">Inventory</span><span class="stat-value" id="stat-inventory">0</span></div>
-      <div class="stat"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></div>
-      <div class="stat" title="Sum of allocated cost for products you've started using. Inventory items (no start date) are excluded until you begin using them."><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
-      <div class="stat" title="Sum of allocated cost for products purchased AND started using in the current calendar year. Inventory items are excluded."><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></div>
-      <div class="stat" title="Total cost of product usage in the last 30 days. Each product contributes its per-day rate × days of overlap with the 30-day window — so two $5 products used sequentially over 30 days correctly totals $10, not $20. Updates daily as the window rolls forward."><span class="stat-label">Last 30 days</span><span class="stat-value" id="stat-rolling30">$0.00</span></div>
-      <div class="stat" title="Combined daily burn rate across all product categories active this year. For each category, rate = total spend on that category divided by the date span its products covered (so two $5 underarms used over 30 days = $0.33/day, not $0.67/day). Categories sum because they're used in parallel."><span class="stat-label">YTD daily cost</span><span class="stat-value" id="stat-ytd-perday">$0.00</span></div>
+      <button type="button" class="stat" data-stat-key="count" title="Click to see all tracked products"><span class="stat-label">Tracked products</span><span class="stat-value" id="stat-count">0</span></button>
+      <button type="button" class="stat" data-stat-key="active" title="Items you've started using and not yet finished — click to view"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></button>
+      <button type="button" class="stat" data-stat-key="inventory" title="Items purchased but not yet started — click to view"><span class="stat-label">Inventory</span><span class="stat-value" id="stat-inventory">0</span></button>
+      <button type="button" class="stat" data-stat-key="finished" title="Items you've used up — click to view"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></button>
+      <button type="button" class="stat" data-stat-key="total" title="Sum of allocated cost for products you've started using. Inventory items are excluded. Click to see the breakdown."><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></button>
+      <button type="button" class="stat" data-stat-key="ytd" title="Sum of allocated cost for products purchased AND started using in the current calendar year. Click to see the breakdown."><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></button>
+      <button type="button" class="stat" data-stat-key="rolling30" title="Total cost of product usage in the last 30 days. Each product contributes its per-day rate × days of overlap. Click to see the breakdown."><span class="stat-label">Last 30 days</span><span class="stat-value" id="stat-rolling30">$0.00</span></button>
+      <!-- YTD daily cost intentionally NOT clickable: drills into category-level rates, not per-product contributions, so the modal wouldn't have a clean list to show. -->
+      <div class="stat stat-static" title="Combined daily burn rate across all product categories active this year. Categories sum because they're used in parallel."><span class="stat-label">YTD daily cost</span><span class="stat-value" id="stat-ytd-perday">$0.00</span></div>
     </section>
 
     <nav class="view-tabs" id="view-tabs" role="tablist" aria-label="View">
@@ -217,6 +191,47 @@
     </nav>
 
     <section class="view" id="view-table" role="tabpanel">
+      <!-- v0.25.0: display controls moved here from the top of the page
+           so the stats bar gets prime visual real estate. These four
+           controls (Currency, Pre-tax toggle, Density, Columns) sit
+           directly above the search bar — same visual treatment as
+           before, just pushed lower. Density + Columns are hidden on
+           mobile by the v0.17.5 rule since they only affect the
+           desktop table. -->
+      <div class="display-controls" aria-label="Display controls">
+        <!-- v0.12.0: currency selector -->
+        <label class="currency-selector" title="Display all costs in this currency">
+          <span class="currency-selector-label">Currency</span>
+          <select id="currency-select"></select>
+        </label>
+        <label class="pretax-toggle" title="Show all costs with or without tax">
+          <input type="checkbox" id="pretax-toggle">
+          <span class="pretax-track" aria-hidden="true"><span class="pretax-thumb"></span></span>
+          <span class="pretax-label">Show pre-tax prices</span>
+        </label>
+        <!-- v0.17.0: density + column visibility controls. Persist per
+             browser via localStorage. Affect the desktop table only — the
+             mobile card layout has its own column subset already. -->
+        <label class="density-toggle" title="Switch table row spacing">
+          <span>Density</span>
+          <select id="density-select" aria-label="Table density">
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </label>
+        <div class="columns-dropdown">
+          <button type="button" id="btn-columns" class="columns-trigger" aria-haspopup="true" aria-expanded="false" title="Show or hide table columns">Columns &#9662;</button>
+          <div class="columns-menu" id="columns-menu" role="menu">
+            <div class="columns-menu-title">Show columns</div>
+            <div id="columns-menu-rows"></div>
+            <div class="columns-menu-actions">
+              <button type="button" class="columns-menu-action" id="columns-show-all">Show all</button>
+              <button type="button" class="columns-menu-action" id="columns-reset">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- v0.14.4: live search across product fields. AND-combines with the
            row-filter tabs below + any active chip filters above. -->
       <div class="row-search-wrap">
@@ -785,6 +800,24 @@
       <button type="button" class="changelog-filter-tab" data-filter="fix" role="tab" aria-selected="false">Fix</button>
     </nav>
     <div class="changelog-body" id="changelog-body"></div>
+  </dialog>
+
+  <!-- v0.25.0: stat-detail drill-down modal. Opens when the user clicks
+       an amount-based stat tile (Total spend, YTD spend, Last 30 days).
+       Lists each contributing product + its contribution amount + the
+       total. Count-based stats (Active / Inventory / Finished / Tracked)
+       use the existing row-filter tabs instead — no modal needed. -->
+  <dialog id="stat-detail-dialog" class="stat-detail-dialog">
+    <header class="dialog-header">
+      <h2 id="stat-detail-title">Spend breakdown</h2>
+      <button type="button" class="icon-btn" id="stat-detail-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="stat-detail-body">
+      <p class="stat-detail-lead" id="stat-detail-lead"></p>
+      <div class="stat-detail-total" id="stat-detail-total"></div>
+      <div class="stat-detail-list" id="stat-detail-list"></div>
+      <p class="stat-detail-empty" id="stat-detail-empty" hidden>No products contributed to this stat.</p>
+    </div>
   </dialog>
 
   <!-- v0.15.5: <dialog> instead of <div> so toasts render in the browser's

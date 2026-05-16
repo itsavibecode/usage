@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.24.1
+**Version:** v0.25.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.24.1)
+## Current status (v0.25.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,13 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.25.0 — 2026-05-15
+- **Clickable stat tiles.** Each tile in the stats bar now drills down. Count-based tiles (Tracked / Active / Inventory / Finished) switch the Table view + apply the matching row filter. Amount-based tiles (Total spend / YTD / Last 30 days) open a new stat-detail modal listing every contributing product + its individual contribution to the total, sorted descending. Click any row in the breakdown to open that product's Edit dialog. YTD daily cost stays non-clickable — it's a category-rate sum, not a per-product breakdown, so a drill-down list wouldn't read cleanly.
+- **Display controls moved.** Currency / Pre-tax toggle / Density / Columns dropdowns now sit inside the Table view directly above the search bar, instead of at the top of the page above the stats. Stats get prime visual real estate at the top; controls are still one tap away when you need them. Density + Columns continue to be hidden on mobile per v0.17.5.
+- **Demo banner reworked.** Was a soft primary-tinted in-page panel; now fixed at the top of the viewport in solid primary blue with white text. Reads as "you're in a mode," not "this is part of the website." `body.is-demo-mode` adds top padding (44px desktop / 64px mobile) so the fixed banner doesn't overlay the site header.
+- **Demo data fully fictional.** Replaced real consumer brands (Old Spice, Crest, Head & Shoulders, etc.) with made-up names: FreshGuard, BrightSmile, ScalpClear, MintGlide, DentalGuard, GumShield. Demo UPCs now use the reserved `000000-` prefix range so they can't collide with real products. "Demo user" / card `0000` for buyer/card fields. Demo session reads as obviously synthetic.
+- **Thumb size belt-and-suspenders.** Added explicit `width`/`height` HTML attrs to the brand-logo and product-image `<img>` tags in the desktop table and mobile cards. The browser now sizes them correctly even if the service worker is serving a stale `style.css` from cache — fixes the "thumb renders at natural 64px" failure mode some users were seeing.
 
 ### v0.24.1 — 2026-05-15
 - **Mobile card layout fix.** The brand logo / product thumbnail was sitting in the `mc-head` flex row at 32px, stacked above the wrapping product name like its own banner. Moved it into a new `.mc-title-row` that flows inline with the title at 22px (matches the 17px / 1.3 line-height of `mc-name`). `mc-head` now just contains the product-type chip and status pill. Reads as part of the title now.
