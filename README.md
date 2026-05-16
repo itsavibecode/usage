@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.25.1
+**Version:** v0.25.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.25.1)
+## Current status (v0.25.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.25.2 — 2026-05-15
+- **"What's filtered" visual feedback.** Two complementary signals when a stat tile applies a row filter:
+  - **Selected stat tile** — the Active / Inventory / Finished tile stays highlighted in solid primary blue while its filter is in effect, so the user can see which group is on screen. The Tracked tile intentionally never highlights since `filter='all'` is the default state. Total / YTD / Last 30 days tiles don't get a selected state either — they open the drill-down modal but don't apply a persistent filter.
+  - **Filter indicator pill** — a small chip appears next to the view-tabs reading `Showing only: Active` (or Inventory / Finished) with an inline `×` to clear back to "all". Visible only on the Table view and only when a specific filter is applied. Clicking `×` sets the filter back to `all` via the standard `setFilter('all')` path.
+- State syncs from `currentFilter` + `currentView` via `applyStatSelectedState()` called from `setFilter()` and `setView()` plus once on page load. No new state to track — both visual signals derive from the existing filter/view state.
 
 ### v0.25.1 — 2026-05-15
 - **Unified table toolbar.** Filter tabs (All / Active / Inventory / Finished / Reset), the search bar, and the display controls (Currency / Pre-tax / Density / Columns) now share a single horizontal row instead of stacking on three. Filter tabs sit on the left, search grows to fill the middle, display controls anchor the right. Wraps cleanly on narrow widths so mobile still gets a sensible stacked layout. Frees ~80px of vertical space at the top of the table view — the products list now starts much closer to the stats bar.

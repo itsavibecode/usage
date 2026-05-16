@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.25.1">
+  <meta name="version" content="0.25.2">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.25.1</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.25.2</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -183,12 +183,25 @@
       <div class="stat stat-static" title="Combined daily burn rate across all product categories active this year. Categories sum because they're used in parallel."><span class="stat-label">YTD daily cost</span><span class="stat-value" id="stat-ytd-perday">$0.00</span></div>
     </section>
 
-    <nav class="view-tabs" id="view-tabs" role="tablist" aria-label="View">
-      <button type="button" class="view-tab is-active" data-view="table" role="tab" aria-selected="true">Table</button>
-      <button type="button" class="view-tab" data-view="dashboard" role="tab" aria-selected="false">Dashboard</button>
-      <button type="button" class="view-tab" data-view="activity" role="tab" aria-selected="false">Activity</button>
-      <button type="button" class="view-tab" data-view="favorites" role="tab" aria-selected="false">Favorites</button>
-    </nav>
+    <!-- v0.25.2: row wraps the view-tabs alongside a context filter
+         indicator. The indicator surfaces only when the table view is
+         filtered to a specific subset (Active / Inventory / Finished)
+         via a stat-tile click or the row-filter-tabs. Sits next to the
+         view-tabs so the user can see at a glance which slice of the
+         data is currently on screen, with an inline X to clear back to
+         "all". -->
+    <div class="view-tabs-row">
+      <nav class="view-tabs" id="view-tabs" role="tablist" aria-label="View">
+        <button type="button" class="view-tab is-active" data-view="table" role="tab" aria-selected="true">Table</button>
+        <button type="button" class="view-tab" data-view="dashboard" role="tab" aria-selected="false">Dashboard</button>
+        <button type="button" class="view-tab" data-view="activity" role="tab" aria-selected="false">Activity</button>
+        <button type="button" class="view-tab" data-view="favorites" role="tab" aria-selected="false">Favorites</button>
+      </nav>
+      <div class="filter-indicator" id="filter-indicator" hidden>
+        <span class="filter-indicator-label">Showing only: <strong id="filter-indicator-name">Active</strong></span>
+        <button type="button" class="filter-indicator-clear" id="filter-indicator-clear" aria-label="Clear filter" title="Clear filter and show all products">&times;</button>
+      </div>
+    </div>
 
     <section class="view" id="view-table" role="tabpanel">
       <!-- v0.25.1: unified table toolbar. Filter tabs (left), search

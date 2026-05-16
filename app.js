@@ -1,4 +1,16 @@
-/* Usage Tracker — v0.25.1
+/* Usage Tracker — v0.25.2
+ * v0.25.2: Visible "what's filtered" feedback. Clicking a stat tile
+ *   (Active / Inventory / Finished) now keeps that tile highlighted in
+ *   solid primary blue while the filter is in effect, so the user can
+ *   see which group is on screen. A small filter-indicator pill also
+ *   appears next to the view-tabs reading "Showing only: Active" (or
+ *   Inventory / Finished) with an inline X to clear back to "all."
+ *   Tracked tile is intentionally NOT highlighted because filter='all'
+ *   is the default state (nothing's been selected). The Total / YTD /
+ *   Last 30 days tiles open the drill-down modal — they don't apply a
+ *   persistent filter so they don't get a selected state either. State
+ *   syncs from `currentFilter` + `currentView` via applyStatSelectedState()
+ *   called from setFilter() and setView() plus once on page load.
  * v0.25.1: Unified table toolbar. Filter tabs (All / Active / Inventory /
  *   Finished / Reset) + search bar + display controls (Currency / Pre-tax /
  *   Density / Columns) now share a single horizontal row instead of
@@ -519,7 +531,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.25.1';
+const APP_VERSION = '0.25.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -782,6 +794,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.25.2',
+    date: '2026-05-15',
+    tags: ['improvement'],
+    title: "Visible 'what's filtered' feedback",
+    body: 'When you click Active, Inventory, or Finished, the stat tile now stays highlighted in blue while that filter is in effect — so you can see which group is on screen at a glance. A small "Showing only: Active" pill also appears next to the view tabs, with an × to clear back to all products.',
+  },
   {
     version: '0.25.0',
     date: '2026-05-15',
@@ -2505,6 +2524,44 @@ function closeStatDetail() {
   if (dlg && dlg.open) dlg.close();
 }
 
+// v0.25.2: visual feedback for which stat tile is "selected" based on
+// the currently-applied filter. Only meaningful on the Table view — the
+// Dashboard / Activity / Favorites views aren't filtered by the row-
+// filter system. The Tracked tile is intentionally never highlighted
+// because filter='all' is the default state ("everything") and shouldn't
+// read as a discrete selection. Count-based filters only — Total / YTD /
+// Last 30 days don't apply persistent filters (they open the drill-down
+// modal instead).
+function applyStatSelectedState() {
+  const onTable = currentView === 'table';
+  const filterToKey = { active: 'active', inventory: 'inventory', finished: 'finished' };
+  const selectedKey = onTable ? filterToKey[currentFilter] : null;
+
+  for (const tile of document.querySelectorAll('.stats-bar button.stat[data-stat-key]')) {
+    tile.classList.toggle('is-selected', !!selectedKey && tile.dataset.statKey === selectedKey);
+  }
+
+  applyFilterIndicator();
+}
+
+// v0.25.2: small pill next to the view-tabs showing what subset of
+// products is being displayed. Visible only when on the Table view AND
+// the filter is something other than 'all'. Clicking the inline X
+// clears the filter back to 'all'.
+function applyFilterIndicator() {
+  const indicator = document.getElementById('filter-indicator');
+  const nameEl = document.getElementById('filter-indicator-name');
+  if (!indicator || !nameEl) return;
+  const labels = { active: 'Active', inventory: 'Inventory', finished: 'Finished' };
+  const label = currentView === 'table' ? labels[currentFilter] : null;
+  if (label) {
+    nameEl.textContent = label;
+    indicator.hidden = false;
+  } else {
+    indicator.hidden = true;
+  }
+}
+
 /* ---------- dashboard ---------- */
 
 async function renderDashboard() {
@@ -3468,6 +3525,10 @@ function setFilter(filter) {
     btn.setAttribute('aria-selected', active ? 'true' : 'false');
   }
   renderTable();
+  // v0.25.2: keep the stat-tile selected highlight + filter-indicator
+  // pill in sync. Both are pure visual sync from currentFilter — no
+  // additional state needed.
+  applyStatSelectedState();
 }
 
 function resetFilters() {
@@ -3499,6 +3560,10 @@ function setView(view) {
   if (view === 'dashboard') renderDashboard();
   if (view === 'activity') renderActivity();
   if (view === 'favorites') renderFavorites();
+  // v0.25.2: stat-selected highlight + filter indicator are scoped to
+  // the Table view. Switching to Dashboard / Activity / Favorites
+  // should clear those highlights regardless of currentFilter.
+  applyStatSelectedState();
 }
 
 /* ---------- v0.15.0 Favorites view ---------- */
@@ -6547,6 +6612,14 @@ document.addEventListener('DOMContentLoaded', () => {
     closeStatDetail();
     if (id) openEditDialog(id);
   });
+
+  // v0.25.2: filter indicator's clear X resets filter to 'all'.
+  document.getElementById('filter-indicator-clear')?.addEventListener('click', () => setFilter('all'));
+
+  // v0.25.2: initial sync of stat-selected highlight + filter indicator
+  // pill. Runs once on page load so the visual state matches whatever
+  // filter is persisted in localStorage (e.g. user reloads on Active).
+  applyStatSelectedState();
 
   // v0.21.0: recall panel handlers. Dismiss × on a card removes that
   // specific recall (persists to localStorage). "Dismiss all" button in

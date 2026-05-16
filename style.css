@@ -1009,6 +1009,78 @@ button.stat:active { transform: translateY(1px); }
 .stat-static { cursor: default; }
 .stat-static:hover { border-color: var(--border); box-shadow: none; }
 
+/* v0.25.2: stat tile in the "selected" state — drawn in primary-blue
+ * fill with white text so it clearly reads as the currently-active
+ * filter. Synced from JS to currentFilter when on the Table view
+ * (Active / Inventory / Finished tiles only — the Tracked tile maps
+ * to "all" which is the default state and shouldn't read as
+ * "selected"). */
+button.stat.is-selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(43, 95, 217, 0.20);
+}
+button.stat.is-selected .stat-label { color: rgba(255, 255, 255, 0.85); }
+button.stat.is-selected .stat-value { color: #fff; }
+button.stat.is-selected:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+/* v0.25.2: view-tabs row — wraps the existing view-tabs nav and the
+ * new filter-indicator pill. Filter pill anchors right; view-tabs
+ * stay left. Wraps on narrow widths. */
+.view-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.view-tabs-row .view-tabs { margin-bottom: 0; }
+
+/* v0.25.2: filter-indicator pill — only visible when the table view is
+ * filtered to a specific subset. Reads "Showing only: <Filter>" with an
+ * inline X to clear back to "all". Light-primary background with primary
+ * border + text so it picks up the brand color without screaming. */
+.filter-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 12px;
+  background: #eef3ff;
+  color: var(--primary);
+  border: 1px solid #c5d6ff;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.filter-indicator[hidden] { display: none; }
+.filter-indicator-label { font-weight: 500; }
+.filter-indicator-label strong { font-weight: 700; }
+.filter-indicator-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--primary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.filter-indicator-clear:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
 /* v0.25.0: stat-detail drill-down modal. Used by amount-based stat
  * tiles (Total spend / YTD / Last 30 days). Lists each contributing
  * product with its share of the total. Count-based stats use the
