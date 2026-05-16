@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.25.2
+**Version:** v0.25.3
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.25.2)
+## Current status (v0.25.3)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.25.3 — 2026-05-15
+- **Semver in the browser tab title.** `document.title` now reads `Usage Tracker · v0.25.3` (or whatever the current version is). Set on `DOMContentLoaded` from `APP_VERSION` so it stays in lockstep with the header chip and the `<meta name="version">` tag — single source of truth, no manual duplication. Visible in the OS title bar, the tab strip, the Cmd/Alt-Tab switcher, and any pinned tab tooltip. `share.html` and `404.html` keep their own static titles since they don't load `app.js`.
 
 ### v0.25.2 — 2026-05-15
 - **"What's filtered" visual feedback.** Two complementary signals when a stat tile applies a row filter:

@@ -1,4 +1,11 @@
-/* Usage Tracker — v0.25.2
+/* Usage Tracker — v0.25.3
+ * v0.25.3: Browser tab title now includes the semver. `document.title`
+ *   gets set to `Usage Tracker · v0.25.3` on DOMContentLoaded so the
+ *   version shows up wherever the OS surfaces the page title — OS title
+ *   bar, tab strip, Cmd/Alt-Tab switcher, pinned tabs. Drives off
+ *   APP_VERSION so it stays in lockstep with the header chip and
+ *   <meta name="version">. share.html and 404.html keep their own
+ *   static titles since they're separate pages without app.js.
  * v0.25.2: Visible "what's filtered" feedback. Clicking a stat tile
  *   (Active / Inventory / Finished) now keeps that tile highlighted in
  *   solid primary blue while the filter is in effect, so the user can
@@ -531,7 +538,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.25.2';
+const APP_VERSION = '0.25.3';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -6322,6 +6329,11 @@ function registerServiceWorker() {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('version').textContent = `v${APP_VERSION}`;
   document.querySelector('meta[name="version"]')?.setAttribute('content', APP_VERSION);
+  // v0.25.3: browser tab title now includes the semver so the version
+  // is visible everywhere it could be — header chip, OS title bar, and
+  // any tab-switching UI (Cmd-Tab, Alt-Tab, pinned tabs). Keeps APP_VERSION
+  // as the single source of truth instead of duplicating into the <title>.
+  document.title = `Usage Tracker · v${APP_VERSION}`;
   // v0.20.0: apply the unread-dot to the version chip on load so users
   // see at a glance that there's a new changelog entry waiting.
   applyChangelogUnreadDot();
