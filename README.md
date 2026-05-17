@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.26.1
+**Version:** v0.27.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.26.1)
+## Current status (v0.27.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,13 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.0 — 2026-05-15
+- **Cross-device preference sync.** All viewing preferences — `preTaxMode`, `densityMode`, `columnVisibility`, `userCurrency`, `activityPageSize`, `changelogLastSeen` — now mirror to Firestore at `/users/{uid}/meta/uiPrefs` so they follow the user across browsers and devices. Set your favorite columns + density on the laptop, sign in on the phone, same view appears.
+- **Architecture:** single combined doc (one read on sign-in instead of N), `setDoc({merge:true})` per field so concurrent writes from different fields don't clobber each other. localStorage remains the synchronous backing — every preference change writes to localStorage first (instant feedback, offline-safe) and fires a Firestore write in the background. Cloud is the cross-device source of truth and wins on conflict (applied over local on each sign-in).
+- **Migration:** first-time users (no cloud doc yet) get their current localStorage values seeded to the cloud automatically, so existing users don't lose their preferences. New helper `saveUiPrefsField(field, value)` is fire-and-forget — never blocks the UI on a network call.
+- **changelogLastSeen** specifically uses a loose semver comparison so the NEWER value wins regardless of which side has it. Prevents a stale device from re-arming the unread dot when sync runs the other direction.
+- Demo mode (`?demo=1`) intentionally skips cloud writes — there's no real user to write under.
 
 ### v0.26.1 — 2026-05-15
 - **Welcome-seen state is per-account, not per-browser.** v0.26.0 stored "you've seen the welcome" only in `localStorage`, which meant signing in on a new device or different browser re-triggered the onboarding modal. State now lives in Firestore at `/users/{uid}/meta/welcomeSeen` so it follows the user across devices. localStorage still gets written for instant same-session dedup (no Firestore round-trip needed if `onAuthStateChanged` fires twice on a page load), but the cloud doc is the cross-device source of truth.

@@ -1,4 +1,26 @@
-/* Usage Tracker — v0.26.1
+/* Usage Tracker — v0.27.0
+ * v0.27.0: User-preference sync across devices. All viewing preferences
+ *   that used to live in localStorage only now mirror to Firestore at
+ *   `/users/{uid}/meta/uiPrefs`, so signing in on a new browser or
+ *   device picks up the same look and feel automatically. Synced fields:
+ *   - preTaxMode (Show pre-tax prices toggle)
+ *   - density (Comfortable / Compact)
+ *   - columns (per-column visibility map)
+ *   - currency (selected display currency)
+ *   - activityPageSize (Activity log page size)
+ *   - changelogLastSeen (unread-dot state on the version chip)
+ *
+ *   localStorage remains the synchronous backing for instant same-session
+ *   feedback + offline fallback. Firestore is the cross-device source of
+ *   truth and wins on conflict (cloud applied over local on each sign-in).
+ *   First-time users with no cloud doc get their current localStorage
+ *   values seeded so the doc starts populated, and subsequent devices
+ *   inherit those choices. Demo mode never writes to the cloud (no real
+ *   user). saveUiPrefsField() is fire-and-forget — never blocks the UI.
+ *
+ *   changelogLastSeen uses a loose semver comparison so the NEWER value
+ *   wins regardless of which side has it — prevents a stale device from
+ *   re-arming the unread dot when sync runs the other direction.
  * v0.26.1: Welcome-seen state moved from localStorage to Firestore at
  *   `/users/{uid}/meta/welcomeSeen` so it follows the user across
  *   browsers and devices. localStorage still gets written for same-
@@ -562,7 +584,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.26.1';
+const APP_VERSION = '0.27.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -826,6 +848,13 @@ const DEMO_PRODUCTS = (() => {
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
   {
+    version: '0.27.0',
+    date: '2026-05-15',
+    tags: ['new', 'improvement'],
+    title: 'Your view follows you across devices',
+    body: 'Display preferences — pre-tax toggle, currency, density, column visibility, Activity page size — now sync to your account instead of just to one browser. Set your favorite view on your laptop and the same setup shows up next time you sign in on your phone (or any other browser).',
+  },
+  {
     version: '0.26.0',
     date: '2026-05-15',
     tags: ['new'],
@@ -1052,8 +1081,16 @@ function getLastChangelogSeen() {
   try { return localStorage.getItem(CHANGELOG_SEEN_KEY) || ''; }
   catch { return ''; }
 }
-function setLastChangelogSeen(version) {
+// v0.27.0: split into local-only (used by loadAndApplyUiPrefs when
+// applying cloud value — already writing localStorage as part of the
+// cloud-→-local sync, so we shouldn't bounce back to the cloud) and
+// cloud-syncing (the default for user-initiated changes — write both).
+function setLastChangelogSeenLocal(version) {
   try { localStorage.setItem(CHANGELOG_SEEN_KEY, version); } catch {}
+}
+function setLastChangelogSeen(version) {
+  setLastChangelogSeenLocal(version);
+  saveUiPrefsField('changelogLastSeen', version);
 }
 function hasUnreadChangelog() {
   if (!CHANGELOG.length) return false;
@@ -1498,6 +1535,154 @@ async function saveEmailPrefs({ enabled, email }) {
   };
   await setDoc(emailPrefsDoc(), payload, { merge: true });
   return payload;
+}
+
+// v0.27.0: cross-device UI preferences. Each viewing preference that
+// used to live in localStorage only (preTaxMode, density, columns,
+// currency, activityPageSize, changelogLastSeen) is also mirrored to
+// `/users/{uid}/meta/uiPrefs` so it follows the user across browsers
+// and devices. localStorage remains the synchronous backing for
+// immediate same-session feedback + offline fallback; Firestore is the
+// cross-device source of truth and wins on conflict (i.e. on sign-in
+// we apply cloud over local). Demo mode never writes to the cloud
+// (no real user to write under). Single combined doc instead of one
+// per pref so it's a single read on sign-in.
+function uiPrefsDoc(uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'meta', 'uiPrefs');
+}
+
+// Fire-and-forget single-field write. Called from every preference-
+// changing handler after the local state + localStorage have been
+// updated. Caller doesn't await — the local change is already in
+// effect, the cloud sync just propagates to other devices.
+function saveUiPrefsField(field, value) {
+  if (!currentUser?.uid || isDemoMode) return;
+  setDoc(uiPrefsDoc(currentUser.uid), { [field]: value }, { merge: true })
+    .catch(err => console.warn(`saveUiPrefsField(${field}) failed:`, err));
+}
+
+// Read cloud prefs on sign-in and apply them to local state + the UI.
+// First-time users (no cloud doc) get their current localStorage
+// values seeded to the cloud so subsequent devices inherit them.
+// Subsequent loads on the same device usually no-op (cloud === local)
+// or apply small drifts (e.g. user changed something on their phone).
+async function loadAndApplyUiPrefs(uid) {
+  if (!uid) return;
+  let snap;
+  try {
+    snap = await getDoc(uiPrefsDoc(uid));
+  } catch (e) {
+    console.warn('loadAndApplyUiPrefs read failed:', e);
+    return;
+  }
+
+  // First sign-in on cloud (or any user pre-v0.27.0): seed the doc
+  // from whatever the local state is right now. Then we're done.
+  if (!snap.exists()) {
+    const seed = {
+      preTaxMode,
+      density: densityMode,
+      columns: columnVisibility,
+      currency: userCurrency,
+      activityPageSize,
+      changelogLastSeen: getLastChangelogSeen(),
+    };
+    setDoc(uiPrefsDoc(uid), seed, { merge: true })
+      .catch(err => console.warn('uiPrefs seed write failed:', err));
+    return;
+  }
+
+  const data = snap.data() || {};
+  let anyApplied = false;
+
+  // preTaxMode — boolean
+  if (typeof data.preTaxMode === 'boolean' && data.preTaxMode !== preTaxMode) {
+    preTaxMode = data.preTaxMode;
+    try { localStorage.setItem(PRETAX_KEY, preTaxMode ? '1' : '0'); } catch {}
+    const tog = document.getElementById('pretax-toggle');
+    if (tog) tog.checked = preTaxMode;
+    applyPreTaxMode();
+    anyApplied = true;
+  }
+
+  // density — 'comfortable' | 'compact'
+  if ((data.density === 'compact' || data.density === 'comfortable') && data.density !== densityMode) {
+    densityMode = data.density;
+    try { localStorage.setItem(DENSITY_KEY, densityMode); } catch {}
+    const sel = document.getElementById('density-select');
+    if (sel) sel.value = densityMode;
+    applyDensityMode();
+    anyApplied = true;
+  }
+
+  // columns — { key: boolean, ... } — merge with defaults so a future
+  // new column added in code doesn't accidentally hide on this user.
+  if (data.columns && typeof data.columns === 'object') {
+    const defaults = Object.fromEntries(TOGGLEABLE_COLUMNS.map(c => [c.key, true]));
+    columnVisibility = { ...defaults, ...data.columns };
+    try { localStorage.setItem(COLUMNS_KEY, JSON.stringify(columnVisibility)); } catch {}
+    applyColumnVisibility();
+    renderColumnsMenu();
+    anyApplied = true;
+  }
+
+  // currency — 3-letter code that must be in our supported list
+  if (typeof data.currency === 'string'
+      && SUPPORTED_CURRENCIES.some(c => c.code === data.currency)
+      && data.currency !== userCurrency) {
+    userCurrency = data.currency;
+    try { localStorage.setItem(CURRENCY_KEY, userCurrency); } catch {}
+    const sel = document.getElementById('currency-select');
+    if (sel) sel.value = userCurrency;
+    _moneyFormatters = { code: '', coarse: null, fine: null }; // invalidate cache
+    applyCurrencySymbol();
+    anyApplied = true;
+  }
+
+  // activityPageSize — one of the fixed options
+  if (typeof data.activityPageSize === 'number'
+      && [25, 50, 100, 150].includes(data.activityPageSize)
+      && data.activityPageSize !== activityPageSize) {
+    activityPageSize = data.activityPageSize;
+    try { localStorage.setItem('usage.activityPageSize.v1', String(activityPageSize)); } catch {}
+    const sel = document.getElementById('activity-pagesize');
+    if (sel) sel.value = String(activityPageSize);
+    anyApplied = true;
+  }
+
+  // changelogLastSeen — version string. Trickier: we keep whichever is
+  // NEWER (semver-comparable). If cloud is older than local, write local
+  // back up. Prevents a stale device from re-arming the unread dot.
+  if (typeof data.changelogLastSeen === 'string') {
+    const local = getLastChangelogSeen();
+    const cloud = data.changelogLastSeen;
+    if (compareSemver(cloud, local) > 0) {
+      setLastChangelogSeenLocal(cloud);
+      anyApplied = true;
+    } else if (compareSemver(local, cloud) > 0) {
+      // Cloud is stale — push local up.
+      saveUiPrefsField('changelogLastSeen', local);
+    }
+    applyChangelogUnreadDot();
+  }
+
+  // If any pref changed display state, do a single re-render to keep
+  // everything (stats, charts, table) in sync. Skipped if nothing changed.
+  if (anyApplied) render();
+}
+
+// Compare two semver strings (loose — splits on '.', numeric-compare).
+// Returns -1 / 0 / +1 in the usual sort sense.
+function compareSemver(a, b) {
+  const pa = String(a || '').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b || '').split('.').map(n => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x < y) return -1;
+    if (x > y) return 1;
+  }
+  return 0;
 }
 
 function subscribeData(uid) {
@@ -3574,9 +3759,11 @@ function applyColumnVisibility() {
 }
 
 // v0.17.0: persist column visibility to localStorage. Called on every
-// checkbox change.
+// checkbox change. v0.27.0: also mirror to Firestore via uiPrefs so the
+// chosen columns follow the user across browsers/devices.
 function saveColumnVisibility() {
   try { localStorage.setItem(COLUMNS_KEY, JSON.stringify(columnVisibility)); } catch {}
+  saveUiPrefsField('columns', columnVisibility);
 }
 
 // v0.17.0: build the dropdown menu rows. One checkbox per toggleable
@@ -6831,6 +7018,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if ([25, 50, 100, 150].includes(v)) {
       activityPageSize = v;
       try { localStorage.setItem('usage.activityPageSize.v1', String(v)); } catch {}
+      saveUiPrefsField('activityPageSize', v); // v0.27.0
       renderActivity();
     }
   });
@@ -6880,6 +7068,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!SUPPORTED_CURRENCIES.some(c => c.code === next)) return;
       userCurrency = next;
       try { localStorage.setItem(CURRENCY_KEY, next); } catch {}
+      saveUiPrefsField('currency', next); // v0.27.0
       _moneyFormatters = { code: '', coarse: null, fine: null }; // invalidate
       applyCurrencySymbol();
       render();
@@ -6895,6 +7084,7 @@ document.addEventListener('DOMContentLoaded', () => {
     preTaxToggle.addEventListener('change', () => {
       preTaxMode = preTaxToggle.checked;
       try { localStorage.setItem(PRETAX_KEY, preTaxMode ? '1' : '0'); } catch {}
+      saveUiPrefsField('preTaxMode', preTaxMode); // v0.27.0
       applyPreTaxMode();
       render();
       toast(preTaxMode ? 'Showing pre-tax prices' : 'Showing prices with tax');
@@ -6911,6 +7101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     densitySelect.addEventListener('change', () => {
       densityMode = densitySelect.value === 'compact' ? 'compact' : 'comfortable';
       try { localStorage.setItem(DENSITY_KEY, densityMode); } catch {}
+      saveUiPrefsField('density', densityMode); // v0.27.0
       applyDensityMode();
     });
   }
@@ -7031,6 +7222,13 @@ document.addEventListener('DOMContentLoaded', () => {
       loadWelcomeSeen(user.uid).then(seen => {
         if (!seen) setTimeout(openWelcome, 700);
       }).catch(() => {});
+
+      // v0.27.0: pull cross-device viewing preferences from Firestore and
+      // apply them. preTaxMode / density / columns / currency / activity
+      // page-size / changelogLastSeen all live in /users/{uid}/meta/uiPrefs.
+      // First-time users get their current localStorage values seeded to
+      // the cloud. Async + fire-and-forget — same reasoning as above.
+      loadAndApplyUiPrefs(user.uid).catch(() => {});
     } else {
       showSignedOut();
       unsubscribeData();
