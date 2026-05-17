@@ -1178,6 +1178,145 @@ button.stat.is-selected:hover {
   .stat-detail-dialog { max-width: 96vw; }
 }
 
+/* v0.26.0: Help (?) icon button in the user-chip toolbar. Round, small,
+ * sits between the user name and the Install/Settings/Sign-out cluster.
+ * Reuses .btn-ghost behavior but locked to a fixed square shape so it
+ * reads as an icon rather than a text button. */
+.btn-help-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.btn-help-icon:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* v0.26.0: welcome / about dialog. Auto-opens once on first sign-in
+ * (gated by localStorage.usage.welcomeSeen.v1); always reachable
+ * afterward via the "?" button. Larger than typical dialogs since it
+ * carries getting-started content, but stays scrollable on short
+ * viewports. */
+.welcome-dialog {
+  max-width: 640px;
+  width: 92vw;
+  max-height: 90vh;
+}
+.welcome-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f7fb 100%);
+}
+.welcome-header img {
+  flex-shrink: 0;
+  border-radius: 8px;
+  margin-top: 2px;
+}
+.welcome-header-text {
+  flex: 1;
+  min-width: 0;
+}
+.welcome-header-text h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.welcome-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.welcome-close-x {
+  flex-shrink: 0;
+  margin-top: -2px;
+}
+.welcome-body {
+  padding: 18px 24px 20px;
+  overflow-y: auto;
+  max-height: calc(90vh - 200px);
+}
+.welcome-section {
+  margin-bottom: 18px;
+}
+.welcome-section:last-child { margin-bottom: 0; }
+.welcome-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+}
+.welcome-section p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.welcome-section ul,
+.welcome-section ol {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.welcome-section ul li,
+.welcome-section ol li {
+  margin-bottom: 4px;
+}
+.welcome-section strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.welcome-section em {
+  font-style: normal;
+  color: var(--primary);
+  font-weight: 500;
+}
+.welcome-section a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+.welcome-section a:hover { text-decoration: underline; }
+.welcome-section-quiet {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: var(--surface-alt);
+  border-radius: 8px;
+}
+.welcome-section-quiet h3 {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.welcome-section-quiet p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+@media (max-width: 640px) {
+  .welcome-dialog { max-width: 96vw; max-height: 92vh; }
+  .welcome-header { padding: 16px 18px 14px; }
+  .welcome-header-text h2 { font-size: 19px; }
+  .welcome-body { padding: 14px 18px 16px; max-height: calc(92vh - 200px); }
+}
+
 .stat-label {
   font-size: 12px;
   color: var(--text-muted);

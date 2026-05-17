@@ -1,4 +1,17 @@
-/* Usage Tracker — v0.25.3
+/* Usage Tracker — v0.26.0
+ * v0.26.0: Welcome / Help modal. First-time onboarding gate that auto-
+ *   opens once on a user's first sign-in (gated by localStorage
+ *   `usage.welcomeSeen.v1`). Three sections inside: "Why this exists"
+ *   (the problem the app solves), "Getting started in three steps"
+ *   (Add → Start → Finish flow), and "Worth knowing" (stat clicks,
+ *   email reminders, bundles, demo mode, install). A privacy callout
+ *   at the bottom explains where data lives + how to export.
+ *   Always reachable afterward via a new "?" Help icon button in the
+ *   user-chip toolbar (between user name and the Install / Settings /
+ *   Sign-out cluster). Demo mode skips the auto-open since demo users
+ *   are already exploring without commitment. Modal marks itself seen
+ *   on first open, so manually re-opening via "?" doesn't re-arm the
+ *   auto-trigger.
  * v0.25.3: Browser tab title now includes the semver. `document.title`
  *   gets set to `Usage Tracker · v0.25.3` on DOMContentLoaded so the
  *   version shows up wherever the OS surfaces the page title — OS title
@@ -538,7 +551,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.25.3';
+const APP_VERSION = '0.26.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -802,6 +815,13 @@ const DEMO_PRODUCTS = (() => {
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
   {
+    version: '0.26.0',
+    date: '2026-05-15',
+    tags: ['new'],
+    title: 'Welcome + Help',
+    body: 'A new welcome guide auto-opens once on your first sign-in to explain why the app exists, the basic Add → Start → Finish flow, and a handful of "worth knowing" tips. Always reachable any time via the new "?" Help button in the top toolbar.',
+  },
+  {
     version: '0.25.2',
     date: '2026-05-15',
     tags: ['improvement'],
@@ -928,6 +948,34 @@ const CHANGELOG = [
     body: "Marking an active product as finished used to require opening the Edit dialog and typing the end date. Now there's a single Finish button on each active row (mobile too) that opens a tiny dialog with today's date pre-filled — confirm and done.",
   },
 ];
+
+// v0.26.0: welcome / onboarding modal. Auto-opens on a user's first
+// sign-in (when no `usage.welcomeSeen.v1` localStorage entry yet);
+// always reachable afterward via the "?" Help button in the user-chip
+// toolbar. Skipped in demo mode — demo users are already exploring
+// without commitment and don't need an onboarding gate.
+const WELCOME_SEEN_KEY = 'usage.welcomeSeen.v1';
+function hasSeenWelcome() {
+  try { return localStorage.getItem(WELCOME_SEEN_KEY) === '1'; }
+  // Pessimistic: if storage is unavailable, treat as "seen" so we
+  // don't open the modal on every page load.
+  catch { return true; }
+}
+function markWelcomeSeen() {
+  try { localStorage.setItem(WELCOME_SEEN_KEY, '1'); } catch {}
+}
+function openWelcome() {
+  const dlg = document.getElementById('welcome-dialog');
+  if (!dlg) return;
+  if (!dlg.open) dlg.showModal();
+  // Mark as seen as soon as the modal opens so re-opening it manually
+  // (via the Help button) doesn't re-arm the first-sign-in auto-open.
+  markWelcomeSeen();
+}
+function closeWelcome() {
+  const dlg = document.getElementById('welcome-dialog');
+  if (dlg && dlg.open) dlg.close();
+}
 
 // v0.20.0: track the latest version the user has seen in the changelog
 // modal. Drives the unread-dot indicator on the version chip — if the
@@ -6686,6 +6734,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') { e.preventDefault(); confirmFinish(); }
   });
 
+  // v0.26.0: Help (?) button → open the welcome/about modal. Same
+  // modal that auto-shows once on first sign-in.
+  document.getElementById('btn-help')?.addEventListener('click', openWelcome);
+  document.getElementById('welcome-close')?.addEventListener('click', closeWelcome);
+  document.getElementById('welcome-dismiss')?.addEventListener('click', closeWelcome);
+
   // v0.16.0: settings dialog (email reminder opt-in) handlers
   document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
   document.getElementById('settings-close')?.addEventListener('click', closeSettingsDialog);
@@ -6902,6 +6956,14 @@ document.addEventListener('DOMContentLoaded', () => {
       showSignedIn(user);
       subscribeData(user.uid);
       await offerLegacyMigration(user.uid);
+      // v0.26.0: first-time onboarding. Auto-open the welcome modal on
+      // a user's very first sign-in (or any sign-in that happens in a
+      // browser without the WELCOME_SEEN_KEY localStorage entry). Delay
+      // ~700ms so the main UI lands first and the modal arrives as a
+      // gentle overlay rather than competing with first paint.
+      if (!hasSeenWelcome()) {
+        setTimeout(openWelcome, 700);
+      }
     } else {
       showSignedOut();
       unsubscribeData();

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.25.3
+**Version:** v0.26.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.25.3)
+## Current status (v0.26.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,15 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.26.0 — 2026-05-15
+- **Welcome / Help modal.** New first-time onboarding gate that auto-opens once on a user's very first sign-in (tracked via `localStorage.usage.welcomeSeen.v1`). Three sections:
+  - **Why this exists** — short explanation of the problem (household consumables get used up quietly, you only notice when standing at the mirror with an empty tube) and what the app does about it (visibility into when products are running low, per-day cost, brand longevity, optional email reminders).
+  - **Getting started in three steps** — Add a product (UPC scan auto-fills brand/image/type) → Track when you start using it → Mark it finished when it runs out. After a few finished products in a category, the app learns the average lifespan and starts surfacing reorder reminders.
+  - **Worth knowing** — pointer to the clickable stats, email reminder opt-in, bundle support, demo mode (`?demo=1`), PWA install path.
+  - **Privacy callout** — quick note on where data lives + how to export.
+- **"?" Help button** in the user-chip toolbar (between the user name and Install / Settings / Sign out) opens the same modal at any time. Modal marks itself seen on first open, so manually reopening it via the Help button doesn't re-arm the auto-trigger.
+- Demo mode (`?demo=1`) intentionally skips the auto-open since demo users are already exploring without commitment.
 
 ### v0.25.3 — 2026-05-15
 - **Semver in the browser tab title.** `document.title` now reads `Usage Tracker · v0.25.3` (or whatever the current version is). Set on `DOMContentLoaded` from `APP_VERSION` so it stays in lockstep with the header chip and the `<meta name="version">` tag — single source of truth, no manual duplication. Visible in the OS title bar, the tab strip, the Cmd/Alt-Tab switcher, and any pinned tab tooltip. `share.html` and `404.html` keep their own static titles since they don't load `app.js`.

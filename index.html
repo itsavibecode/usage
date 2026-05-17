@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.25.3">
+  <meta name="version" content="0.26.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.25.3</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.26.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -100,6 +100,9 @@
       <div class="user-chip" id="user-chip" hidden>
         <img id="user-avatar" alt="" referrerpolicy="no-referrer">
         <span id="user-name"></span>
+        <!-- v0.26.0: help button — opens the welcome / about modal that
+             also auto-shows once on a user's first sign-in. -->
+        <button type="button" id="btn-help" class="btn btn-ghost btn-help-icon" title="Help &amp; about Usage Tracker" aria-label="Help and about">?</button>
         <!-- v0.23.0: PWA install button. Hidden by default; shown only
              when the browser fires `beforeinstallprompt` AND the app
              isn't already running standalone. Clicking calls the saved
@@ -814,6 +817,63 @@
       <button type="button" class="changelog-filter-tab" data-filter="fix" role="tab" aria-selected="false">Fix</button>
     </nav>
     <div class="changelog-body" id="changelog-body"></div>
+  </dialog>
+
+  <!-- v0.26.0: welcome / help dialog. Auto-opens once on first sign-in
+       (gated by localStorage `usage.welcomeSeen.v1`). Always reachable
+       afterward via the "?" Help button in the user-chip toolbar.
+       Skipped in demo mode — demo users are already exploring and don't
+       need an onboarding gate. -->
+  <dialog id="welcome-dialog" class="welcome-dialog">
+    <header class="welcome-header">
+      <img src="favicon.svg" alt="" width="44" height="44" decoding="async">
+      <div class="welcome-header-text">
+        <h2>Welcome to Usage Tracker</h2>
+        <p class="welcome-subtitle">A simple log for the everyday products you use — toothpaste, shampoo, deodorant, razors, makeup, whatever runs out and needs replacing.</p>
+      </div>
+      <button type="button" class="icon-btn welcome-close-x" id="welcome-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="welcome-body">
+      <section class="welcome-section">
+        <h3>Why this exists</h3>
+        <p>Household consumables get used up quietly. You only notice when you're standing at the bathroom mirror with an empty tube. This app makes the patterns visible:</p>
+        <ul>
+          <li>Know when something's about to run out — before it does.</li>
+          <li>See what each product actually costs you per day.</li>
+          <li>Track which brands and types last longer for you.</li>
+          <li>Get a heads-up by email a few days before you'd be out.</li>
+        </ul>
+      </section>
+
+      <section class="welcome-section">
+        <h3>Getting started in three steps</h3>
+        <ol>
+          <li><strong>Add a product.</strong> Tap <strong>+ Add product</strong> in the top toolbar. Scan the UPC with your camera or type it in — brand name, product image, and product type all auto-fill from the UPC database.</li>
+          <li><strong>Track when you start using it.</strong> Either set a Start date when you add it, or leave it as Inventory and tap <strong>Start</strong> on the row later (one-tap, today's date pre-filled).</li>
+          <li><strong>Mark it finished when it runs out.</strong> Tap <strong>Finish</strong> on the active row. After a few finished products in a category, the app learns the average lifespan and starts surfacing reorder reminders for actives approaching that average.</li>
+        </ol>
+      </section>
+
+      <section class="welcome-section">
+        <h3>Worth knowing</h3>
+        <ul>
+          <li><strong>Stats are clickable.</strong> Tap <em>Active</em> / <em>Inventory</em> / <em>Finished</em> to filter the table to just those products. Tap <em>Total spend</em> / <em>YTD</em> / <em>Last 30 days</em> to see which products contribute to that total.</li>
+          <li><strong>Email reminders.</strong> Open <em>Settings</em> (top-right) and toggle on. You'll get an email digest when products are running low, capped at one per week.</li>
+          <li><strong>Bundles.</strong> Buying a 3-pack? Check <em>Part of a bundle purchase</em> and set the size — the app derives the per-item cost and tracks each sibling separately.</li>
+          <li><strong>What's new.</strong> Click the version chip in the top-left any time to see recent changes to the app.</li>
+          <li><strong>Try a demo</strong> at <a href="?demo=1">?demo=1</a> — sample products, no sign-in needed, nothing saves.</li>
+          <li><strong>Install as an app.</strong> On Chrome / Edge / Android, an <em>Install app</em> button appears in the toolbar — clicking it adds a home-screen icon and opens the app in its own window. On iPhone use Safari's share menu → <em>Add to Home Screen</em>.</li>
+        </ul>
+      </section>
+
+      <section class="welcome-section welcome-section-quiet">
+        <h3>Your data, privately</h3>
+        <p>Products are stored in your own Firestore document under your Google account UID. No other user can see them. The only outbound calls are: the UPC database (when you add a product), brand-logo CDN, recall-alert API, and Resend if you opt in to email reminders. You can export everything to JSON or CSV any time from the Import/Export menu.</p>
+      </section>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn btn-primary" id="welcome-dismiss">Got it, let's go</button>
+    </footer>
   </dialog>
 
   <!-- v0.25.0: stat-detail drill-down modal. Opens when the user clicks
