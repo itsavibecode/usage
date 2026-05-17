@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.26.0
+**Version:** v0.26.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.26.0)
+## Current status (v0.26.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.26.1 — 2026-05-15
+- **Welcome-seen state is per-account, not per-browser.** v0.26.0 stored "you've seen the welcome" only in `localStorage`, which meant signing in on a new device or different browser re-triggered the onboarding modal. State now lives in Firestore at `/users/{uid}/meta/welcomeSeen` so it follows the user across devices. localStorage still gets written for instant same-session dedup (no Firestore round-trip needed if `onAuthStateChanged` fires twice on a page load), but the cloud doc is the cross-device source of truth.
+- **Migration handled transparently.** Existing users who already dismissed the welcome modal under v0.26.0 have `localStorage.usage.welcomeSeen.v1=1` but no cloud doc. On their next sign-in we honor the local flag AND fire-and-forget a cloud write to seed the doc, so they don't see the modal again on any device.
 
 ### v0.26.0 — 2026-05-15
 - **Welcome / Help modal.** New first-time onboarding gate that auto-opens once on a user's very first sign-in (tracked via `localStorage.usage.welcomeSeen.v1`). Three sections:

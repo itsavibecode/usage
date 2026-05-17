@@ -1,4 +1,15 @@
-/* Usage Tracker — v0.26.0
+/* Usage Tracker — v0.26.1
+ * v0.26.1: Welcome-seen state moved from localStorage to Firestore at
+ *   `/users/{uid}/meta/welcomeSeen` so it follows the user across
+ *   browsers and devices. localStorage still gets written for same-
+ *   session dedup (instant, no Firestore round-trip needed when
+ *   onAuthStateChanged fires twice on a page load), but the cloud doc
+ *   is the cross-device source of truth. Migration: legacy users with
+ *   `localStorage.usage.welcomeSeen.v1=1` but no cloud doc are treated
+ *   as seen, AND a fire-and-forget cloud write seeds the doc so future
+ *   devices stay in sync without re-showing the modal. New helpers:
+ *   loadWelcomeSeen(uid) (async getDoc + migration fallback) and
+ *   markWelcomeSeenInCloud(uid) (async setDoc with merge:true).
  * v0.26.0: Welcome / Help modal. First-time onboarding gate that auto-
  *   opens once on a user's first sign-in (gated by localStorage
  *   `usage.welcomeSeen.v1`). Three sections inside: "Why this exists"
@@ -551,7 +562,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.26.0';
+const APP_VERSION = '0.26.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -950,27 +961,82 @@ const CHANGELOG = [
 ];
 
 // v0.26.0: welcome / onboarding modal. Auto-opens on a user's first
-// sign-in (when no `usage.welcomeSeen.v1` localStorage entry yet);
-// always reachable afterward via the "?" Help button in the user-chip
-// toolbar. Skipped in demo mode — demo users are already exploring
-// without commitment and don't need an onboarding gate.
+// sign-in; always reachable afterward via the "?" Help button. Skipped
+// in demo mode — demo users are already exploring without commitment.
+//
+// v0.26.1: state moved from localStorage-only to Firestore-backed under
+// `/users/{uid}/meta/welcomeSeen` so it follows the user across browsers
+// and devices. localStorage still gets written for instant same-session
+// dedup (so the modal doesn't re-open if onAuthStateChanged fires
+// twice on a page load); the cloud doc is the cross-device source of
+// truth. Migration: if a pre-v0.26.1 user has `localStorage.usage.
+// welcomeSeen.v1=1` but no cloud doc, we treat them as seen and
+// fire-and-forget a cloud write so future devices stay in sync.
 const WELCOME_SEEN_KEY = 'usage.welcomeSeen.v1';
-function hasSeenWelcome() {
+
+function hasSeenWelcomeLocal() {
   try { return localStorage.getItem(WELCOME_SEEN_KEY) === '1'; }
-  // Pessimistic: if storage is unavailable, treat as "seen" so we
-  // don't open the modal on every page load.
   catch { return true; }
 }
-function markWelcomeSeen() {
+function markWelcomeSeenLocal() {
   try { localStorage.setItem(WELCOME_SEEN_KEY, '1'); } catch {}
 }
+
+function welcomeSeenDoc(uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'meta', 'welcomeSeen');
+}
+
+// Async: returns true if the user has already seen the welcome modal,
+// false if they haven't. Checks Firestore first (cross-device); falls
+// back to localStorage with a migration write if the local flag is set
+// but Firestore doesn't have the doc yet (pre-v0.26.1 users).
+async function loadWelcomeSeen(uid) {
+  if (!uid) return true; // no uid → can't check, treat as seen to avoid spam
+  try {
+    const snap = await getDoc(welcomeSeenDoc(uid));
+    if (snap.exists() && snap.data()?.seenAt) return true;
+  } catch (e) {
+    // Firestore unreachable. Fall through to localStorage check so the
+    // user isn't blocked from seeing/dismissing the welcome offline.
+    console.warn('loadWelcomeSeen failed:', e);
+  }
+  // Cloud says no. If localStorage says yes (legacy / migration case),
+  // treat as seen AND fire-and-forget a cloud write so other devices
+  // pick up the state too.
+  if (hasSeenWelcomeLocal()) {
+    markWelcomeSeenInCloud(uid).catch(() => {});
+    return true;
+  }
+  return false;
+}
+
+async function markWelcomeSeenInCloud(uid = currentUser?.uid) {
+  if (!uid) return;
+  try {
+    await setDoc(
+      welcomeSeenDoc(uid),
+      { seenAt: new Date().toISOString(), version: APP_VERSION },
+      { merge: true }
+    );
+  } catch (e) {
+    // Non-fatal — localStorage still tracks it for this browser.
+    console.warn('markWelcomeSeenInCloud failed:', e);
+  }
+}
+
 function openWelcome() {
   const dlg = document.getElementById('welcome-dialog');
   if (!dlg) return;
   if (!dlg.open) dlg.showModal();
-  // Mark as seen as soon as the modal opens so re-opening it manually
-  // (via the Help button) doesn't re-arm the first-sign-in auto-open.
-  markWelcomeSeen();
+  // Mark seen everywhere:
+  //  - localStorage immediately so the SAME session doesn't re-open if
+  //    onAuthStateChanged refires before the cloud write completes.
+  //  - Firestore async so OTHER devices/browsers respect it on next
+  //    sign-in. Skipped in demo mode (no real user to write under).
+  markWelcomeSeenLocal();
+  if (currentUser?.uid && !isDemoMode) {
+    markWelcomeSeenInCloud(currentUser.uid).catch(() => {});
+  }
 }
 function closeWelcome() {
   const dlg = document.getElementById('welcome-dialog');
@@ -6957,13 +7023,14 @@ document.addEventListener('DOMContentLoaded', () => {
       subscribeData(user.uid);
       await offerLegacyMigration(user.uid);
       // v0.26.0: first-time onboarding. Auto-open the welcome modal on
-      // a user's very first sign-in (or any sign-in that happens in a
-      // browser without the WELCOME_SEEN_KEY localStorage entry). Delay
-      // ~700ms so the main UI lands first and the modal arrives as a
-      // gentle overlay rather than competing with first paint.
-      if (!hasSeenWelcome()) {
-        setTimeout(openWelcome, 700);
-      }
+      // a user's very first sign-in. v0.26.1: the seen-state lives in
+      // Firestore under /users/{uid}/meta/welcomeSeen, so signing in on
+      // a new device after dismissing it elsewhere doesn't re-trigger.
+      // Fire-and-forget — we don't block the rest of the sign-in flow
+      // on this Firestore read.
+      loadWelcomeSeen(user.uid).then(seen => {
+        if (!seen) setTimeout(openWelcome, 700);
+      }).catch(() => {});
     } else {
       showSignedOut();
       unsubscribeData();
