@@ -746,6 +746,29 @@ main {
 @media (max-width: 720px) {
   .display-controls { justify-content: flex-start; }
   #currency-select { max-width: 180px; }
+  /* v0.27.2: keep narrow viewports from overflowing horizontally.
+   * The v0.25.1 unified-toolbar rule pins .display-controls to
+   * flex-shrink: 0 inside .table-toolbar so it doesn't get squeezed
+   * by the search bar on desktop. That same pin breaks mobile when
+   * the toggle's label ("Show pre-tax prices") + track is wider than
+   * the viewport — the row insists on intrinsic width and triggers
+   * a horizontal scrollbar. Override on mobile: let the section
+   * shrink, then let the pretax label wrap to a second line if
+   * needed instead of pushing past the right edge. */
+  .table-toolbar .display-controls {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .pretax-toggle {
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .pretax-label {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
 }
 
 .pretax-toggle {

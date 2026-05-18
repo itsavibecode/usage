@@ -1,4 +1,14 @@
-/* Usage Tracker — v0.27.1
+/* Usage Tracker — v0.27.2
+ * v0.27.2: Fix mobile horizontal scrollbar caused by the pre-tax toggle.
+ *   The v0.25.1 unified-toolbar rule pinned `.display-controls` to
+ *   `flex-shrink: 0` so the search bar couldn't squeeze it on desktop.
+ *   That pin broke mobile: when the pre-tax toggle's label "Show
+ *   pre-tax prices" plus the track were wider than the viewport, the
+ *   section insisted on intrinsic width and triggered a page-level
+ *   horizontal scrollbar. Mobile override: let `.display-controls`
+ *   shrink, let `.pretax-toggle` wrap internally, and let the label
+ *   break on words/anywhere if needed. Label now wraps to a second
+ *   line below the track instead of pushing past the right edge.
  * v0.27.1: Trend banner is now clickable. The "Trend" panel at the top
  *   of the page used to be a plain text statement; clicking it now
  *   opens a detail modal listing the products that make up the trend.
@@ -603,7 +613,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.1';
+const APP_VERSION = '0.27.2';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';

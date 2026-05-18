@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.1
+**Version:** v0.27.2
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.1)
+## Current status (v0.27.2)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.2 — 2026-05-15
+- **Fixed: horizontal scrollbar on iPhone caused by the pre-tax toggle.** The v0.25.1 unified-toolbar layout pinned `.display-controls` to `flex-shrink: 0` so the search bar couldn't squeeze it on desktop. That pin broke mobile: when the pre-tax toggle's label "Show pre-tax prices" plus the track were wider than the viewport, the section insisted on intrinsic width and triggered a page-level horizontal scrollbar. Mobile override now lets `.display-controls` shrink, lets `.pretax-toggle` wrap internally, and lets the label break on words / anywhere if needed. Label now wraps to a second line below the track on narrow screens instead of pushing past the right edge.
 
 ### v0.27.1 — 2026-05-15
 - **Trend banner is clickable.** The Trend panel at the top of the page now opens a drill-down modal showing the products that make up the trend. Each `INSIGHT_GENERATOR` returns `{text, kind, payload}` (was just a string); `openTrendDrillDown(insight)` routes by `kind`:
