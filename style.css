@@ -652,11 +652,55 @@ main {
   min-width: 0;
 }
 
+/* v0.27.1: drill-down button variant. When the trend has supporting
+ * data, the panel renders a <button> child instead of plain content
+ * so the user gets a clickable affordance. Strip default button chrome
+ * so it inherits the panel's gradient + border; add hover/focus + a
+ * trailing chevron so it reads as "this is interactive". */
+.trends-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: opacity 0.12s ease;
+}
+.trends-button:hover { opacity: 0.78; }
+.trends-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.trends-chevron {
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-left: 4px;
+}
+
 @media (max-width: 720px) {
   .trends-panel {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
+  }
+  .trends-button {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .trends-chevron {
+    /* On mobile, the chevron stacks below the text — push it to the
+     * right edge of its own line for affordance. */
+    align-self: flex-end;
+    margin-top: -22px; /* overlap with the text row visually */
   }
 }
 

@@ -1,4 +1,23 @@
-/* Usage Tracker — v0.27.0
+/* Usage Tracker — v0.27.1
+ * v0.27.1: Trend banner is now clickable. The "Trend" panel at the top
+ *   of the page used to be a plain text statement; clicking it now
+ *   opens a detail modal listing the products that make up the trend.
+ *   Each INSIGHT_GENERATOR returns {text, kind, payload} (was just a
+ *   string), and openTrendDrillDown routes by kind:
+ *     - topSpend / topPerDay → list products in that category with
+ *       allocated cost / $/day respectively
+ *     - longestActive → open that specific product's Edit dialog
+ *     - recentlyFinished → list products finished in the window, sorted
+ *       by end date with duration as the amount column
+ *     - inventoryPileUp → list all current inventory items
+ *     - cold (educational fact) → no drill-down; banner stays a <div>
+ *
+ *   showDetailModal extracted from openStatDetail for reuse — same modal
+ *   chrome (stat-detail-dialog) supports both stat-tile and trend
+ *   drill-downs now. New optional detail-shape fields: amountLabel
+ *   (override "$X.XX" with arbitrary text like "92 days" or "$0.05/day"),
+ *   subline (override the default "type · date"), hideTotal (skip the
+ *   Total bar when the column doesn't meaningfully sum), totalLabel.
  * v0.27.0: User-preference sync across devices. All viewing preferences
  *   that used to live in localStorage only now mirror to Firestore at
  *   `/users/{uid}/meta/uiPrefs`, so signing in on a new browser or
@@ -584,7 +603,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.0';
+const APP_VERSION = '0.27.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -847,6 +866,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.1',
+    date: '2026-05-15',
+    tags: ['new'],
+    title: 'Click the trend banner for details',
+    body: 'The Trend panel at the top of the page is now clickable when a real insight is shown. Tap it to see exactly which products are driving the trend — e.g. "you\'ve spent the most on Underarm" opens a breakdown of every Underarm product and its share of that spend. Educational tips (the "Did you know" banner) stay non-clickable since there\'s no data to drill into.',
+  },
   {
     version: '0.27.0',
     date: '2026-05-15',
@@ -2785,6 +2811,20 @@ function computeStatDetail(key) {
 function openStatDetail(key) {
   const detail = computeStatDetail(key);
   if (!detail) return;
+  showDetailModal(detail);
+}
+
+// v0.27.1: shared modal renderer for any "product list with amounts"
+// drill-down. Used by openStatDetail (stat tile clicks) and
+// openTrendDrillDown (trend banner clicks). The detail shape:
+//   { title, lead, items: [{ product, amount, amountLabel?, subline? }],
+//     hideTotal?: boolean, totalLabel?: string }
+// `amountLabel` lets a caller override the formatted amount (e.g. "92 days"
+// for a duration-based drill-down). `subline` overrides the default
+// "type · date" sub line. `hideTotal` skips the Total bar when the
+// numbers don't meaningfully sum (e.g. listing $/day rates).
+function showDetailModal(detail) {
+  if (!detail) return;
   const dlg = document.getElementById('stat-detail-dialog');
   const titleEl = document.getElementById('stat-detail-title');
   const leadEl = document.getElementById('stat-detail-lead');
@@ -2795,29 +2835,35 @@ function openStatDetail(key) {
 
   titleEl.textContent = detail.title;
   leadEl.textContent = detail.lead;
-  const total = detail.items.reduce((s, x) => s + x.amount, 0);
 
-  if (detail.items.length === 0) {
+  if (!detail.items || detail.items.length === 0) {
     totalEl.hidden = true;
     listEl.innerHTML = '';
     if (emptyEl) emptyEl.hidden = false;
   } else {
-    totalEl.hidden = false;
-    totalEl.innerHTML = `<span class="stat-detail-total-label">Total</span><span class="stat-detail-total-value">${escapeHtml(money(total))}</span>`;
+    if (detail.hideTotal) {
+      totalEl.hidden = true;
+    } else {
+      const total = detail.items.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      totalEl.hidden = false;
+      const totalLabel = detail.totalLabel || 'Total';
+      totalEl.innerHTML = `<span class="stat-detail-total-label">${escapeHtml(totalLabel)}</span><span class="stat-detail-total-value">${escapeHtml(money(total))}</span>`;
+    }
     if (emptyEl) emptyEl.hidden = true;
-    listEl.innerHTML = detail.items.map(({ product: p, amount }) => {
+    listEl.innerHTML = detail.items.map(({ product: p, amount, amountLabel, subline }) => {
       const type = escapeHtml(p.productType || '');
       const datePart = (() => {
         const d = parseLocalDate(p.purchaseDate || p.startDate);
         return d ? formatDate(d.toISOString().slice(0, 10)) : '';
       })();
-      const subBits = [type, datePart].filter(Boolean).join(' · ');
+      const subBits = subline ? escapeHtml(subline) : [type, datePart].filter(Boolean).join(' · ');
+      const shownAmount = amountLabel != null ? amountLabel : money(amount);
       return `<button type="button" class="stat-detail-item" data-id="${escapeHtml(p.id)}" title="Click to open ${escapeHtml(p.productName || '')}">
         <div class="stat-detail-item-main">
           <div class="stat-detail-item-name">${escapeHtml(p.productName || '(unnamed)')}</div>
           ${subBits ? `<div class="stat-detail-item-sub">${subBits}</div>` : ''}
         </div>
-        <div class="stat-detail-item-amount">${escapeHtml(money(amount))}</div>
+        <div class="stat-detail-item-amount">${escapeHtml(shownAmount)}</div>
       </button>`;
     }).join('');
   }
@@ -3128,7 +3174,9 @@ const COLD_START_FACTS = {
   ]
 };
 
-// Each generator: takes the products array, returns a string or null.
+// v0.27.1: each generator now returns an object {text, kind, payload}
+// (or null). The `kind` identifies the trend type; the `payload` carries
+// the data needed to re-compute the drill-down list at click time.
 // Generators get shuffled per page load so the same one doesn't always win.
 const INSIGHT_GENERATORS = [
   // Most-spent category
@@ -3143,7 +3191,11 @@ const INSIGHT_GENERATORS = [
     const top = topEntry(map);
     if (!top || top[1] <= 0) return null;
     const count = used.filter(p => p.productType === top[0]).length;
-    return `You've spent the most on ${top[0]} so far — ${money(top[1])} across ${count} item${count === 1 ? '' : 's'}.`;
+    return {
+      text: `You've spent the most on ${top[0]} so far — ${money(top[1])} across ${count} item${count === 1 ? '' : 's'}.`,
+      kind: 'topSpend',
+      payload: { productType: top[0] },
+    };
   },
   // Longest currently active product
   function longestActive(ps) {
@@ -3153,7 +3205,11 @@ const INSIGHT_GENERATORS = [
       .sort((a, b) => b.dur - a.dur);
     if (active.length === 0) return null;
     const x = active[0];
-    return `${x.p.productName} has been going for ${x.dur} days and counting — your longest active product right now.`;
+    return {
+      text: `${x.p.productName} has been going for ${x.dur} days and counting — your longest active product right now.`,
+      kind: 'longestActive',
+      payload: { productId: x.p.id },
+    };
   },
   // Recently finished products
   function recentlyFinished(ps) {
@@ -3165,7 +3221,11 @@ const INSIGHT_GENERATORS = [
       return d && d >= cutoff;
     });
     if (recent.length < 2) return null;
-    return `You've finished ${recent.length} products in the last 30 days.`;
+    return {
+      text: `You've finished ${recent.length} products in the last 30 days.`,
+      kind: 'recentlyFinished',
+      payload: { cutoffDays: 30 },
+    };
   },
   // Highest per-day burn category — v0.7.18: finished products only.
   // Active products are still in progress; their `calcCostPerDay` uses today
@@ -3193,18 +3253,27 @@ const INSIGHT_GENERATORS = [
       }
     }
     if (!bestType || bestRate <= 0) return null;
-    return `${bestType} is your highest daily-cost category, burning ${moneyFine(bestRate)} per day.`;
+    return {
+      text: `${bestType} is your highest daily-cost category, burning ${moneyFine(bestRate)} per day.`,
+      kind: 'topPerDay',
+      payload: { productType: bestType },
+    };
   },
   // Inventory pile-up
   function inventoryPileUp(ps) {
     const inv = ps.filter(isInventory).length;
     if (inv < 3) return null;
-    return `You have ${inv} item${inv === 1 ? '' : 's'} sitting in inventory — give one a Start date when you crack it open to start tracking its lifespan.`;
+    return {
+      text: `You have ${inv} item${inv === 1 ? '' : 's'} sitting in inventory — give one a Start date when you crack it open to start tracking its lifespan.`,
+      kind: 'inventoryPileUp',
+      payload: {},
+    };
   }
 ];
 
 function pickRealInsight(ps) {
   // Shuffle generator order each call so reloads surface different insights.
+  // v0.27.1: generators now return {text, kind, payload} objects (or null).
   const gens = [...INSIGHT_GENERATORS].sort(() => Math.random() - 0.5);
   for (const gen of gens) {
     const result = gen(ps);
@@ -3225,7 +3294,11 @@ function pickColdStartFact(ps) {
   for (const [type] of ranked) {
     const facts = COLD_START_FACTS[type];
     if (facts && facts.length) {
-      return { type, fact: facts[Math.floor(Math.random() * facts.length)] };
+      return {
+        text: facts[Math.floor(Math.random() * facts.length)],
+        kind: 'cold',
+        payload: { productType: type },
+      };
     }
   }
   return null;
@@ -3240,13 +3313,19 @@ let trendInsightCache;
 function computeTrendInsight() {
   // v0.15.0: trends always operate on tracked products only — favorites are
   // catalog references, not data the user has insights about.
+  // v0.27.1: generators + cold-start return the full {text, kind, payload}
+  // object now, so we just pass through.
   const ps = trackedOnly();
   const real = pickRealInsight(ps);
-  if (real) return { kind: 'real', text: real };
+  if (real) return real;
   const cold = pickColdStartFact(ps);
-  if (cold) return { kind: 'cold', text: cold.fact };
+  if (cold) return cold;
   return null;
 }
+
+// v0.27.1: kinds that have a drill-down available. Cold-start facts don't
+// (they're educational tidbits, not data-backed insights).
+const TREND_DRILLDOWN_KINDS = new Set(['topSpend', 'longestActive', 'recentlyFinished', 'topPerDay', 'inventoryPileUp']);
 
 function renderTrendsPanel() {
   const panel = document.getElementById('trends-panel');
@@ -3264,9 +3343,116 @@ function renderTrendsPanel() {
     return;
   }
   panel.hidden = false;
-  const tagLabel = insight.kind === 'real' ? 'Trend' : 'Did you know';
-  const tagClass = insight.kind === 'real' ? 'trends-tag' : 'trends-tag trends-tag-cold';
-  panel.innerHTML = `<span class="${tagClass}">${tagLabel}</span><span class="trends-text">${escapeHtml(insight.text)}</span>`;
+  const isCold = insight.kind === 'cold';
+  const tagLabel = isCold ? 'Did you know' : 'Trend';
+  const tagClass = isCold ? 'trends-tag trends-tag-cold' : 'trends-tag';
+  // v0.27.1: render as a button when a drill-down is available so the
+  // user gets a hover/focus cue + keyboard support. Cold facts stay as
+  // a plain <div> since there's nothing to drill into.
+  const drillable = TREND_DRILLDOWN_KINDS.has(insight.kind);
+  const inner = `<span class="${tagClass}">${tagLabel}</span><span class="trends-text">${escapeHtml(insight.text)}</span>${drillable ? '<span class="trends-chevron" aria-hidden="true">&rsaquo;</span>' : ''}`;
+  if (drillable) {
+    panel.innerHTML = `<button type="button" class="trends-button" id="trends-button" title="See the details behind this trend">${inner}</button>`;
+  } else {
+    panel.innerHTML = inner;
+  }
+}
+
+// v0.27.1: open the trend drill-down. Routes by kind:
+//   - topSpend / topPerDay → list products in that category with their
+//     allocated cost or $/day, sorted descending.
+//   - longestActive → directly open the Edit dialog for that product
+//     (single-product modal would be weird).
+//   - recentlyFinished → list products finished in the window, sorted
+//     by end date (newest first), with duration as the amount column.
+//   - inventoryPileUp → list all current inventory items.
+function openTrendDrillDown(insight) {
+  if (!insight || !TREND_DRILLDOWN_KINDS.has(insight.kind)) return;
+  const tracked = trackedOnly();
+
+  if (insight.kind === 'longestActive') {
+    const id = insight.payload?.productId;
+    const p = tracked.find(x => x.id === id);
+    if (p) openEditDialog(p.id);
+    return;
+  }
+
+  let detail = null;
+
+  if (insight.kind === 'topSpend') {
+    const type = insight.payload?.productType;
+    const items = tracked
+      .filter(p => p.productType === type && !isInventory(p))
+      .map(p => ({ product: p, amount: allocatedCost(p) || 0 }))
+      .filter(x => x.amount > 0)
+      .sort((a, b) => b.amount - a.amount);
+    detail = {
+      title: `Spend breakdown — ${type}`,
+      lead: `Products in the ${type} category and their share of your total spend on this type. Bundle items contribute their per-item share. Inventory items are excluded.`,
+      items,
+    };
+  } else if (insight.kind === 'topPerDay') {
+    const type = insight.payload?.productType;
+    // For "highest daily-cost category" we show per-product $/day rates
+    // for the finished products in that category. The category-level rate
+    // shown in the trend banner is a different number (uses
+    // categoryDailyRate to avoid sequential-product inflation), but
+    // per-product is what's intuitive to drill into.
+    const items = tracked
+      .filter(p => p.productType === type && isFinished(p))
+      .map(p => ({ product: p, amount: calcCostPerDay(p) || 0 }))
+      .filter(x => x.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .map(x => ({ ...x, amountLabel: `${moneyFine(x.amount)}/day` }));
+    detail = {
+      title: `Daily burn — ${type}`,
+      lead: `Finished products in the ${type} category and their effective $/day (cost divided by lifespan). The category-level rate shown in the banner uses a slightly different calculation that avoids double-counting sequential products of the same type.`,
+      items,
+      hideTotal: true,
+    };
+  } else if (insight.kind === 'recentlyFinished') {
+    const days = insight.payload?.cutoffDays || 30;
+    const cutoff = new Date(Date.now() - days * 86400000);
+    const items = tracked
+      .filter(p => {
+        if (!p.endDate) return false;
+        const d = parseLocalDate(p.endDate);
+        return d && d >= cutoff;
+      })
+      .map(p => {
+        const dur = calcDuration(p);
+        const endStr = formatDate(p.endDate);
+        return {
+          product: p,
+          amount: dur || 0,
+          amountLabel: dur != null ? `${dur} days` : '—',
+          subline: `${p.productType || ''} · ended ${endStr}`,
+        };
+      })
+      .sort((a, b) => parseLocalDate(b.product.endDate) - parseLocalDate(a.product.endDate));
+    detail = {
+      title: `Finished in the last ${days} days`,
+      lead: `Products you marked as finished within this window. The right-side column shows the total lifespan from start date to end date.`,
+      items,
+      hideTotal: true,
+    };
+  } else if (insight.kind === 'inventoryPileUp') {
+    const items = tracked
+      .filter(isInventory)
+      .map(p => ({
+        product: p,
+        amount: allocatedCost(p) || 0,
+        subline: `${p.productType || ''}${p.purchaseDate ? ` · bought ${formatDate(p.purchaseDate)}` : ''}`,
+      }));
+    detail = {
+      title: 'In your inventory',
+      lead: 'Products you\'ve purchased but haven\'t started using yet. Tap any row to open the product. To start tracking lifespan, set a Start date or tap the Start button on the row in the Table view.',
+      items,
+      totalLabel: 'Inventory value',
+    };
+  }
+
+  if (detail) showDetailModal(detail);
 }
 
 /* v0.10.0 — Reorder reminders. For each active product, look at the average
@@ -6905,6 +7091,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reminders-panel')?.addEventListener('click', e => {
     const item = e.target.closest('.reminder-item');
     if (item) openEditDialog(item.dataset.id);
+  });
+
+  // v0.27.1: trend banner click → drill-down modal (or open Edit
+  // dialog directly for single-product trends like longestActive).
+  // The button is created dynamically in renderTrendsPanel, so we use
+  // event delegation on the panel itself.
+  document.getElementById('trends-panel')?.addEventListener('click', e => {
+    const btn = e.target.closest('#trends-button');
+    if (btn && trendInsightCache) openTrendDrillDown(trendInsightCache);
   });
 
   // v0.25.0: stat tile clicks → drill-down. Count-based tiles switch

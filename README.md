@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.0
+**Version:** v0.27.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.0)
+## Current status (v0.27.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,15 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.1 — 2026-05-15
+- **Trend banner is clickable.** The Trend panel at the top of the page now opens a drill-down modal showing the products that make up the trend. Each `INSIGHT_GENERATOR` returns `{text, kind, payload}` (was just a string); `openTrendDrillDown(insight)` routes by `kind`:
+  - **topSpend / topPerDay** → list of products in the called-out category, sorted by allocated cost / $/day descending.
+  - **longestActive** → opens the Edit dialog for that one product directly (single-product modal would have been weird).
+  - **recentlyFinished** → list of products finished in the last 30 days sorted by end date, with each product's total lifespan as the right-side amount.
+  - **inventoryPileUp** → list of all current inventory items with their value.
+  - **cold** (educational "did you know" facts) → no drill-down; banner stays a plain `<div>` since there's no data to show.
+- **`showDetailModal(detail)` extracted** from `openStatDetail` for reuse. The stat-detail-dialog now backs both stat-tile and trend drill-downs. New optional `detail` fields: `amountLabel` (override the right-column display, e.g. "92 days" instead of "$5.00"), `subline` (override the default "type · date" sub line), `hideTotal` (skip the Total bar when the column doesn't meaningfully sum), `totalLabel` (override "Total").
 
 ### v0.27.0 — 2026-05-15
 - **Cross-device preference sync.** All viewing preferences — `preTaxMode`, `densityMode`, `columnVisibility`, `userCurrency`, `activityPageSize`, `changelogLastSeen` — now mirror to Firestore at `/users/{uid}/meta/uiPrefs` so they follow the user across browsers and devices. Set your favorite columns + density on the laptop, sign in on the phone, same view appears.
