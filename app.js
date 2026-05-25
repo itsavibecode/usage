@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.2
+/* Usage Tracker — v0.27.3
+ * v0.27.3: Suppress reorder reminders when the same product type is sitting in inventory.
  * v0.27.2: Fix mobile horizontal scrollbar caused by the pre-tax toggle.
  *   The v0.25.1 unified-toolbar rule pinned `.display-controls` to
  *   `flex-shrink: 0` so the search bar couldn't squeeze it on desktop.
@@ -613,7 +614,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.2';
+const APP_VERSION = '0.27.3';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -876,6 +877,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.3',
+    date: '2026-05-24',
+    tags: ['fix'],
+    title: 'No reorder nudge when you already have a backup',
+    body: 'Reorder reminders now skip any product type you already have sitting in inventory. If you\'ve got an unopened backup tube of toothpaste on the shelf, the app stops telling you to reorder toothpaste — the whole point of the reminder is "buy more before you run out," and a waiting backup means you\'re covered. Both the in-app reminders panel and the daily email digest apply the same check so they stay in sync.',
+  },
   {
     version: '0.27.1',
     date: '2026-05-15',
@@ -3493,10 +3501,26 @@ function computeReorderReminders() {
     meanLifespan.set(k, mean);
   }
 
+  // v0.27.3: skip reorder reminders for productTypes that already have an
+  // inventory item on hand. The point of the reminder is "buy more before
+  // you run out" — if the user has an unopened backup of the same
+  // category sitting in inventory, they have a backup ready to start
+  // when the current one finishes, so a "reorder" nudge would be wrong.
+  // Matched by productType (the category), mirroring the worker's
+  // computeReminders logic so the in-app panel and the email digest
+  // surface the same set of reminders.
+  const typesWithInventory = new Set();
+  for (const p of products) {
+    if (isInventory(p) && p.productType) {
+      typesWithInventory.add(p.productType);
+    }
+  }
+
   const reminders = [];
   for (const p of products) {
     if (!isActive(p)) continue;
     const k = p.productType || '';
+    if (typesWithInventory.has(k)) continue; // v0.27.3 backup-in-inventory check
     const mean = meanLifespan.get(k);
     if (mean == null) continue;
     const dur = calcDuration(p);
