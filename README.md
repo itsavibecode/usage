@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.3
+**Version:** v0.27.4
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.3)
+## Current status (v0.27.4)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.4 — 2026-06-12
+- **Fixed: Help "?" button in the toolbar looked like a broken character.** The v0.26.0 button inherited `.btn-ghost` styling, which sets background AND border to transparent. The only thing actually visible in the toolbar was a faint muted "?" floating in space — easy to read as a glyph that failed to render or an incomplete element. Now it has explicit affordance: a 30×30 circle with a visible 1.5px primary-blue border, a light primary-tinted background, and a primary-colored "?". Hover fills it solid blue with a white "?" (unchanged from before). Selector compounded as `.btn-ghost.btn-help-icon` to outrank `.btn-ghost` without depending on stylesheet order. Behavior unchanged — still opens the welcome/help dialog.
 
 ### v0.27.3 — 2026-05-24
 - **Fixed: reorder reminders firing when a backup of the same product type is already in inventory.** The reminder logic computes each `productType`'s mean lifespan, then walks active products and flags any that have used ≥85% of their type's mean. Now it first builds a set of `productType`s that have at least one item in inventory (`isInventory`) and skips those types in the active-iteration loop. The point of the reminder is "buy more before you run out" — if you've already got an unopened replacement sitting on the shelf, you don't need a nudge to reorder. Matched by type (the category), not exact product/UPC, because the user mental model is "do I have any X waiting?" Both the in-app **Reorder reminders** panel and the daily email digest (`usage-worker` v0.3.1) apply the same check, so they stay in sync. See `computeReorderReminders` in `app.js` and `computeReminders` in `usage-worker/src/index.js`.

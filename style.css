@@ -1247,24 +1247,41 @@ button.stat.is-selected:hover {
 
 /* v0.26.0: Help (?) icon button in the user-chip toolbar. Round, small,
  * sits between the user name and the Install/Settings/Sign-out cluster.
- * Reuses .btn-ghost behavior but locked to a fixed square shape so it
- * reads as an icon rather than a text button. */
-.btn-help-icon {
-  width: 28px;
-  height: 28px;
+ * v0.27.4: solid border + light primary tint + primary-colored "?". The
+ * v0.26.0 version inherited .btn-ghost's transparent background AND
+ * transparent border, so all that was visible in the toolbar was a faint
+ * muted "?" floating in space — read as a glyph that didn't render or
+ * an unfinished element rather than a button. Now it has obvious
+ * affordance: visible boundary, tinted background, colored question
+ * mark. Hover behavior unchanged.
+ *
+ * Selector is compounded with .btn-ghost so we outrank the .btn-ghost
+ * background/border/color rules later in the file without depending on
+ * source order. */
+.btn-ghost.btn-help-icon {
+  width: 30px;
+  height: 30px;
   padding: 0;
   border-radius: 50%;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: rgba(43, 95, 217, 0.08);
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
 }
-.btn-help-icon:hover {
+.btn-ghost.btn-help-icon:hover {
   background: var(--primary);
   color: #fff;
   border-color: var(--primary);
+}
+.btn-ghost.btn-help-icon:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* v0.26.0: welcome / about dialog. Auto-opens once on first sign-in

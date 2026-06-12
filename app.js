@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.3
+/* Usage Tracker — v0.27.4
+ * v0.27.4: Help "?" button now reads as a button instead of a stray glyph (visible border + tinted bg).
  * v0.27.3: Suppress reorder reminders when the same product type is sitting in inventory.
  * v0.27.2: Fix mobile horizontal scrollbar caused by the pre-tax toggle.
  *   The v0.25.1 unified-toolbar rule pinned `.display-controls` to
@@ -614,7 +615,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.3';
+const APP_VERSION = '0.27.4';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -877,6 +878,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.4',
+    date: '2026-06-12',
+    tags: ['fix'],
+    title: 'Help button looks like a button now',
+    body: 'The "?" Help icon in the top toolbar had a transparent background and transparent border, so it read as a stray character rather than something you could click. Now it sits in a clearly defined circle with a primary-blue border and light tint, and fills in solid blue on hover. Same behavior — click it to reopen the welcome / help guide any time.',
+  },
   {
     version: '0.27.3',
     date: '2026-05-24',
