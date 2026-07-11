@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="0.27.5">
+  <title>Privacy, Terms &amp; Disclaimer · Usage Tracker</title>
+  <meta name="description" content="Privacy policy, terms of use, and disclaimer for Usage Tracker — a personal product usage tracker.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://dev.rizzo.cc/usage/legal.html">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+  <meta name="theme-color" content="#2b5fd9">
+  <meta name="color-scheme" content="light">
+  <!-- OG tags so a shared link produces a sane embed. Reuses the app's
+       existing 1200x630 image. -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Usage Tracker">
+  <meta property="og:title" content="Privacy, Terms &amp; Disclaimer · Usage Tracker">
+  <meta property="og:description" content="How Usage Tracker handles your data, what you agree to by using it, and what the app's numbers do and don't mean.">
+  <meta property="og:url" content="https://dev.rizzo.cc/usage/legal.html">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://dev.rizzo.cc/usage/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Usage Tracker — personal product usage tracker">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Privacy, Terms &amp; Disclaimer · Usage Tracker">
+  <meta name="twitter:description" content="How Usage Tracker handles your data, what you agree to by using it, and what the app's numbers do and don't mean.">
+  <meta name="twitter:image" content="https://dev.rizzo.cc/usage/og-image.png">
+  <style>
+    /* Self-contained styles so this page renders cleanly even when the
+       main app bundle is broken or unreachable. Mirrors the production
+       design tokens from style.css (primary blue, surface white, system
+       font stack). */
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --border: #e3e7ef;
+      --border-strong: #c9d0dd;
+      --text: #1a2238;
+      --text-muted: #6b7390;
+      --primary: #2b5fd9;
+      --primary-hover: #1f4ec2;
+      --primary-tint: rgba(43, 95, 217, 0.08);
+      --shadow-md: 0 4px 16px rgba(20, 30, 60, 0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+    header.page-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+    }
+    header.page-header img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    header.page-header .title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    header.page-header h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    header.page-header .subtitle {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    header.page-header .back {
+      margin-left: auto;
+      padding: 6px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--surface);
+      white-space: nowrap;
+    }
+    header.page-header .back:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+      background: var(--primary-tint);
+      text-decoration: none;
+    }
+    nav.toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow-md);
+    }
+    nav.toc .toc-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    nav.toc ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+    nav.toc li { margin: 4px 0; }
+    section.doc-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-md);
+    }
+    section.doc-section h2 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    section.doc-section h2 .last-updated {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+    section.doc-section .lead {
+      color: var(--text-muted);
+      margin: 0 0 20px;
+      font-size: 14px;
+    }
+    section.doc-section h3 {
+      margin: 20px 0 6px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    section.doc-section h3:first-of-type { margin-top: 12px; }
+    section.doc-section p { margin: 6px 0 10px; }
+    section.doc-section ul { margin: 6px 0 12px; padding-left: 22px; }
+    section.doc-section li { margin: 4px 0; }
+    section.doc-section strong { font-weight: 600; }
+    section.doc-section .callout {
+      background: var(--primary-tint);
+      border-left: 3px solid var(--primary);
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    .footer-note {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .footer-note .brand {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .footer-note .version {
+      font-variant-numeric: tabular-nums;
+      margin-left: 6px;
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 20px 16px 60px; }
+      header.page-header { flex-wrap: wrap; }
+      header.page-header .back { margin-left: 0; margin-top: 4px; }
+      section.doc-section { padding: 20px 18px; border-radius: 10px; }
+      section.doc-section h2 { font-size: 18px; flex-wrap: wrap; }
+    }
+    @media (prefers-color-scheme: dark) {
+      /* v0.27.5: honor system dark preference for this static page, even
+         though the app itself is light-themed. This page is often the
+         first thing a curious visitor reads and shouldn't blind them. */
+      :root {
+        --bg: #0f1421;
+        --surface: #171d2e;
+        --border: #2a3245;
+        --border-strong: #3a4361;
+        --text: #e6ecff;
+        --text-muted: #9aa3c2;
+        --primary: #6089ef;
+        --primary-hover: #7e9eef;
+        --primary-tint: rgba(96, 137, 239, 0.12);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="page-header">
+      <img src="favicon.svg" alt="" width="44" height="44">
+      <div class="title">
+        <h1>Privacy, Terms &amp; Disclaimer</h1>
+        <span class="subtitle">Usage Tracker — how your data is handled and what the app's numbers do and don't mean.</span>
+      </div>
+      <a href="./" class="back">← Back to app</a>
+    </header>
+
+    <nav class="toc" aria-label="Sections">
+      <div class="toc-label">On this page</div>
+      <ol>
+        <li><a href="#privacy">Privacy Policy</a></li>
+        <li><a href="#terms">Terms of Use</a></li>
+        <li><a href="#disclaimer">Disclaimer</a></li>
+      </ol>
+    </nav>
+
+    <section class="doc-section" id="privacy">
+      <h2>Privacy Policy <span class="last-updated">Last updated 2026-06-12</span></h2>
+      <p class="lead">Usage Tracker is a personal-use hobby app. This section explains, in plain English, what data the app collects, where it's stored, and who else touches it.</p>
+
+      <h3>What the app stores about you</h3>
+      <ul>
+        <li><strong>Google account info</strong> — when you sign in with Google, Firebase Auth records your Google account's unique ID, email address, display name, and profile picture URL. This is the standard sign-in payload from Google.</li>
+        <li><strong>Products you enter</strong> — everything you type into the Add/Edit form: product name, type, size, cost (with and without tax), start/end dates, purchase date, store, buyer name, last-four of the payment card, UPC, brand, notes, bundle status, favorite rating and reason.</li>
+        <li><strong>Activity log</strong> — an internal log of when you added, edited, duplicated, or deleted a product. Used to render the Activity tab.</li>
+        <li><strong>Viewing preferences</strong> — pre-tax display, currency, density, which columns are visible, page size, last-seen changelog version.</li>
+        <li><strong>Email-reminder settings</strong> — whether you've opted in, and (if provided) the email address to send reminders to.</li>
+        <li><strong>UPC-lookup cache</strong> — when you scan or look up a UPC, the response is cached under your account so repeat lookups are instant and don't burn quota.</li>
+      </ul>
+
+      <h3>Where it lives</h3>
+      <ul>
+        <li><strong>Firebase (Google Cloud)</strong> hosts the authentication service and Firestore database that stores all of the above. Firestore security rules restrict every document to its owner — no one else's account (including the developer's) can read your product list.</li>
+        <li><strong>Your browser's localStorage</strong> holds a fast-access copy of your viewing preferences and the UPC cache so the app feels snappy offline. It's per-browser and cleared when you clear browser data.</li>
+        <li><strong>Cloudflare Workers</strong> (behind the scenes) runs the daily reorder-reminder cron and — with a temporary Google service-account token — reads only the fields it needs to send that email.</li>
+      </ul>
+
+      <h3>Who else the app talks to</h3>
+      <ul>
+        <li><strong>Google</strong> — sign-in (Firebase Auth), database (Firestore), and static hosting for the app itself (GitHub Pages, which is Microsoft-owned; the mirror is served from the same origin).</li>
+        <li><strong>UPCitemdb</strong> and <strong>OpenFoodFacts</strong> — when you look up a UPC, the code is sent to one or both services to fetch product name / brand / image. The lookup is proxied through a Google Apps Script endpoint owned by the developer to avoid CORS, but no additional identifying data is added.</li>
+        <li><strong>openFDA</strong> — the recall-alerts banner queries the FDA's public Enforcement Reports API by <em>brand name</em> (not UPC) to check for open recalls. Matching is brand-only and imprecise; see the Disclaimer.</li>
+        <li><strong>logo.dev</strong> — displays brand logos next to products. The brand name is included in the image URL; nothing else about you is sent.</li>
+        <li><strong>Resend</strong> — if you opt in to reorder-reminder emails, the daily cron uses Resend to deliver them. Only your email address and the reminder content are sent to Resend.</li>
+      </ul>
+
+      <h3>What the app <em>doesn't</em> collect</h3>
+      <ul>
+        <li>No analytics tracker. No Google Analytics, no Plausible, no anything.</li>
+        <li>No ad networks. No tracking pixels. No fingerprinting scripts.</li>
+        <li>No location data. The app doesn't ask for geolocation.</li>
+        <li>No camera images. The UPC scanner runs entirely in your browser; the video stream never leaves your device. Only the decoded barcode string is used.</li>
+        <li>No third-party session cookies. Only Firebase's own auth cookie for keeping you signed in.</li>
+      </ul>
+
+      <h3>Controlling and exporting your data</h3>
+      <ul>
+        <li><strong>Export</strong> — the Export JSON / Export CSV buttons dump every product you've tracked into a file you can save.</li>
+        <li><strong>Delete a product</strong> — the trash icon on any row deletes that single record.</li>
+        <li><strong>Clear activity</strong> — the Clear button on the Activity tab wipes the log.</li>
+        <li><strong>Delete your account</strong> — sign out and open a GitHub issue on the repo asking for account deletion. Alternatively, revoke the app's access from your Google Account's security settings; the Firestore data will still exist under your UID but you can request removal.</li>
+        <li><strong>Contact</strong> — file an issue at <a href="https://github.com/itsavibecode/usage/issues">github.com/itsavibecode/usage/issues</a>. Because this is a personal project, there's no support inbox or SLA.</li>
+      </ul>
+
+      <h3>Children</h3>
+      <p>Usage Tracker isn't directed at children under 13 and requires a Google account to sign in (which has its own age minimum). If a child has signed in and you're their guardian, contact the repo and the account will be deleted.</p>
+
+      <h3>Changes</h3>
+      <p>If the app starts collecting a new kind of data or talking to a new third party, this page will be updated and the "Last updated" date bumped. Material changes will also show up in the in-app "What's new" modal.</p>
+    </section>
+
+    <section class="doc-section" id="terms">
+      <h2>Terms of Use <span class="last-updated">Last updated 2026-06-12</span></h2>
+      <p class="lead">By using Usage Tracker you agree to the following. These terms are written in plain English because the app is a hobby project, not a business.</p>
+
+      <h3>What this app is</h3>
+      <p>Usage Tracker is a free personal product-usage tracker. It exists so one person (and now maybe you) can log everyday household consumables — toothpaste, shampoo, deodorant, razors — and understand when they'll run out and what they cost per day. It is not a commercial service.</p>
+
+      <h3>Personal use only</h3>
+      <p>You can use the app for your own household. You may not resell it, embed it in a commercial offering, use it as a data source for another product, or attempt to scrape / harvest other users' data.</p>
+
+      <h3>Your data is yours</h3>
+      <p>Everything you type into the app belongs to you. You can export it any time. The developer will not sell or share your product list.</p>
+
+      <h3>Provided "as is"</h3>
+      <p>The app is provided "as is" with no warranty of any kind, express or implied. It might have bugs. It might mis-calculate your cost per day. It might miss a recall. It might send an email at the wrong time. Use it as a tool to help you notice patterns, not as a source of authoritative facts.</p>
+
+      <h3>No professional advice</h3>
+      <p>Usage Tracker is not a source of medical, financial, legal, health, or safety advice. If a product is medicated, expired, recalled, or otherwise raises a health question, consult the actual authority (your doctor, the FDA website, the manufacturer). See the Disclaimer for specifics.</p>
+
+      <h3>Third-party services</h3>
+      <p>The app runs on top of services owned by Google (Firebase, Google Cloud, GitHub Pages), Cloudflare (Workers, DNS), Resend (email), and public APIs from UPCitemdb / OpenFoodFacts / openFDA / logo.dev. Their terms and privacy policies apply to their own portions of what you do here. When those services are down or return bad data, the app degrades accordingly.</p>
+
+      <h3>Account termination</h3>
+      <p>The developer may pause or delete an account that's being used to abuse the app, disrupt third-party services, upload illegal content, or attempt to attack other users or infrastructure. Everyone else keeps their data intact.</p>
+
+      <h3>Service availability and changes</h3>
+      <p>Because this is a hobby project, there is no uptime guarantee. Features may be added, changed, or removed without notice. The app may be shut down entirely at some point; if that happens, an announcement will go up on the site with enough lead time for you to export your data.</p>
+
+      <h3>Limitation of liability</h3>
+      <p>To the maximum extent permitted by law, the developer of Usage Tracker will not be liable for any loss, damage, expense, or inconvenience arising from your use of the app — including but not limited to a missed reorder reminder, an incorrect cost estimate, a false-positive recall alert, or a service outage. This is a free tool provided in good faith; treat it as such.</p>
+
+      <h3>Governing law</h3>
+      <p>Any dispute related to this app is governed by the laws of the State of Illinois, United States, without regard to conflict-of-law principles.</p>
+    </section>
+
+    <section class="doc-section" id="disclaimer">
+      <h2>Disclaimer <span class="last-updated">Last updated 2026-06-12</span></h2>
+      <p class="lead">The rest of the page is legal-shaped. This section is the practical version — what the app's numbers actually mean, and what they don't.</p>
+
+      <div class="callout">
+        <strong>TL;DR:</strong> Usage Tracker's estimates are averages built from what you've told it. Treat every number as a rough guide, not a certified measurement.
+      </div>
+
+      <h3>Reorder reminders are averages, not guarantees</h3>
+      <p>The Reorder Reminders panel and the daily email digest flag active products when they've reached ~85% of the average lifespan for their product type. That average is calculated from your own past finished products (minimum two per type). The math is honest but the world is messy: your next tube of toothpaste might last twice as long or half as long as the last one. If a reminder fires and the current product still has plenty left, ignore it. If a reminder never fires and you run out, that's a data-not-enough problem, not a bug.</p>
+
+      <h3>Cost math is only as good as your input</h3>
+      <p>Per-day cost, per-unit cost, and total spend are derived from the size, cost, bundle, and dates you enter. Enter a wrong price and every dependent number is wrong. Bundle-mode expects the <em>full bundle price</em>, not the per-item price — the app labels the input and shows a live per-item derivation to make this hard to get wrong, but you can still fool it.</p>
+
+      <h3>FDA recall alerts are brand-only matched</h3>
+      <p>The recall banner queries the openFDA Enforcement Reports API by <em>brand name only</em>. It doesn't check UPC. If a recall covers only one flavor / size / lot of a brand you own, this app will flag every product of that brand — including ones that are not affected. It's a first-look nudge, not a definitive answer.</p>
+      <div class="callout">
+        <strong>Always verify a recall on the FDA's own site</strong> before assuming a specific bottle in your bathroom is affected. Each recall card includes a link to the official FDA record. Use it.
+      </div>
+      <p>Conversely, the FDA API only covers FDA-regulated categories (mostly drugs, food, medical devices). Products outside that scope (small kitchen appliances, apparel) aren't checked at all. Absence of a recall banner is not evidence that a product is safe.</p>
+
+      <h3>Not medical advice</h3>
+      <p>Usage Tracker treats over-the-counter medication like any other consumable — a product with a start date, size, and cost. It does not know whether a medication is safe for you, whether an expiration date has passed, or whether a recall applies to your specific lot. Follow the manufacturer's instructions and consult a pharmacist or physician for anything medication-related.</p>
+
+      <h3>Not financial advice</h3>
+      <p>The cost dashboards exist to help you notice spending patterns on household goods. They are not a substitute for budgeting software, a professional accountant, or a financial advisor.</p>
+
+      <h3>UPC-lookup data is third-party</h3>
+      <p>When the app fills in a product name, brand, or image from a UPC, that information came from UPCitemdb or OpenFoodFacts — public databases populated by many contributors. It can be wrong, outdated, or missing. Always verify a match before saving.</p>
+
+      <h3>Brand logos and images</h3>
+      <p>Logos and product images shown in the app come from third-party services (logo.dev for brand logos; UPCitemdb / OpenFoodFacts for product images) and remain the trademarks and copyrights of their respective owners. Their appearance in the app does not imply endorsement of Usage Tracker by any brand.</p>
+    </section>
+
+    <div class="footer-note">
+      <span class="brand">Usage Tracker</span> · Legal <span class="version">v0.27.5</span> · <a href="./">Return to app</a>
+    </div>
+  </main>
+</body>
+</html>

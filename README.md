@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.4
+**Version:** v0.27.5
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.4)
+## Current status (v0.27.5)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.5 — 2026-06-12
+- **New: `legal.html` — Privacy Policy, Terms of Use, and Disclaimer on one page.** Linked from the footer of the app (also visible in demo mode, since the disclaimer applies to demo visitors too). Self-contained inline CSS matching the 404 page's design tokens, so it renders cleanly even if the main app bundle breaks. Table of contents at the top jumps between the three sections. Privacy section enumerates what data is stored, where it lives (Firestore + localStorage), who else the app talks to (Google, UPCitemdb, OpenFoodFacts, openFDA, logo.dev, Resend), and what the app explicitly does *not* collect (no analytics, no ads, no location, no camera images ever leave the device). Terms section covers personal-use only, provided-as-is, no professional advice, service availability, limitation of liability. Disclaimer section is the practical version — what reorder reminders / cost math / FDA recall alerts actually mean and don't mean (reminders are averages built from your own data; recalls are brand-only matched and imprecise; always verify on the FDA site). Honors `prefers-color-scheme: dark` since this is often the first page a curious visitor reads and shouldn't blind them. Included in the OG-embed set (canonical URL, twitter card) so a shared link renders cleanly.
+- **Refreshed the 404 page's version chip and meta version** from v0.15.5 / v0.18.2 to v0.27.5. The 404's layout is unchanged; just the stamped version. Custom 404 has existed since v0.14.4 — this release doesn't add one, it just makes sure its version markers keep up with the rest of the site.
 
 ### v0.27.4 — 2026-06-12
 - **Fixed: Help "?" button in the toolbar looked like a broken character.** The v0.26.0 button inherited `.btn-ghost` styling, which sets background AND border to transparent. The only thing actually visible in the toolbar was a faint muted "?" floating in space — easy to read as a glyph that failed to render or an incomplete element. Now it has explicit affordance: a 30×30 circle with a visible 1.5px primary-blue border, a light primary-tinted background, and a primary-colored "?". Hover fills it solid blue with a white "?" (unchanged from before). Selector compounded as `.btn-ghost.btn-help-icon` to outrank `.btn-ghost` without depending on stylesheet order. Behavior unchanged — still opens the welcome/help dialog.

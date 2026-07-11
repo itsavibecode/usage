@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.27.4">
+  <meta name="version" content="0.27.5">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.27.4</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.27.5</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -386,11 +386,17 @@
     <!-- v0.23.2: footer pinned to the bottom of main-wrap. Currently
          hosts the demo link so signed-in users have an easy "share this
          with a friend" path without digging through Settings. Hidden in
-         demo mode itself (you're already there) via body.is-demo-mode. -->
+         demo mode itself (you're already there) via body.is-demo-mode.
+         v0.27.5: legal link added — one page covering Privacy / Terms /
+         Disclaimer. Rendered even in demo mode (unlike the demo-share
+         line) because the disclaimer applies to demo visitors too. -->
     <footer class="site-footer">
       <p class="site-footer-text">
         Want to share this app with someone?
         <a href="?demo=1" class="site-footer-link">Try the demo &rsaquo;</a>
+      </p>
+      <p class="site-footer-legal">
+        <a href="legal.html" class="site-footer-link">Privacy, terms &amp; disclaimer</a>
       </p>
     </footer>
   </main>

@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.4
+/* Usage Tracker — v0.27.5
+ * v0.27.5: Privacy / Terms / Disclaimer page + 404 page version refresh + footer link.
  * v0.27.4: Help "?" button now reads as a button instead of a stray glyph (visible border + tinted bg).
  * v0.27.3: Suppress reorder reminders when the same product type is sitting in inventory.
  * v0.27.2: Fix mobile horizontal scrollbar caused by the pre-tax toggle.
@@ -615,7 +616,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.4';
+const APP_VERSION = '0.27.5';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -878,6 +879,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.5',
+    date: '2026-06-12',
+    tags: ['new'],
+    title: 'Privacy, terms & disclaimer page',
+    body: 'A single Legal page now covers what data the app stores, what you agree to by using it, and — most usefully — what the reorder-reminder and FDA-recall numbers actually mean (and don\'t mean). Linked from the footer at the bottom of the page. The 404 page also had its version chip refreshed while I was in there.',
+  },
   {
     version: '0.27.4',
     date: '2026-06-12',
