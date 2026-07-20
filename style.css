@@ -865,6 +865,10 @@ body.pretax-mode .products tbody td.cell-with-tax {
  * this only affects the desktop table. */
 body.cols-hide-productType .products thead th[data-sort="productType"],
 body.cols-hide-productType .products tbody td.col-productType { display: none; }
+/* v0.27.7: image column hides via a class on the <th> (it has no data-sort
+ * because it isn't sortable) so header + cells disappear together. */
+body.cols-hide-image .products thead th.col-image-head,
+body.cols-hide-image .products tbody td.col-image { display: none; }
 body.cols-hide-size .products thead th[data-sort="size"],
 body.cols-hide-size .products tbody td.col-size { display: none; }
 body.cols-hide-startDate .products thead th[data-sort="startDate"],
@@ -1484,17 +1488,9 @@ button.stat.is-selected:hover {
     white-space: normal;
     max-width: 280px;
   }
-  /* v0.27.6: flex row so the brand logo stays pinned to the left and a
-   * long title wraps in the remaining space beside it, instead of the
-   * inline-block logo landing on its own line above a wrapping title.
-   * align-items:center vertically centers the logo against the (possibly
-   * multi-line) title block. min-width:0 on the button lets it shrink and
-   * wrap inside the flex row rather than forcing overflow. */
-  .products tbody td.name-cell .name-cell-inner {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-  }
+  /* v0.27.7: the brand logo / product image moved to its own .col-image
+   * column (superseding the v0.27.6 in-cell flex approach), so the name
+   * cell now holds only the wrapping title. */
   .products tbody td.name-cell .name-link {
     display: inline;
     white-space: normal;
@@ -2683,6 +2679,26 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
   background: #fff;
   object-fit: contain;
   padding: 1px;
+}
+/* v0.27.7: dedicated image column. Narrow, thumbnail centered. The thumb's
+ * inline margin-right (used when it sat inline in the name cell) is zeroed
+ * here since it's now centered in its own cell. Column collapses to minimal
+ * width so it doesn't steal room from the data columns. */
+.products td.col-image {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.products td.col-image .name-thumb {
+  margin: 0;
+  vertical-align: middle;
+}
+.products thead th.col-image-head {
+  width: 1%;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 /* Mobile-card head thumbnail — slightly larger since it's the only visual

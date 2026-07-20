@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.6
+/* Usage Tracker — v0.27.7
+ * v0.27.7: Brand logo / product image moved to its own table column so thumbnails and names each align in a clean vertical strip.
  * v0.27.6: Table name cell — brand logo stays left of a wrapping title (flex row) instead of stacking above it.
  * v0.27.5: Privacy / Terms / Disclaimer page + 404 page version refresh + footer link.
  * v0.27.4: Help "?" button now reads as a button instead of a stray glyph (visible border + tinted bg).
@@ -617,7 +618,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.6';
+const APP_VERSION = '0.27.7';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -732,6 +733,7 @@ let densityMode = (() => {
 const COLUMNS_KEY = 'usage.columns.v1';
 const TOGGLEABLE_COLUMNS = [
   { key: 'productType',  label: 'Type' },
+  { key: 'image',        label: 'Image' }, // v0.27.7: brand logo / product image column
   { key: 'size',         label: 'Size' },
   { key: 'startDate',    label: 'Start' },
   { key: 'endDate',      label: 'End' },
@@ -880,6 +882,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.7',
+    date: '2026-07-20',
+    tags: ['improvement'],
+    title: 'Product images get their own column',
+    body: 'Brand logos and product images now live in their own column in the table, just left of the name. That keeps every product name starting at the same left edge and lines the images up in a tidy vertical strip — much cleaner to scan. Don\'t want the image column? Hide it from the Columns menu like any other column.',
+  },
   {
     version: '0.27.6',
     date: '2026-07-20',
@@ -2527,7 +2536,7 @@ function renderRow(p) {
   // no duplicated event-handler wiring.
   tr.innerHTML = `
     <td class="col-productType">${p.productType ? `<button type="button" class="cell-chip cell-chip-type" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
-    <td class="name-cell col-productName"><span class="name-cell-inner">${(() => {
+    <td class="col-image">${(() => {
       // v0.15.2: prefer brand company logo (consistent visual scanning by
       // brand). If no brand, fall back to UPC product image. Both onerror
       // handlers self-remove on load failure.
@@ -2535,13 +2544,14 @@ function renderRow(p) {
       // thumb correctly even before CSS loads (or if the SW serves a
       // stale style.css from cache). Belt-and-suspenders against the
       // "thumb renders at natural 64px" stale-cache failure mode.
-      // v0.27.6: logo + title wrapped in .name-cell-inner (a flex row) so a
-      // long wrapping title stays beside the logo instead of pushing it up
-      // onto its own line above the title.
+      // v0.27.7: logo/image lives in its own column (was inline in the name
+      // cell) so thumbnails align in a vertical strip and every name starts
+      // at the same left edge.
       if (p.brand) return `<img class="name-thumb name-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" width="24" height="24" onerror="this.remove()">`;
       if (p.imageUrl) return `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" width="24" height="24" onerror="this.remove()">`;
       return '';
-    })()}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></span></td>
+    })()}</td>
+    <td class="name-cell col-productName"><button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
     <td class="num col-size">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td class="col-startDate">${formatDate(p.startDate)}</td>
     <td class="col-endDate">${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>
@@ -2618,8 +2628,9 @@ function renderRow(p) {
 // all sibling rows that share the same bundleId. Clicking a sibling jumps
 // to its Edit dialog. The current row is highlighted via .is-current.
 // Renders as a `<tr>` with a single colspan'd `<td>` so it spans the full
-// table width. v0.17.0: 16 desktop columns + 1 mobile-card-cell = 17 total
-// (was 19 pre-v0.17.0 when STORE/BUYER/CARD were three separate columns).
+// table width. v0.27.7: 17 desktop columns + 1 mobile-card-cell = 18 total
+// (v0.17.0 had 16 desktop after STORE/BUYER/CARD merged; v0.27.7 added the
+// Image column, +1).
 // Shared body of the slide-out panel — inner HTML only, used both for the
 // desktop full-width row and the mobile inline-in-card variant.
 function renderBundleSiblingsInner(p) {
@@ -2667,10 +2678,10 @@ function renderBundleSiblingsInline(p) {
 function renderBundleSiblingsRow(p) {
   const tr = document.createElement('tr');
   tr.className = 'bundle-siblings-row';
-  // colspan=17: 16 desktop columns + 1 mobile-card-cell (post-v0.17.0). The
-  // cell spans the full table width so the panel reads as detail belonging
-  // to the row above.
-  tr.innerHTML = `<td colspan="17" class="bundle-siblings-cell">${renderBundleSiblingsInner(p)}</td>`;
+  // colspan=18: 17 desktop columns + 1 mobile-card-cell (v0.27.7 added the
+  // Image column). The cell spans the full table width so the panel reads as
+  // detail belonging to the row above.
+  tr.innerHTML = `<td colspan="18" class="bundle-siblings-cell">${renderBundleSiblingsInner(p)}</td>`;
   return tr;
 }
 

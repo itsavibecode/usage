@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.27.6">
+  <meta name="version" content="0.27.7">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.27.6</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.27.7</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -283,6 +283,11 @@
           <thead>
             <tr>
               <th data-sort="productType">Type</th>
+              <!-- v0.27.7: brand logo / product image gets its own column so
+                   thumbnails align in a tidy vertical strip and every product
+                   name starts at the same left edge. Not sortable (no
+                   data-sort); toggleable via the Columns menu (key "image"). -->
+              <th class="col-image-head" aria-label="Image"></th>
               <th data-sort="productName">Name</th>
               <th data-sort="size">Size</th>
               <th data-sort="startDate">Start</th>

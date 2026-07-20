@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.6
+**Version:** v0.27.7
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.6)
+## Current status (v0.27.7)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.7 — 2026-07-20
+- **Product image / brand logo promoted to its own table column.** Follow-up to v0.27.6: rather than keeping the thumbnail inline at the start of the name cell, it now has a dedicated `Image` column between `Type` and `Name`. This aligns every product name at the same left edge and lines the thumbnails up in a clean vertical strip — easier to scan a long list. Implementation: new non-sortable `<th class="col-image-head">` (no `data-sort`, so the sort handler ignores it) + a `col-image` `<td>` per row holding the logo/image `<img>`; the name cell is back to holding only the title. Column is toggleable via the existing Columns manager (`TOGGLEABLE_COLUMNS` key `image`, hidden through `body.cols-hide-image` targeting the header class + `td.col-image`), defaults visible for everyone (missing key resolves to `true` in the `{...defaults, ...saved}` merge). `.col-image` is `width:1%; white-space:nowrap` so it collapses to thumbnail width and never steals room from data columns. Bundle-siblings panel colspan bumped 17 → 18. Mobile is unaffected — the card layout hides all desktop cells generically, and the mobile card keeps its own `.mc-thumb`. The v0.27.6 `.name-cell-inner` flex rule is removed (superseded).
 
 ### v0.27.6 — 2026-07-20
 - **Fixed: brand logo stacked above a wrapping product name in the desktop table.** A product with both a brand logo and a long name (e.g. "Old Spice High Endurance Pure Sport Deodorant") rendered the logo on its own line *above* the title instead of beside it. Root cause: the logo `<img>` (inline-block) and the title `<button>` (inline) shared the `.name-cell` `<td>` as inline flow; when the title wrapped, the inline-block logo ended up on its own line. Fix wraps both in a new `.name-cell-inner` span that is `display:flex; align-items:center` on desktop (`min-width: 721px`), so the logo is a fixed-width (`flex-shrink:0`) flex item pinned left and the title is a `min-width:0` flex item that wraps in the remaining space beside it. A non-wrapping flex row can't push the logo onto its own line. Considered giving the logo its own table column but rejected it — it would widen the table (against the v0.17.0 column-consolidation work) and sit empty for the many products with no brand logo. Mobile card layout (`.mc-thumb`) was already a flex row and is unaffected.
