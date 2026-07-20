@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.5
+/* Usage Tracker — v0.27.6
+ * v0.27.6: Table name cell — brand logo stays left of a wrapping title (flex row) instead of stacking above it.
  * v0.27.5: Privacy / Terms / Disclaimer page + 404 page version refresh + footer link.
  * v0.27.4: Help "?" button now reads as a button instead of a stray glyph (visible border + tinted bg).
  * v0.27.3: Suppress reorder reminders when the same product type is sitting in inventory.
@@ -616,7 +617,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.5';
+const APP_VERSION = '0.27.6';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -879,6 +880,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.6',
+    date: '2026-07-20',
+    tags: ['fix'],
+    title: 'Brand logo sits beside the name, not above it',
+    body: 'In the table, a product with a brand logo and a long name (like the Old Spice deodorant) was showing the logo stacked on its own line above the wrapping title. The logo now stays pinned to the left of the name, and the name wraps neatly beside it.',
+  },
   {
     version: '0.27.5',
     date: '2026-06-12',
@@ -2519,7 +2527,7 @@ function renderRow(p) {
   // no duplicated event-handler wiring.
   tr.innerHTML = `
     <td class="col-productType">${p.productType ? `<button type="button" class="cell-chip cell-chip-type" style="background:${colorForType(p.productType)};color:#fff;border-color:transparent" data-filter-col="productType" data-filter-val="${escapeHtml(p.productType)}" title="Filter to ${escapeHtml(p.productType)}">${escapeHtml(p.productType)}</button>` : '—'}</td>
-    <td class="name-cell col-productName">${(() => {
+    <td class="name-cell col-productName"><span class="name-cell-inner">${(() => {
       // v0.15.2: prefer brand company logo (consistent visual scanning by
       // brand). If no brand, fall back to UPC product image. Both onerror
       // handlers self-remove on load failure.
@@ -2527,10 +2535,13 @@ function renderRow(p) {
       // thumb correctly even before CSS loads (or if the SW serves a
       // stale style.css from cache). Belt-and-suspenders against the
       // "thumb renders at natural 64px" stale-cache failure mode.
+      // v0.27.6: logo + title wrapped in .name-cell-inner (a flex row) so a
+      // long wrapping title stays beside the logo instead of pushing it up
+      // onto its own line above the title.
       if (p.brand) return `<img class="name-thumb name-thumb-logo" src="${escapeHtml(brandLogoUrl(p.brand))}" alt="${escapeHtml(p.brand)} logo" loading="lazy" width="24" height="24" onerror="this.remove()">`;
       if (p.imageUrl) return `<img class="name-thumb" src="${escapeHtml(p.imageUrl)}" alt="" loading="lazy" width="24" height="24" onerror="this.remove()">`;
       return '';
-    })()}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></td>
+    })()}<button type="button" class="name-link" data-id="${p.id}" title="Edit product">${escapeHtml(p.productName)}</button></span></td>
     <td class="num col-size">${escapeHtml(p.size)} ${escapeHtml(p.unit)}</td>
     <td class="col-startDate">${formatDate(p.startDate)}</td>
     <td class="col-endDate">${p.endDate ? formatDate(p.endDate) : (isInventory(p) ? '<span class="badge badge-inventory">inventory</span>' : '<span class="badge badge-active">active</span>')}</td>

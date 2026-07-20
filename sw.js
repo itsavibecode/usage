@@ -31,7 +31,7 @@
  * URL (/usage/sw.js → /usage/ scope), no edits needed.
  */
 
-const SHELL_VERSION = 'usage-shell-v0.27.5';
+const SHELL_VERSION = 'usage-shell-v0.27.6';
 
 // Files cached on SW install. Listed as relative paths so the same SW
 // works at both deployments (primary + secondary) without edits.

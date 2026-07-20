@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.5
+**Version:** v0.27.6
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.5)
+## Current status (v0.27.6)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.6 — 2026-07-20
+- **Fixed: brand logo stacked above a wrapping product name in the desktop table.** A product with both a brand logo and a long name (e.g. "Old Spice High Endurance Pure Sport Deodorant") rendered the logo on its own line *above* the title instead of beside it. Root cause: the logo `<img>` (inline-block) and the title `<button>` (inline) shared the `.name-cell` `<td>` as inline flow; when the title wrapped, the inline-block logo ended up on its own line. Fix wraps both in a new `.name-cell-inner` span that is `display:flex; align-items:center` on desktop (`min-width: 721px`), so the logo is a fixed-width (`flex-shrink:0`) flex item pinned left and the title is a `min-width:0` flex item that wraps in the remaining space beside it. A non-wrapping flex row can't push the logo onto its own line. Considered giving the logo its own table column but rejected it — it would widen the table (against the v0.17.0 column-consolidation work) and sit empty for the many products with no brand logo. Mobile card layout (`.mc-thumb`) was already a flex row and is unaffected.
 
 ### v0.27.5 — 2026-06-12
 - **New: `legal.html` — Privacy Policy, Terms of Use, and Disclaimer on one page.** Linked from the footer of the app (also visible in demo mode, since the disclaimer applies to demo visitors too). Self-contained inline CSS matching the 404 page's design tokens, so it renders cleanly even if the main app bundle breaks. Table of contents at the top jumps between the three sections. Privacy section enumerates what data is stored, where it lives (Firestore + localStorage), who else the app talks to (Google, UPCitemdb, OpenFoodFacts, openFDA, logo.dev, Resend), and what the app explicitly does *not* collect (no analytics, no ads, no location, no camera images ever leave the device). Terms section covers personal-use only, provided-as-is, no professional advice, service availability, limitation of liability. Disclaimer section is the practical version — what reorder reminders / cost math / FDA recall alerts actually mean and don't mean (reminders are averages built from your own data; recalls are brand-only matched and imprecise; always verify on the FDA site). Honors `prefers-color-scheme: dark` since this is often the first page a curious visitor reads and shouldn't blind them. Included in the OG-embed set (canonical URL, twitter card) so a shared link renders cleanly.
