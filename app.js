@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.28.0
+/* Usage Tracker — v0.28.1
+ * v0.28.1: Fix the "what's new" unread dot floating far right of the version number (version button was stretching to the heading width).
  * v0.28.0: Amazon ASIN field (revealed when store is Amazon) → direct amazon.com/dp/{ASIN} reorder link; accepts a pasted URL; auto-filled from UPC lookup.
  * v0.27.8: Reorder reminders return once you're down to your last unit of a type (was: silenced whenever any backup existed).
  * v0.27.7: Brand logo / product image moved to its own table column so thumbnails and names each align in a clean vertical strip.
@@ -620,7 +621,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.28.0';
+const APP_VERSION = '0.28.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -889,6 +890,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.28.1',
+    date: '2026-08-06',
+    tags: ['fix'],
+    title: 'Version "new" dot sits next to the version again',
+    body: 'The little blue dot that signals an unread "What\'s new" entry was floating off to the right instead of hugging the version number. It now sits right beside it.',
+  },
   {
     version: '0.28.0',
     date: '2026-08-06',

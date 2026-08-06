@@ -89,6 +89,12 @@ html, body {
   cursor: pointer;
   position: relative;
   transition: background 0.12s ease, color 0.12s ease;
+  /* v0.28.1: .brand-text is a flex column, so without this the button
+   * stretches to the width of the "Usage Tracker" heading above it and the
+   * absolutely-positioned unread dot (right:0) floats far to the right of the
+   * version number. Shrink the button to its own text so the dot sits right
+   * beside the version. */
+  align-self: flex-start;
 }
 .version:hover {
   background: var(--surface-alt);
