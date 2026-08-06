@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.7
+/* Usage Tracker — v0.27.8
+ * v0.27.8: Reorder reminders return once you're down to your last unit of a type (was: silenced whenever any backup existed).
  * v0.27.7: Brand logo / product image moved to its own table column so thumbnails and names each align in a clean vertical strip.
  * v0.27.6: Table name cell — brand logo stays left of a wrapping title (flex row) instead of stacking above it.
  * v0.27.5: Privacy / Terms / Disclaimer page + 404 page version refresh + footer link.
@@ -618,7 +619,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.7';
+const APP_VERSION = '0.27.8';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -882,6 +883,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.27.8',
+    date: '2026-08-06',
+    tags: ['fix'],
+    title: 'Reorder reminders come back when you\'re on your last one',
+    body: 'A previous change silenced reorder reminders for any product type you kept a backup of in inventory — which meant types you always keep stocked went quiet for good. Now a reminder is only held back while you actually have a spare beyond the one running low. The moment you\'re down to your last unit of something and it\'s running low, the reminder (and the email) come back.',
+  },
   {
     version: '0.27.7',
     date: '2026-07-20',
@@ -3539,18 +3547,18 @@ function computeReorderReminders() {
     meanLifespan.set(k, mean);
   }
 
-  // v0.27.3: skip reorder reminders for productTypes that already have an
-  // inventory item on hand. The point of the reminder is "buy more before
-  // you run out" — if the user has an unopened backup of the same
-  // category sitting in inventory, they have a backup ready to start
-  // when the current one finishes, so a "reorder" nudge would be wrong.
-  // Matched by productType (the category), mirroring the worker's
-  // computeReminders logic so the in-app panel and the email digest
-  // surface the same set of reminders.
-  const typesWithInventory = new Set();
+  // v0.27.8: suppress a reorder reminder only while there's a spare beyond the
+  // unit running low — i.e. 2+ on-hand units of the type (active + inventory;
+  // finished don't count). Once you're down to your last unit (on-hand == 1),
+  // the reminder fires so you know to restock before you're empty. Refines
+  // v0.27.3, which suppressed whenever ANY inventory of the type existed and so
+  // permanently silenced every type the user keeps a rolling backup of. Mirrors
+  // the worker's computeReminders (v0.3.3) so the in-app panel and the email
+  // digest surface the same set.
+  const onHandByType = new Map();
   for (const p of products) {
-    if (isInventory(p) && p.productType) {
-      typesWithInventory.add(p.productType);
+    if ((isActive(p) || isInventory(p)) && p.productType) {
+      onHandByType.set(p.productType, (onHandByType.get(p.productType) || 0) + 1);
     }
   }
 
@@ -3558,7 +3566,7 @@ function computeReorderReminders() {
   for (const p of products) {
     if (!isActive(p)) continue;
     const k = p.productType || '';
-    if (typesWithInventory.has(k)) continue; // v0.27.3 backup-in-inventory check
+    if ((onHandByType.get(k) || 0) >= 2) continue; // v0.27.8: suppress only while a spare exists
     const mean = meanLifespan.get(k);
     if (mean == null) continue;
     const dur = calcDuration(p);

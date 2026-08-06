@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.7
+**Version:** v0.27.8
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.7)
+## Current status (v0.27.8)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.27.8 — 2026-08-06
+- **Reorder reminders no longer go permanently silent for types you keep stocked.** v0.27.3 suppressed a reminder whenever *any* inventory item of that type existed. For anyone who keeps a rolling backup (e.g. always one spare deodorant), that silenced the reminder forever — the email digest included. This was the cause of reminder emails stopping after 2026-05-24 (when the matching worker change, v0.3.1, went live). New rule: count **on-hand units** of the type (active + inventory; finished don't count) and suppress only while that count is **≥ 2** — i.e. there's a genuine spare beyond the one running low. Down to your last unit and it's running low → the reminder (and email) return. Implemented identically in `computeReorderReminders` (app) and `computeReminders` (usage-worker v0.3.3) so the in-app panel and the email digest stay in sync.
 
 ### v0.27.7 — 2026-07-20
 - **Product image / brand logo promoted to its own table column.** Follow-up to v0.27.6: rather than keeping the thumbnail inline at the start of the name cell, it now has a dedicated `Image` column between `Type` and `Name`. This aligns every product name at the same left edge and lines the thumbnails up in a clean vertical strip — easier to scan a long list. Implementation: new non-sortable `<th class="col-image-head">` (no `data-sort`, so the sort handler ignores it) + a `col-image` `<td>` per row holding the logo/image `<img>`; the name cell is back to holding only the title. Column is toggleable via the existing Columns manager (`TOGGLEABLE_COLUMNS` key `image`, hidden through `body.cols-hide-image` targeting the header class + `td.col-image`), defaults visible for everyone (missing key resolves to `true` in the `{...defaults, ...saved}` merge). `.col-image` is `width:1%; white-space:nowrap` so it collapses to thumbnail width and never steals room from data columns. Bundle-siblings panel colspan bumped 17 → 18. Mobile is unaffected — the card layout hides all desktop cells generically, and the mobile card keeps its own `.mc-thumb`. The v0.27.6 `.name-cell-inner` flex rule is removed (superseded).
