@@ -3389,6 +3389,71 @@ body.is-demo-mode .site-footer { display: none; }
 
 .chart-card-wide .chart-box { height: 300px; }
 
+/* v0.30.0: segmented controls above the configurable time-series charts.
+ * Two groups per chart (type + range) sitting on one row, wrapping to a second
+ * row on narrow screens rather than overflowing (no horizontal scroll, ever). */
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+
+.chart-ctl-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.chart-ctl {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  border-right: 1px solid var(--border);
+  min-height: 28px;
+}
+.chart-ctl:last-child { border-right: none; }
+.chart-ctl:hover { background: var(--surface-alt); color: var(--text); }
+.chart-ctl.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+.chart-ctl:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* Empty-state message shown in place of an axis-only chart when a range has
+ * no data. Centered inside the chart box so the card keeps its height. */
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 720px) {
+  /* Slightly tighter on phones so both groups still fit one row where possible. */
+  .chart-ctl { padding: 5px 9px; font-size: 11px; }
+  .chart-controls { gap: 6px; }
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .dash-charts { grid-template-columns: 1fr; }

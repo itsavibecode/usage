@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.29.0">
+  <meta name="version" content="0.30.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.29.0</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.30.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -349,6 +349,73 @@
         <div class="chart-card chart-card-wide">
           <h3>Longest-running products <span class="chart-sub">(active + past, top 10)</span></h3>
           <div class="chart-box"><canvas id="chart-longest-running"></canvas></div>
+        </div>
+
+        <!-- v0.30.0: configurable month-by-month time series. Each card has a
+             chart-type switcher (line / area / bar) and a range switcher
+             (6M / 12M / 24M / All). Choices persist per chart and sync across
+             devices via /users/{uid}/meta/uiPrefs.timeseriesCharts. -->
+        <div class="chart-card chart-card-wide">
+          <h3>Cost per month <span class="chart-sub">(what you spent, by purchase date)</span></h3>
+          <div class="chart-controls" data-chart="costPerMonth">
+            <div class="chart-ctl-group" role="group" aria-label="Chart type for cost per month">
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="line" aria-pressed="false">Line</button>
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="area" aria-pressed="false">Area</button>
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="bar" aria-pressed="false">Bar</button>
+            </div>
+            <div class="chart-ctl-group" role="group" aria-label="Time range for cost per month">
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="6" aria-pressed="false">6M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="12" aria-pressed="false">12M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="24" aria-pressed="false">24M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="all" aria-pressed="false">All</button>
+            </div>
+          </div>
+          <div class="chart-box">
+            <canvas id="chart-cost-per-month"></canvas>
+            <p class="chart-empty" id="chart-cost-per-month-empty" hidden></p>
+          </div>
+        </div>
+
+        <div class="chart-card chart-card-wide">
+          <h3>Average $/day by month <span class="chart-sub">(daily burn rate while in use)</span></h3>
+          <div class="chart-controls" data-chart="avgPerDay">
+            <div class="chart-ctl-group" role="group" aria-label="Chart type for average dollars per day">
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="line" aria-pressed="false">Line</button>
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="area" aria-pressed="false">Area</button>
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="bar" aria-pressed="false">Bar</button>
+            </div>
+            <div class="chart-ctl-group" role="group" aria-label="Time range for average dollars per day">
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="6" aria-pressed="false">6M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="12" aria-pressed="false">12M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="24" aria-pressed="false">24M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="all" aria-pressed="false">All</button>
+            </div>
+          </div>
+          <div class="chart-box">
+            <canvas id="chart-avg-per-day"></canvas>
+            <p class="chart-empty" id="chart-avg-per-day-empty" hidden></p>
+          </div>
+        </div>
+
+        <div class="chart-card chart-card-wide">
+          <h3>Average lifespan by month <span class="chart-sub">(products finished that month)</span></h3>
+          <div class="chart-controls" data-chart="avgLifespan">
+            <div class="chart-ctl-group" role="group" aria-label="Chart type for average lifespan">
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="line" aria-pressed="false">Line</button>
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="area" aria-pressed="false">Area</button>
+              <button type="button" class="chart-ctl" data-ctl="type" data-val="bar" aria-pressed="false">Bar</button>
+            </div>
+            <div class="chart-ctl-group" role="group" aria-label="Time range for average lifespan">
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="6" aria-pressed="false">6M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="12" aria-pressed="false">12M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="24" aria-pressed="false">24M</button>
+              <button type="button" class="chart-ctl" data-ctl="months" data-val="all" aria-pressed="false">All</button>
+            </div>
+          </div>
+          <div class="chart-box">
+            <canvas id="chart-avg-lifespan"></canvas>
+            <p class="chart-empty" id="chart-avg-lifespan-empty" hidden></p>
+          </div>
         </div>
       </div>
 

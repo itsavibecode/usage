@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.29.0
+/* Usage Tracker — v0.30.0
+ * v0.30.0: Three configurable month-by-month charts (cost, avg $/day, avg lifespan) with line/area/bar + 6M/12M/24M/All switchers; prefs sync per chart.
  * v0.29.0: Bundle "create all N at once" — one product per unit, auto-numbered 1..N under a shared bundle, #1 active and the rest inventory backups.
  * v0.28.1: Fix the "what's new" unread dot floating far right of the version number (version button was stretching to the heading width).
  * v0.28.0: Amazon ASIN field (revealed when store is Amazon) → direct amazon.com/dp/{ASIN} reorder link; accepts a pasted URL; auto-filled from UPC lookup.
@@ -622,7 +623,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.29.0';
+const APP_VERSION = '0.30.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -768,6 +769,33 @@ let columnVisibility = (() => {
   } catch { return defaults; }
 })();
 
+// v0.30.0: per-chart display prefs for the configurable time-series charts on
+// the Dashboard. Each entry is { type: 'line'|'area'|'bar', months: 6|12|24|'all' }.
+// Same dual-write pattern as the other viewing preferences (localStorage for
+// instant/offline, Firestore uiPrefs for cross-device) — see saveUiPrefsField.
+const TIMESERIES_KEY = 'usage.timeseriesCharts.v1';
+const TIMESERIES_DEFAULTS = {
+  costPerMonth: { type: 'line', months: 12 },
+  avgPerDay:    { type: 'line', months: 12 },
+  // Lifespan is naturally sparse (only months where something finished), so
+  // bars read better than a line with gaps.
+  avgLifespan:  { type: 'bar',  months: 12 },
+};
+let timeseriesPrefs = (() => {
+  const defaults = JSON.parse(JSON.stringify(TIMESERIES_DEFAULTS));
+  try {
+    const raw = localStorage.getItem(TIMESERIES_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) || {};
+    for (const k of Object.keys(defaults)) {
+      if (parsed[k] && typeof parsed[k] === 'object') {
+        defaults[k] = { ...defaults[k], ...parsed[k] };
+      }
+    }
+    return defaults;
+  } catch { return defaults; }
+})();
+
 // v0.22.0: demo mode (?demo=1) — bypass Firebase Auth, load sample data
 // into memory, intercept save/delete to be no-ops with toast. Lets people
 // see the app without signing in. Same pattern as the `sick` repo's
@@ -891,6 +919,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.30.0',
+    date: '2026-08-06',
+    tags: ['new'],
+    title: 'Three new charts you can shape yourself',
+    body: 'The Dashboard has three new month-by-month charts: what you spent each month, your average cost per day, and how long the products you finished actually lasted. Each one has its own switches — view it as a line, a filled area, or bars, over the last 6, 12, or 24 months (or your whole history). Your picks stick per chart and follow you to your other devices.',
+  },
   {
     version: '0.29.0',
     date: '2026-08-06',
@@ -1265,7 +1300,9 @@ function persistActiveFilters() {
 let charts = {
   byType: null, byStore: null, finishedByMonth: null,
   // v0.7.11
-  perDayByType: null, countByType: null, longestRunning: null
+  perDayByType: null, countByType: null, longestRunning: null,
+  // v0.30.0 — configurable month-by-month time series
+  costPerMonth: null, avgPerDay: null, avgLifespan: null
 };
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
@@ -1700,6 +1737,7 @@ async function loadAndApplyUiPrefs(uid) {
       currency: userCurrency,
       activityPageSize,
       changelogLastSeen: getLastChangelogSeen(),
+      timeseriesCharts: timeseriesPrefs, // v0.30.0
     };
     setDoc(uiPrefsDoc(uid), seed, { merge: true })
       .catch(err => console.warn('uiPrefs seed write failed:', err));
@@ -1762,6 +1800,28 @@ async function loadAndApplyUiPrefs(uid) {
     const sel = document.getElementById('activity-pagesize');
     if (sel) sel.value = String(activityPageSize);
     anyApplied = true;
+  }
+
+  // v0.30.0: timeseriesCharts — per-chart { type, months }. Merged over the
+  // defaults so a chart added in a later release still gets its default when
+  // an older cloud doc doesn't mention it. Validated per field so a malformed
+  // doc can't put a chart into an unrenderable state.
+  if (data.timeseriesCharts && typeof data.timeseriesCharts === 'object') {
+    const merged = JSON.parse(JSON.stringify(TIMESERIES_DEFAULTS));
+    for (const k of Object.keys(merged)) {
+      const incoming = data.timeseriesCharts[k];
+      if (!incoming || typeof incoming !== 'object') continue;
+      if (['line', 'area', 'bar'].includes(incoming.type)) merged[k].type = incoming.type;
+      if (incoming.months === 'all' || [6, 12, 24].includes(Number(incoming.months))) {
+        merged[k].months = incoming.months === 'all' ? 'all' : Number(incoming.months);
+      }
+    }
+    if (JSON.stringify(merged) !== JSON.stringify(timeseriesPrefs)) {
+      timeseriesPrefs = merged;
+      try { localStorage.setItem(TIMESERIES_KEY, JSON.stringify(timeseriesPrefs)); } catch {}
+      syncTimeSeriesControls();
+      anyApplied = true;
+    }
   }
 
   // changelogLastSeen — version string. Trickier: we keep whichever is
@@ -3035,6 +3095,9 @@ async function renderDashboard() {
     renderChartPerDayByType();
     renderChartCountByType();
     renderChartLongestRunning();
+    // v0.30.0: configurable month-by-month series (cost, $/day, lifespan).
+    syncTimeSeriesControls();
+    renderTimeSeriesCharts();
   }
 }
 
@@ -3210,6 +3273,303 @@ function renderChartFinishedByMonth() {
 }
 
 function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+/* ---------- v0.30.0 configurable time-series charts ----------
+ * Three month-by-month charts on the Dashboard, each with a switchable chart
+ * type (line / area / bar) and time range (6M / 12M / 24M / All):
+ *
+ *   costPerMonth  — what you spent each month, bucketed by purchase date.
+ *   avgPerDay     — average daily burn rate during each month (amortized).
+ *   avgLifespan   — average lifespan of products finished in each month.
+ *
+ * All three share one renderer (renderTimeSeriesChart) driven by the
+ * TIMESERIES_CHARTS config, so adding a fourth series later is a config entry
+ * plus a compute function — not another bespoke chart function.
+ */
+
+const MS_PER_DAY = 86400000;
+
+// Month buckets ending with the current month. `start` is inclusive, `end`
+// exclusive, so overlap math never double-counts a boundary day.
+function monthBuckets(months) {
+  const now = new Date();
+  const out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    out.push({
+      key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      label: start.toLocaleString(undefined, { month: 'short', year: '2-digit' }),
+      start,
+      end,
+      days: Math.round((end - start) / MS_PER_DAY),
+    });
+  }
+  return out;
+}
+
+// Turn a pref value into a concrete month count. 'all' spans from the earliest
+// date on any tracked product to now, capped at 10 years so a stray typo'd date
+// (e.g. year 1999) can't render thousands of buckets.
+function resolveMonthCount(months) {
+  if (months !== 'all') {
+    const n = Number(months);
+    return isFinite(n) && n > 0 ? Math.floor(n) : 12;
+  }
+  let earliest = null;
+  for (const p of trackedOnly()) {
+    for (const raw of [p.purchaseDate, p.startDate, p.endDate]) {
+      const d = parseLocalDate(raw);
+      if (d && (!earliest || d < earliest)) earliest = d;
+    }
+  }
+  if (!earliest) return 12;
+  const now = new Date();
+  const span = (now.getFullYear() - earliest.getFullYear()) * 12
+    + (now.getMonth() - earliest.getMonth()) + 1;
+  return Math.max(1, Math.min(span, 120));
+}
+
+function monthKeyOf(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Days of overlap between [aStart, aEnd] (inclusive end) and [bStart, bEnd)
+// (exclusive end). Used to spread a product's daily rate across the months its
+// lifespan touches.
+function overlapDays(aStart, aEnd, bStart, bEnd) {
+  const start = Math.max(aStart.getTime(), bStart.getTime());
+  const end = Math.min(aEnd.getTime() + MS_PER_DAY, bEnd.getTime());
+  if (end <= start) return 0;
+  return (end - start) / MS_PER_DAY;
+}
+
+// How many days of a bucket have actually elapsed. Full month for past buckets;
+// days-so-far for the current month, so a partial month isn't averaged against
+// days that haven't happened yet (which would understate the current rate).
+function elapsedDaysInBucket(b) {
+  const now = new Date();
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const end = Math.min(b.end.getTime(), todayEnd.getTime());
+  const days = (end - b.start.getTime()) / MS_PER_DAY;
+  return days > 0 ? days : b.days;
+}
+
+// Money out the door per month, by purchase date (falling back to start date
+// for rows entered without one). Inventory IS included here — you paid for it
+// that month even if you haven't opened it yet. That's deliberately different
+// from groupAllocatedSpend, which excludes inventory because it answers a
+// usage-cost question rather than a cash-spent one.
+function seriesCostPerMonth(buckets) {
+  const vals = buckets.map(() => 0);
+  const idx = new Map(buckets.map((b, i) => [b.key, i]));
+  let any = false;
+  for (const p of trackedOnly()) {
+    const d = parseLocalDate(p.purchaseDate || p.startDate);
+    if (!d) continue;
+    const i = idx.get(monthKeyOf(d));
+    if (i == null) continue;
+    const c = allocatedCost(p);
+    if (!isFinite(c) || c <= 0) continue;
+    vals[i] += c;
+    any = true;
+  }
+  if (!any) return null;
+  // 0 (not null) for months with no spend — a real "you spent nothing" reading.
+  return vals.map(round2);
+}
+
+// Average $/day during each month. Every in-use product contributes its
+// amortized daily rate (allocatedCost / lifespanDays) for the days its lifespan
+// overlaps the month; the month's total is divided by elapsed days. This is the
+// same honest-math approach as the rolling 30-day tile (v0.14.2) — sequential
+// products of the same type don't double-count the way summing per-product
+// $/day would.
+function seriesAvgPerDay(buckets) {
+  const now = new Date();
+  let any = false;
+  const vals = buckets.map(b => {
+    let total = 0;
+    for (const p of trackedOnly()) {
+      if (isInventory(p)) continue; // not in use yet → no burn
+      const s = parseLocalDate(p.startDate);
+      if (!s) continue;
+      const e = p.endDate ? parseLocalDate(p.endDate) : now;
+      if (!e || e < s) continue;
+      const dur = Math.max(1, Math.round((e - s) / MS_PER_DAY));
+      const rate = allocatedCost(p) / dur;
+      if (!isFinite(rate) || rate <= 0) continue;
+      const ov = overlapDays(s, e, b.start, b.end);
+      if (ov > 0) total += rate * ov;
+    }
+    if (total <= 0) return null; // nothing in use that month → gap, not a zero
+    any = true;
+    return round2(total / elapsedDaysInBucket(b));
+  });
+  return any ? vals : null;
+}
+
+// Average lifespan (days) of products FINISHED in each month, bucketed by end
+// date. Months with no finishes are null so the line breaks rather than
+// implying an average of zero days.
+function seriesAvgLifespan(buckets) {
+  const sums = buckets.map(() => 0);
+  const counts = buckets.map(() => 0);
+  const idx = new Map(buckets.map((b, i) => [b.key, i]));
+  let any = false;
+  for (const p of trackedOnly()) {
+    if (!isFinished(p)) continue;
+    const d = parseLocalDate(p.endDate);
+    if (!d) continue;
+    const i = idx.get(monthKeyOf(d));
+    if (i == null) continue;
+    const dur = calcDuration(p);
+    if (dur == null || !isFinite(dur) || dur <= 0) continue;
+    sums[i] += dur;
+    counts[i] += 1;
+    any = true;
+  }
+  if (!any) return null;
+  return sums.map((s, i) => (counts[i] ? Math.round(s / counts[i]) : null));
+}
+
+const TIMESERIES_CHARTS = {
+  costPerMonth: {
+    canvasId: 'chart-cost-per-month',
+    color: '#2b5fd9',
+    compute: seriesCostPerMonth,
+    format: v => money(v),
+    axisFormat: v => money(v),
+    emptyText: 'No purchases with a date in this range yet.',
+    tooltip: v => `Spent ${money(v)}`,
+  },
+  avgPerDay: {
+    canvasId: 'chart-avg-per-day',
+    color: '#2d8a5f',
+    compute: seriesAvgPerDay,
+    format: v => moneyFine(v),
+    axisFormat: v => moneyFine(v),
+    emptyText: 'No products in use during this range yet.',
+    tooltip: v => `${moneyFine(v)} per day`,
+  },
+  avgLifespan: {
+    canvasId: 'chart-avg-lifespan',
+    color: '#7a4ad9',
+    compute: seriesAvgLifespan,
+    format: v => `${v} days`,
+    axisFormat: v => `${v}d`,
+    emptyText: 'Finish a few products to see how long they last.',
+    tooltip: v => `${v} day${v === 1 ? '' : 's'} average`,
+  },
+};
+
+// Keep the segmented buttons' pressed state in sync with the stored prefs.
+function syncTimeSeriesControls() {
+  for (const key of Object.keys(TIMESERIES_CHARTS)) {
+    const host = document.querySelector(`.chart-controls[data-chart="${key}"]`);
+    if (!host) continue;
+    const pref = timeseriesPrefs[key] || TIMESERIES_DEFAULTS[key];
+    host.querySelectorAll('.chart-ctl').forEach(btn => {
+      const isOn = String(pref[btn.dataset.ctl]) === String(btn.dataset.val);
+      btn.classList.toggle('is-active', isOn);
+      btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+    });
+  }
+}
+
+function saveTimeseriesPrefs() {
+  try { localStorage.setItem(TIMESERIES_KEY, JSON.stringify(timeseriesPrefs)); } catch {}
+  saveUiPrefsField('timeseriesCharts', timeseriesPrefs);
+}
+
+function renderTimeSeriesChart(key) {
+  const cfg = TIMESERIES_CHARTS[key];
+  if (!cfg) return;
+  const canvas = document.getElementById(cfg.canvasId);
+  if (!canvas) return;
+  const pref = timeseriesPrefs[key] || TIMESERIES_DEFAULTS[key];
+  const buckets = monthBuckets(resolveMonthCount(pref.months));
+  const values = cfg.compute(buckets);
+
+  destroyChart(key);
+
+  // Empty-state: show a message in place of an axis-only chart.
+  const emptyEl = document.getElementById(`${cfg.canvasId}-empty`);
+  const hasData = Array.isArray(values) && values.some(v => v != null && v > 0);
+  if (emptyEl) {
+    emptyEl.hidden = hasData;
+    emptyEl.textContent = cfg.emptyText;
+  }
+  canvas.hidden = !hasData;
+  if (!hasData) return;
+
+  const isBar = pref.type === 'bar';
+  const isArea = pref.type === 'area';
+  // Many buckets + thin bars get unreadable; drop point markers past ~24.
+  const dense = buckets.length > 24;
+
+  charts[key] = new Chart(canvas, {
+    type: isBar ? 'bar' : 'line',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{
+        data: values,
+        backgroundColor: isBar ? cfg.color : hexToRgba(cfg.color, 0.15),
+        borderColor: cfg.color,
+        borderWidth: isBar ? 0 : 2,
+        borderRadius: isBar ? 4 : undefined,
+        fill: isArea ? 'origin' : false,
+        tension: 0.25,
+        pointRadius: isBar || dense ? 0 : 3,
+        pointHoverRadius: isBar ? 0 : 5,
+        pointBackgroundColor: cfg.color,
+        // Bridge single-month gaps so one empty month doesn't split the line
+        // into disconnected fragments.
+        spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => (ctx.parsed.y == null ? 'No data' : cfg.tooltip(ctx.parsed.y))
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            autoSkip: true,
+            maxRotation: 0,
+            // With a long range, thin the labels so they don't collide.
+            maxTicksLimit: dense ? 12 : 24,
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#eef1f7' },
+          ticks: { callback: v => cfg.axisFormat(v) }
+        }
+      }
+    }
+  });
+}
+
+function renderTimeSeriesCharts() {
+  for (const key of Object.keys(TIMESERIES_CHARTS)) renderTimeSeriesChart(key);
+}
+
+// #rrggbb → rgba() so area fills can be translucent without a second palette.
+function hexToRgba(hex, alpha) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  if (!m) return hex;
+  return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
+}
 
 /* ---------- v0.7.12 trends panel ----------
  * One rotating "insight" line above the stats bar. Two layers:
@@ -5871,19 +6231,27 @@ function renderStatsForExport() {
 // the export functions call setView('dashboard') first if needed.
 function renderChartsForExport() {
   const ids = ['chart-by-type', 'chart-by-store', 'chart-finished-per-month',
-               'chart-perday-by-type', 'chart-count-by-type', 'chart-longest-running'];
+               'chart-perday-by-type', 'chart-count-by-type', 'chart-longest-running',
+               // v0.30.0 — configurable time series (skipped below if empty/hidden)
+               'chart-cost-per-month', 'chart-avg-per-day', 'chart-avg-lifespan'];
   const titles = {
     'chart-by-type': 'Spend by product type',
     'chart-by-store': 'Spend by store',
     'chart-finished-per-month': 'Products finished per month',
     'chart-perday-by-type': '$/day by product type',
     'chart-count-by-type': 'Purchases by product type',
-    'chart-longest-running': 'Longest-running products'
+    'chart-longest-running': 'Longest-running products',
+    'chart-cost-per-month': 'Cost per month',
+    'chart-avg-per-day': 'Average $/day by month',
+    'chart-avg-lifespan': 'Average lifespan by month'
   };
   const blocks = [];
   for (const id of ids) {
     const c = document.getElementById(id);
     if (!c || !(c instanceof HTMLCanvasElement)) continue;
+    // v0.30.0: a time-series canvas is hidden when its range has no data —
+    // capturing it would paste a blank rectangle into the export.
+    if (c.hidden) continue;
     let dataUrl = '';
     try { dataUrl = c.toDataURL('image/png'); } catch { continue; }
     if (!dataUrl) continue;
@@ -7338,6 +7706,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.7.16: dashboard PNG export buttons
   document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);
   document.getElementById('btn-export-overview')?.addEventListener('click', exportOverviewPng);
+
+  // v0.30.0: time-series chart controls (type + range). One delegated listener
+  // on the charts grid covers all three charts' segmented buttons. Only the
+  // affected chart re-renders — the other five dashboard charts are untouched.
+  document.querySelector('.dash-charts')?.addEventListener('click', e => {
+    const btn = e.target.closest('.chart-ctl');
+    if (!btn) return;
+    const host = btn.closest('.chart-controls');
+    const key = host?.dataset.chart;
+    if (!key || !TIMESERIES_CHARTS[key]) return;
+    const ctl = btn.dataset.ctl;   // 'type' | 'months'
+    const val = btn.dataset.val;
+    if (!ctl) return;
+    const pref = timeseriesPrefs[key] || { ...TIMESERIES_DEFAULTS[key] };
+    // months stays numeric except for the 'all' sentinel, so resolveMonthCount
+    // and the button's data-val compare cleanly either way.
+    pref[ctl] = (ctl === 'months' && val !== 'all') ? Number(val) : val;
+    timeseriesPrefs[key] = pref;
+    saveTimeseriesPrefs();
+    syncTimeSeriesControls();
+    renderTimeSeriesChart(key);
+  });
 
   // v0.10.0: reorder reminder clicks → open the product for editing
   document.getElementById('reminders-panel')?.addEventListener('click', e => {

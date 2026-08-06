@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.29.0
+**Version:** v0.30.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.29.0)
+## Current status (v0.30.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,15 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.30.0 — 2026-08-06
+- **Three configurable month-by-month charts on the Dashboard**, each with a chart-type switcher (Line / Area / Bar) and a range switcher (6M / 12M / 24M / All):
+  - **Cost per month** — allocated spend bucketed by `purchaseDate` (falling back to `startDate`). Inventory **is** included here: you paid for it that month even if you haven't opened it. That's deliberately different from `groupAllocatedSpend`, which excludes inventory because it answers a usage-cost question rather than a cash-spent one. Months with no purchases render as a real `0`.
+  - **Average $/day by month** — amortized daily burn rate. Each in-use product contributes `allocatedCost / lifespanDays` for the days its lifespan overlaps the month; the month total is divided by *elapsed* days (so the current, partial month isn't averaged against days that haven't happened). Same honest-math approach as the rolling 30-day tile (v0.14.2) — sequential products of the same type don't double-count the way summing per-product `$/day` would. Months with nothing in use are `null` (a gap), not `0`.
+  - **Average lifespan by month** — mean `calcDuration` of products **finished** in that month, bucketed by `endDate`. Sparse by nature, so it defaults to Bar; months with no finishes are `null` rather than a misleading zero.
+- **Architecture:** one `renderTimeSeriesChart(key)` driven by the `TIMESERIES_CHARTS` config (canvas id, color, compute fn, formatters, empty text), so a fourth series is a config entry plus a compute function rather than another bespoke chart. Shared helpers: `monthBuckets(n)` (inclusive start / exclusive end so overlap math can't double-count a boundary day), `resolveMonthCount()` (`'all'` spans from the earliest date on any product, capped at 120 months so a typo'd year can't render thousands of buckets), `overlapDays()`, `elapsedDaysInBucket()`, `hexToRgba()` for translucent area fills.
+- **Prefs persist per chart** at `usage.timeseriesCharts.v1` and mirror to Firestore `uiPrefs.timeseriesCharts` for cross-device sync (same dual-write pattern as v0.27.0). Cloud values are merged over the defaults and validated per field, so an older cloud doc missing a newly-added chart still gets that chart's default, and a malformed doc can't put a chart into an unrenderable state.
+- Empty ranges show a centered message instead of an axis-only chart, and hidden canvases are skipped by the dashboard PNG export so they don't paste in as blank rectangles. Controls wrap rather than overflow on narrow screens.
 
 ### v0.29.0 — 2026-08-06
 - **Bundle "create all N at once."** When "Part of a bundle purchase" is checked and the bundle size is 2+, a new **Create all N at once** checkbox appears (new adds only; hidden while editing). On Save it creates one product per unit — same details, a shared `bundleId`, auto-numbered `bundlePosition` 1…N — instead of the user entering each sibling by hand. Position 1 keeps the form's start/end dates (the unit you're opening now); positions 2…N are created as **inventory** backups (blank dates), the natural state for a just-bought multipack. This pairs with the v0.27.8 reorder-reminder on-hand counting: a fresh 3-pack is 1 active + 2 inventory (3 on hand), so it stays quiet until you're down to your last unit. While the option is on, the manual "which number" field hides (positions are assigned automatically); `syncBundleAllOption()` owns that visibility + the auto-number label. Implementation is a bulk loop in `handleSubmit` (`Promise`-sequenced `saveProduct` per unit, each logged to the activity feed). The `bundleCreateAll` checkbox is a transient UI control — not in `FIELDS`, so it's never persisted on the product.
