@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.28.1">
+  <meta name="version" content="0.29.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.28.1</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.29.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -577,6 +577,17 @@
         <label class="field" id="bundle-size-wrap" data-tracked-only hidden>
           <span>How many in the bundle? <em>*</em></span>
           <input name="bundleSize" type="number" min="1" step="1" placeholder="e.g. 3">
+        </label>
+
+        <!-- v0.29.0: bulk-create the whole bundle at once. Shown only when the
+             bundle size is 2+ and this is a new add. When checked, Save creates
+             one product per unit, auto-numbered 1..N under a shared bundleId, so
+             the user doesn't have to add each sibling by hand. The manual
+             "which number" field hides while this is on (positions are
+             assigned automatically). -->
+        <label class="field checkbox-field" id="bundle-all-wrap" data-tracked-only hidden>
+          <input name="bundleCreateAll" type="checkbox">
+          <span id="bundle-all-label">Create all items in this bundle at once</span>
         </label>
 
         <label class="field" id="bundle-position-wrap" data-tracked-only hidden>

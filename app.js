@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.28.1
+/* Usage Tracker — v0.29.0
+ * v0.29.0: Bundle "create all N at once" — one product per unit, auto-numbered 1..N under a shared bundle, #1 active and the rest inventory backups.
  * v0.28.1: Fix the "what's new" unread dot floating far right of the version number (version button was stretching to the heading width).
  * v0.28.0: Amazon ASIN field (revealed when store is Amazon) → direct amazon.com/dp/{ASIN} reorder link; accepts a pasted URL; auto-filled from UPC lookup.
  * v0.27.8: Reorder reminders return once you're down to your last unit of a type (was: silenced whenever any backup existed).
@@ -621,7 +622,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.28.1';
+const APP_VERSION = '0.29.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -890,6 +891,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.29.0',
+    date: '2026-08-06',
+    tags: ['new'],
+    title: 'Add a whole multipack in one go',
+    body: 'Buying a 3-pack (or any multipack)? Check "Part of a bundle purchase," enter how many are in it, and a new "Create all N at once" option appears. One tap and the app adds every unit for you — auto-numbered 1 of 3, 2 of 3, 3 of 3 — instead of you entering each by hand. The first one takes the start date you set (the one you\'re opening now); the rest land in your inventory as backups, ready to start when you get to them.',
+  },
   {
     version: '0.28.1',
     date: '2026-08-06',
@@ -4378,19 +4386,49 @@ const form = () => document.getElementById('product-form');
 function setBundleSizeVisibility() {
   const f = form();
   const bundled = f.elements.bundleStatus.checked;
-  const sizeWrap = document.getElementById('bundle-size-wrap');
-  const posWrap = document.getElementById('bundle-position-wrap');
-  sizeWrap.hidden = !bundled;
-  if (posWrap) posWrap.hidden = !bundled;
+  document.getElementById('bundle-size-wrap').hidden = !bundled;
   f.elements.bundleSize.required = bundled;
-  if (f.elements.bundlePosition) f.elements.bundlePosition.required = bundled;
   if (!bundled) {
     f.elements.bundleSize.value = '';
     if (f.elements.bundlePosition) f.elements.bundlePosition.value = '';
+    if (f.elements.bundleCreateAll) f.elements.bundleCreateAll.checked = false;
   }
+  // v0.29.0: bundle-position-wrap + bundle-all-wrap visibility (and the
+  // bundlePosition required flag) are owned by syncBundleAllOption, since they
+  // depend on the bundle size and the create-all toggle, not just bundleStatus.
+  syncBundleAllOption();
   updateBundlePositionMax();
   // v0.17.4: keep the cost label + per-item hint in sync with bundle state.
   syncBundleCostUI();
+}
+
+// v0.29.0: manage the "create all N at once" option. The checkbox is offered
+// only for a NEW add of a bundle with size >= 2 (bulk-creating siblings while
+// editing an existing row would be confusing). While it's on, the manual
+// "which number" field hides — positions are auto-assigned 1..N on save.
+function syncBundleAllOption() {
+  const f = form();
+  if (!f) return;
+  const allWrap = document.getElementById('bundle-all-wrap');
+  const posWrap = document.getElementById('bundle-position-wrap');
+  const label = document.getElementById('bundle-all-label');
+  const bundled = !!f.elements.bundleStatus?.checked;
+  const size = Number(f.elements.bundleSize?.value);
+  const canCreateAll = bundled && !editingId && isFinite(size) && size >= 2;
+
+  if (allWrap) allWrap.hidden = !canCreateAll;
+  // If the option isn't available, make sure it isn't left checked from before.
+  if (!canCreateAll && f.elements.bundleCreateAll) f.elements.bundleCreateAll.checked = false;
+  const createAll = canCreateAll && !!f.elements.bundleCreateAll?.checked;
+
+  if (posWrap) posWrap.hidden = !bundled || createAll;
+  if (f.elements.bundlePosition) f.elements.bundlePosition.required = bundled && !createAll;
+
+  if (label) {
+    label.textContent = canCreateAll
+      ? `Create all ${size} at once — auto-numbered 1 of ${size} … ${size} of ${size}`
+      : 'Create all items in this bundle at once';
+  }
 }
 
 // v0.17.4: bundle-aware cost UI. The schema treats `cost` as the FULL
@@ -4832,6 +4870,42 @@ async function handleSubmit(e) {
     const bs = Number(data.bundleSize);
     if (!isFinite(bs) || bs <= 0) {
       toast('Enter how many were in the bundle');
+      return;
+    }
+    // v0.29.0: bulk create-all path. When the user checked "Create all N at
+    // once" (offered only for a new add with size >= 2), create one product per
+    // unit — same details, shared bundleId, auto-numbered 1..N. Position 1 keeps
+    // the form's start/end dates (the one you're using now); positions 2..N are
+    // created as inventory backups (blank dates), the natural state for a
+    // just-bought multipack — and it pairs with the reorder-reminder on-hand
+    // counting so you're only nudged once you're down to your last unit.
+    const bulkCreateAll = !editingId && !!f.elements.bundleCreateAll?.checked;
+    if (bulkCreateAll) {
+      if (bs < 2 || Math.floor(bs) !== bs) {
+        toast('Bundle size must be a whole number of 2 or more to create a set');
+        return;
+      }
+      const bundleId = newBundleId();
+      const saveBtn = document.getElementById('dialog-save');
+      saveBtn.disabled = true;
+      try {
+        const created = [];
+        for (let i = 1; i <= bs; i++) {
+          const member = { ...data, bundleId, bundlePosition: i };
+          if (i !== 1) { member.startDate = ''; member.endDate = ''; }
+          member.createdAt = new Date().toISOString();
+          const prod = { id: newId(), ...member };
+          await saveProduct(prod);
+          created.push(prod);
+        }
+        created.forEach(p => logActivity('add', p));
+        toast(`Added ${bs} bundle items — 1 of ${bs} … ${bs} of ${bs}`);
+        closeDialog();
+      } catch {
+        toast('Something went wrong creating the bundle');
+      } finally {
+        saveBtn.disabled = false;
+      }
       return;
     }
     const bp = Number(data.bundlePosition);
@@ -7062,6 +7136,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Both the bundle size and the cost feed into the per-item derivation.
   f.elements.bundleSize.addEventListener('input', syncBundleCostUI);
   f.elements.cost.addEventListener('input', syncBundleCostUI);
+  // v0.29.0: reveal/update the "create all N at once" option as the bundle size
+  // changes, and toggle the manual position field when it's checked.
+  f.elements.bundleSize.addEventListener('input', syncBundleAllOption);
+  if (f.elements.bundleCreateAll) f.elements.bundleCreateAll.addEventListener('change', syncBundleAllOption);
   // v0.28.0: reveal/hide the Amazon ASIN field as the store changes, and keep
   // the inline "Open on Amazon" link in sync as the ASIN is typed/pasted.
   if (f.elements.store) f.elements.store.addEventListener('change', syncAsinField);

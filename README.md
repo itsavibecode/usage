@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.28.1
+**Version:** v0.29.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.28.1)
+## Current status (v0.29.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.29.0 — 2026-08-06
+- **Bundle "create all N at once."** When "Part of a bundle purchase" is checked and the bundle size is 2+, a new **Create all N at once** checkbox appears (new adds only; hidden while editing). On Save it creates one product per unit — same details, a shared `bundleId`, auto-numbered `bundlePosition` 1…N — instead of the user entering each sibling by hand. Position 1 keeps the form's start/end dates (the unit you're opening now); positions 2…N are created as **inventory** backups (blank dates), the natural state for a just-bought multipack. This pairs with the v0.27.8 reorder-reminder on-hand counting: a fresh 3-pack is 1 active + 2 inventory (3 on hand), so it stays quiet until you're down to your last unit. While the option is on, the manual "which number" field hides (positions are assigned automatically); `syncBundleAllOption()` owns that visibility + the auto-number label. Implementation is a bulk loop in `handleSubmit` (`Promise`-sequenced `saveProduct` per unit, each logged to the activity feed). The `bundleCreateAll` checkbox is a transient UI control — not in `FIELDS`, so it's never persisted on the product.
 
 ### v0.28.1 — 2026-08-06
 - **Fixed the unread "What's new" dot floating far to the right of the version number.** `.brand-text` is a flex column, so the `.version` button was stretching to the width of the "Usage Tracker" heading above it; the absolutely-positioned `.has-unread::after` dot (`right: 0`) therefore landed at the far edge. Added `align-self: flex-start` so the button shrinks to its own text and the dot sits right beside the version.
