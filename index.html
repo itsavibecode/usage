@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.27.8">
+  <meta name="version" content="0.28.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.27.8</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.28.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -543,6 +543,15 @@
         <label class="field" data-tracked-only>
           <span>Store</span>
           <select name="store"></select>
+        </label>
+
+        <!-- v0.28.0: Amazon ASIN. Revealed only when the store is Amazon (or an
+             ASIN is already saved). Enables a direct amazon.com/dp/{ASIN}
+             reorder link. Accepts a pasted Amazon URL and extracts the ASIN. -->
+        <label class="field" id="asin-field-wrap" data-tracked-only hidden>
+          <span>Amazon ASIN <em class="muted">(for a 1-tap reorder link)</em></span>
+          <input name="asin" type="text" maxlength="200" autocapitalize="characters" spellcheck="false" placeholder="e.g. B01N7O8XYZ — or paste the Amazon product URL">
+          <a id="asin-open-amazon" class="upc-check-link" href="#" target="_blank" rel="noopener" hidden>Open on Amazon &#x2197;</a>
         </label>
 
         <label class="field" data-tracked-only>

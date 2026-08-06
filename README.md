@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.27.8
+**Version:** v0.28.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.27.8)
+## Current status (v0.28.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.28.0 — 2026-08-06
+- **Amazon ASIN field + direct reorder link.** New optional `asin` field on products. It's revealed in the Add/Edit dialog when the store is Amazon (or when an ASIN is already saved, so existing values are never hidden). Accepts either a bare 10-char ASIN or a pasted Amazon product URL — `normalizeAsin()` extracts the ASIN from `/dp/`, `/gp/product/`, `/product/`, or `?asin=` URL forms, uppercases it, and drops unrecognizable input (with a non-blocking toast) rather than storing garbage. When set, an inline "Open on Amazon" link points at `amazon.com/dp/{ASIN}` — a direct product page, far better for reordering than the existing name-based search link. Auto-filled from UPC lookups when UPCitemdb returns an `asin`. Carried over by Duplicate (same physical product → same ASIN). Included in CSV/JSON export + import templates and in search. Cleared on favorite (catalog) entries since it's a tracked-purchase field. `syncAsinField()` handles reveal/hide + link sync and is called on every dialog-open path and on store `change`.
 
 ### v0.27.8 — 2026-08-06
 - **Reorder reminders no longer go permanently silent for types you keep stocked.** v0.27.3 suppressed a reminder whenever *any* inventory item of that type existed. For anyone who keeps a rolling backup (e.g. always one spare deodorant), that silenced the reminder forever — the email digest included. This was the cause of reminder emails stopping after 2026-05-24 (when the matching worker change, v0.3.1, went live). New rule: count **on-hand units** of the type (active + inventory; finished don't count) and suppress only while that count is **≥ 2** — i.e. there's a genuine spare beyond the one running low. Down to your last unit and it's running low → the reminder (and email) return. Implemented identically in `computeReorderReminders` (app) and `computeReminders` (usage-worker v0.3.3) so the in-app panel and the email digest stay in sync.

@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.27.8
+/* Usage Tracker — v0.28.0
+ * v0.28.0: Amazon ASIN field (revealed when store is Amazon) → direct amazon.com/dp/{ASIN} reorder link; accepts a pasted URL; auto-filled from UPC lookup.
  * v0.27.8: Reorder reminders return once you're down to your last unit of a type (was: silenced whenever any backup existed).
  * v0.27.7: Brand logo / product image moved to its own table column so thumbnails and names each align in a clean vertical strip.
  * v0.27.6: Table name cell — brand logo stays left of a wrapping title (flex row) instead of stacking above it.
@@ -619,7 +620,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.8';
+const APP_VERSION = '0.28.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -662,6 +663,11 @@ const FIELDS = [
   'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
   'purchaseDate', 'notes', 'upc', 'imageUrl', 'createdAt',
+  // v0.28.0: Amazon ASIN (10-char product id). Optional; when set it drives a
+  // direct amazon.com/dp/{ASIN} reorder link (better than a name search).
+  // Shown in the dialog when the store is Amazon (or when an ASIN is already
+  // present). Accepts a pasted Amazon URL and extracts the ASIN.
+  'asin',
   // v0.15.2: brand name (from UPCitemdb response) — drives the company-logo
   // icon via logo.dev. Editable in the dialog so users can correct or fill
   // it in for products without UPC lookups.
@@ -883,6 +889,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.28.0',
+    date: '2026-08-06',
+    tags: ['new'],
+    title: 'Amazon ASIN + one-tap reorder link',
+    body: 'Bought something on Amazon? Pick Amazon as the store and a new "Amazon ASIN" field appears. Paste the ASIN or the whole Amazon product URL (it pulls the ASIN out for you), and you get a direct "Open on Amazon" link straight to that product\'s page — much handier for reordering than a name search. If a UPC lookup already knows the ASIN, it fills in automatically. The ASIN is included in CSV/JSON exports and is searchable.',
+  },
   {
     version: '0.27.8',
     date: '2026-08-06',
@@ -2134,7 +2147,7 @@ function getSortValue(p, column) {
 // substring match; AND-combines with row-filter tabs and chip filters.
 // Transient (not persisted) — search is meant to be momentary.
 let searchQuery = '';
-const SEARCH_FIELDS = ['productName', 'productType', 'brand', 'store', 'buyer', 'notes', 'upc', 'cardLast4'];
+const SEARCH_FIELDS = ['productName', 'productType', 'brand', 'store', 'buyer', 'notes', 'upc', 'cardLast4', 'asin'];
 
 // v0.14.0 search-autocomplete state. activeSuggestionIndex tracks keyboard
 // nav through the suggestion dropdown (arrow keys); -1 means no row is
@@ -4514,6 +4527,7 @@ function openAddDialog() {
   setBundleSizeVisibility();
   setUpcStatus('');
   syncAmazonCheckLink(''); // v0.9.0 — hide the Amazon link until UPC is entered
+  syncAsinField(); // v0.28.0 — hidden on fresh Add (no store yet)
   syncDialogImagePreview(); // v0.15.1 — hide preview on fresh Add
   dialog().showModal();
   // v0.7.23: autofocus the UPC field on Add. The dialog opens for the
@@ -4545,6 +4559,7 @@ function openEditDialog(id) {
   setBundleSizeVisibility();
   setUpcStatus('');
   syncAmazonCheckLink(p.upc); // v0.9.0 — show Amazon link if existing UPC is set
+  syncAsinField(); // v0.28.0 — reveal ASIN field if store is Amazon or an ASIN exists
   syncDialogImagePreview(); // v0.15.1 — show existing image
   dialog().showModal();
 }
@@ -4694,7 +4709,7 @@ function openDuplicateDialog(id) {
     'cost', 'costWithTax',
     'bundleStatus', 'bundleSize',
     'store', 'buyer', 'cardLast4',
-    'upc'
+    'upc', 'asin' // v0.28.0: same physical product → same Amazon ASIN
   ];
   populateFormSelects(source);
   for (const key of carryOver) {
@@ -4715,6 +4730,7 @@ function openDuplicateDialog(id) {
   // user can correct it if they're back-filling history. v0.15.1: local date.
   f.elements.purchaseDate.value = todayLocalISODate();
   setBundleSizeVisibility();
+  syncAsinField(); // v0.28.0 — reveal ASIN field if the carried-over store is Amazon
   document.getElementById('dialog-title').textContent = 'Duplicate product';
   toast('Duplicated — set start date when you begin using it');
 }
@@ -4748,6 +4764,7 @@ async function handleSubmit(e) {
     data.bundleStatus = false; data.bundleSize = ''; data.bundlePosition = ''; data.bundleId = '';
     data.store = ''; data.buyer = ''; data.cardLast4 = '';
     data.purchaseDate = '';
+    data.asin = ''; // v0.28.0 — ASIN is a tracked-purchase field, not for catalog favorites
     // Continue to id assignment + save below (reuses the same path).
     const id = editingId || newId();
     if (!editingId) data.createdAt = new Date().toISOString();
@@ -4778,6 +4795,15 @@ async function handleSubmit(e) {
   if (data.store === ADD_NEW) data.store = '';
   if (data.buyer === ADD_NEW) data.buyer = '';
   if (data.cardLast4 === ADD_NEW) data.cardLast4 = '';
+
+  // v0.28.0: normalize the Amazon ASIN — extract it from a pasted Amazon URL,
+  // or keep a bare 10-char id. If the input isn't a recognizable ASIN/URL, drop
+  // it rather than store garbage, and warn so it isn't a silent loss.
+  if (data.asin) {
+    const cleanAsin = normalizeAsin(data.asin);
+    if (!cleanAsin) toast('That didn\'t look like an Amazon ASIN or URL — leaving it blank');
+    data.asin = cleanAsin;
+  }
 
   if (!data.productName) { toast('Product name is required'); return; }
   if (!data.upc) { toast('UPC is required'); return; }
@@ -5837,7 +5863,7 @@ function exportCSV() {
     'cost', 'costWithTax', 'allocatedCost', 'costPerUnit', 'costPerDay',
     'bundleStatus', 'bundleSize', 'bundlePosition',
     'store', 'buyer', 'cardLast4',
-    'purchaseDate', 'upc', 'notes'
+    'purchaseDate', 'upc', 'asin', 'notes'
   ];
   const rows = products.map(p => cols.map(c => {
     let v;
@@ -5892,7 +5918,7 @@ const IMPORT_COLS = [
   'startDate', 'endDate', 'cost', 'costWithTax',
   'bundleStatus', 'bundleSize', 'bundlePosition',
   'store', 'buyer', 'cardLast4',
-  'purchaseDate', 'upc', 'notes'
+  'purchaseDate', 'upc', 'asin', 'notes'
 ];
 
 function downloadJSONTemplate() {
@@ -6305,6 +6331,56 @@ function normalizeUpc(code) {
   return String(code || '').replace(/\D/g, '');
 }
 
+// v0.28.0: Amazon ASIN handling.
+// An ASIN is a 10-char alphanumeric id (products usually start "B0"). Accept
+// either a bare ASIN or a pasted Amazon URL and pull the ASIN out of it
+// (/dp/XXXXXXXXXX, /gp/product/XXXXXXXXXX, /product/XXXXXXXXXX, or ?asin=...).
+// Returns an uppercased 10-char ASIN, or '' if none can be extracted (for a
+// bare 10-char token we uppercase and keep it; anything else → '').
+function normalizeAsin(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const urlMatch = s.match(/(?:\/dp\/|\/gp\/product\/|\/product\/|[?&]asin=)([A-Z0-9]{10})/i);
+  if (urlMatch) return urlMatch[1].toUpperCase();
+  const bare = s.match(/^([A-Za-z0-9]{10})$/);
+  if (bare) return bare[1].toUpperCase();
+  return '';
+}
+
+function amazonUrlForAsin(asin) {
+  return `https://www.amazon.com/dp/${encodeURIComponent(asin)}`;
+}
+
+// v0.28.0: show the ASIN field only when it's relevant — the store is Amazon,
+// or an ASIN is already saved on the product (so an existing value is never
+// hidden). Also keeps the inline "Open on Amazon" direct link in sync with the
+// current (normalized) ASIN value.
+function syncAsinField() {
+  const wrap = document.getElementById('asin-field-wrap');
+  if (!wrap) return;
+  let storeVal = '';
+  let asinVal = '';
+  try {
+    const f = form();
+    storeVal = (f.elements.store?.value || '').trim();
+    asinVal = (f.elements.asin?.value || '').trim();
+  } catch {}
+  const isAmazon = /amazon/i.test(storeVal);
+  wrap.hidden = !(isAmazon || asinVal);
+
+  const link = document.getElementById('asin-open-amazon');
+  if (link) {
+    const asin = normalizeAsin(asinVal);
+    if (asin) {
+      link.hidden = false;
+      link.href = amazonUrlForAsin(asin);
+    } else {
+      link.hidden = true;
+      link.href = '#';
+    }
+  }
+}
+
 /* v0.7.21: three-tier UPC lookup pipeline with persistent caching.
  *
  *   1. L1 in-memory `upcCache` Map — same-session repeat lookups are free.
@@ -6574,6 +6650,12 @@ function applyUpcItemToForm(item) {
   // v0.15.2: capture the brand for the company-logo icon
   const brand = (item.brand || '').trim();
   if (brand) setIfEmpty('brand', brand);
+
+  // v0.28.0: UPCitemdb sometimes includes the Amazon ASIN — capture it so the
+  // direct reorder link works without the user hunting it down. Reveal the
+  // field since an ASIN now exists even if the store isn't set to Amazon yet.
+  const dbAsin = normalizeAsin(item.asin || '');
+  if (dbAsin) { setIfEmpty('asin', dbAsin); syncAsinField(); }
 
   // Product type from category
   const guessedType = guessProductTypeFromCategory(item.category || '');
@@ -6972,6 +7054,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Both the bundle size and the cost feed into the per-item derivation.
   f.elements.bundleSize.addEventListener('input', syncBundleCostUI);
   f.elements.cost.addEventListener('input', syncBundleCostUI);
+  // v0.28.0: reveal/hide the Amazon ASIN field as the store changes, and keep
+  // the inline "Open on Amazon" link in sync as the ASIN is typed/pasted.
+  if (f.elements.store) f.elements.store.addEventListener('change', syncAsinField);
+  if (f.elements.asin) f.elements.asin.addEventListener('input', syncAsinField);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
   // v0.15.1: explicit manual Look up button. Force-fresh fetch (bypasses
