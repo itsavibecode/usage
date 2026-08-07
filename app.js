@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.31.0
+/* Usage Tracker — v0.31.1
+ * v0.31.1: Row action buttons anchor left so rows missing the History button no longer look indented.
  * v0.31.0: $/unit shows its unit ("$1.67/oz", "$0.067/ct") and per-unit / per-day money scales precision so tiny values stop collapsing to $0.00.
  * v0.30.0: Three configurable month-by-month charts (cost, avg $/day, avg lifespan) with line/area/bar + 6M/12M/24M/All switchers; prefs sync per chart.
  * v0.29.0: Bundle "create all N at once" — one product per unit, auto-numbered 1..N under a shared bundle, #1 active and the rest inventory backups.
@@ -624,7 +625,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.31.0';
+const APP_VERSION = '0.31.1';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -920,6 +921,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.31.1',
+    date: '2026-08-06',
+    tags: ['fix'],
+    title: 'Row buttons line up again',
+    body: 'Rows without a History button (products you\'ve only bought once, so there\'s no price history yet) had their action buttons shifted over, which made them look misaligned next to the other rows. All rows now start their buttons at the same place.',
+  },
   {
     version: '0.31.0',
     date: '2026-08-06',

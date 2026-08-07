@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.31.0
+**Version:** v0.31.1
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.31.0)
+## Current status (v0.31.1)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,9 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.31.1 — 2026-08-06
+- **Fixed: row action buttons appearing indented on some rows.** The actions cell used `justify-content: flex-end` (v0.17.1), which kept the right edge tidy but left the *left* edge ragged — because rows don't all have the same button count. `History` only renders when a UPC has 2+ price points (`priceHistoryCount(upc) >= 2`), so a product bought only once shows 5 buttons instead of 6 and its whole group slid right, reading as misaligned next to its neighbours. Now `flex-start`, so `Edit / Finish / Duplicate` sit in the same place on every row and a short row simply ends earlier. The `ACTIONS` header was switched from `text-align: right` to `left` to sit over the first button rather than over the ragged far edge.
 
 ### v0.31.0 — 2026-08-06
 - **`$/unit` column now carries its unit** — `$1.67/oz`, `$0.067/ct`, `$0.22/load` — so the number is interpretable without cross-referencing the Size column. New `formatCostPerUnit(p)` appends the unit in a muted `.per-unit-suffix` span (smaller + `--text-muted`) so the amount stays the thing you read first. `UNIT_ABBREV` shortens only the three units too long to sit in a table cell (`count`→`ct`, `serving`→`srv`, `sheet`→`sht`); everything else passes through unchanged. The share/PNG card already displayed the unit, so this brings the table into line with it.

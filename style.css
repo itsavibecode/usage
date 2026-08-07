@@ -1510,11 +1510,18 @@ button.stat.is-selected:hover {
    * wraps, so stacking doesn't add overall height — it just lets the
    * buttons share the existing vertical space and reclaims horizontal
    * width for the data columns. */
+  /* v0.31.1: left-align (was flex-end). Not every row has the same button
+   * count — History only renders when a UPC has 2+ price points — so
+   * right-aligning kept the right edge tidy but left the LEFT edge ragged:
+   * a 5-button row appeared indented relative to its 6-button neighbours.
+   * Anchoring left keeps Edit / Finish / Duplicate in the same place on
+   * every row (the actions you actually reach for), and a short row simply
+   * ends earlier, which reads as intentional rather than misaligned. */
   .products tbody td.actions-cell {
     white-space: normal;
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 4px;
   }
   .products tbody td.actions-cell button {
@@ -2061,7 +2068,10 @@ button.stat.is-selected:hover {
   margin-left: 1px;
 }
 
-.actions-col, .actions-cell { text-align: right; }
+/* v0.31.1: left-aligned to match the flex-start button row (see the
+ * min-width:721px block). The header now sits over the first button
+ * rather than over the far edge of a ragged group. */
+.actions-col, .actions-cell { text-align: left; }
 .actions-cell button {
   background: transparent;
   border: 1px solid var(--border);
