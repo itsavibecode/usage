@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.30.0
+/* Usage Tracker — v0.31.0
+ * v0.31.0: $/unit shows its unit ("$1.67/oz", "$0.067/ct") and per-unit / per-day money scales precision so tiny values stop collapsing to $0.00.
  * v0.30.0: Three configurable month-by-month charts (cost, avg $/day, avg lifespan) with line/area/bar + 6M/12M/24M/All switchers; prefs sync per chart.
  * v0.29.0: Bundle "create all N at once" — one product per unit, auto-numbered 1..N under a shared bundle, #1 active and the rest inventory backups.
  * v0.28.1: Fix the "what's new" unread dot floating far right of the version number (version button was stretching to the heading width).
@@ -623,7 +624,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.30.0';
+const APP_VERSION = '0.31.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -919,6 +920,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.31.0',
+    date: '2026-08-06',
+    tags: ['fix', 'improvement'],
+    title: '$/unit now shows the unit — and stops rounding to zero',
+    body: 'The $/unit column now tells you what the unit is: $1.67/oz, $0.067/ct, $0.22/load. It was also rounding too hard on high-count items — 1000 sheets of toilet paper for $0.89 was showing as $0.00, and 500 cotton swabs showed $0.01 when the real figure was $0.007. Small amounts now keep enough decimals to be true, while ordinary ones stay short and readable. Same rounding fix applies to $/day.',
+  },
   {
     version: '0.30.0',
     date: '2026-08-06',
@@ -1571,6 +1579,62 @@ const moneyFine = n => {
   if (n == null || !isFinite(Number(n))) return '—';
   return getMoneyFormatters().fine.format(Number(n));
 };
+
+/* v0.31.0 — adaptive-precision money for per-unit / per-day figures.
+ *
+ * v0.16.1 capped moneyFine at 2 decimals to stop the $/unit and $/day columns
+ * forcing horizontal scroll. That's right for most values but silently breaks
+ * high-count products: 1000 sheets of toilet paper at $0.89 is $0.00089/sheet,
+ * which rendered as "$0.00", and 500 cotton swabs at $3.49 rendered "$0.01"
+ * against a true $0.007 (a 43% error).
+ *
+ * Precision now scales with magnitude, so ordinary values stay short and tiny
+ * ones stay truthful:
+ *     >= $0.10  -> 2 decimals   $1.67   $0.75   $0.22
+ *     >= $0.01  -> 3 decimals   $0.067  $0.043
+ *      < $0.01  -> 4 decimals   $0.007  $0.0009
+ * Width only grows for the small values that actually needed it, so the
+ * no-horizontal-scroll constraint that motivated v0.16.1 still holds.
+ *
+ * Self-invalidating on currency change (mirrors getMoneyFormatters), so the
+ * two existing cache-reset sites don't need to know about this one.
+ */
+let _preciseMoney = { code: '', byDec: {} };
+function precisionFor(v) {
+  const a = Math.abs(v);
+  if (!isFinite(a) || a >= 0.1) return 2;
+  if (a >= 0.01) return 3;
+  return 4;
+}
+function moneyPrecise(n) {
+  if (n == null || !isFinite(Number(n))) return '—';
+  const v = Number(n);
+  if (_preciseMoney.code !== userCurrency) _preciseMoney = { code: userCurrency, byDec: {} };
+  const dec = precisionFor(v);
+  if (!_preciseMoney.byDec[dec]) {
+    _preciseMoney.byDec[dec] = new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: userCurrency,
+      minimumFractionDigits: 2, maximumFractionDigits: dec
+    });
+  }
+  return _preciseMoney.byDec[dec].format(v);
+}
+
+/* v0.31.0 — short forms for the units that are too long to sit in a table
+ * cell as a suffix. Everything else (oz, fl oz, lb, g, kg, mL, L, gal, ft, m,
+ * pack, roll, load) is already short enough and passes through unchanged. */
+const UNIT_ABBREV = { count: 'ct', serving: 'srv', sheet: 'sht' };
+function unitAbbrev(u) { return UNIT_ABBREV[u] || u || ''; }
+
+// "$1.67/oz" / "$0.067/ct" — the unit makes the number interpretable at a
+// glance, which a bare "$0.067" doesn't. Falls back to the bare amount when
+// the product has no unit set.
+function formatCostPerUnit(p) {
+  const v = calcCostPerUnit(p);
+  if (v == null || !isFinite(v)) return '—';
+  const u = unitAbbrev(p.unit);
+  return u ? `${moneyPrecise(v)}<span class="per-unit-suffix">/${escapeHtml(u)}</span>` : moneyPrecise(v);
+}
 
 function formatDate(str) {
   const d = parseLocalDate(str);
@@ -2542,7 +2606,7 @@ function renderMobileCard(p) {
   const eff = effectiveCost(p);
   const costPrimary = eff > 0 ? money(eff) : '—';
   const costPerDay = calcCostPerDay(p);
-  const perDayStr = costPerDay != null ? ` &middot; ${moneyFine(costPerDay)}/day` : '';
+  const perDayStr = costPerDay != null ? ` &middot; ${moneyPrecise(costPerDay)}/day` : '';
 
   // v0.15.1: each meta value gets its own labeled row instead of being
   // crammed onto a single line. Better use of card vertical space and
@@ -2655,8 +2719,8 @@ function renderRow(p) {
     <td class="num col-duration">${formatDuration(p)}</td>
     <td class="num col-cost">${money(p.cost)}</td>
     <td class="num cell-with-tax col-costWithTax">${p.costWithTax ? money(p.costWithTax) : '—'}</td>
-    <td class="num col-costPerUnit">${moneyFine(calcCostPerUnit(p))}</td>
-    <td class="num col-costPerDay">${moneyFine(calcCostPerDay(p))}</td>
+    <td class="num col-costPerUnit">${formatCostPerUnit(p)}</td>
+    <td class="num col-costPerDay">${moneyPrecise(calcCostPerDay(p))}</td>
     <td class="col-bundleStatus">${(() => {
       if (!p.bundleStatus) return '—';
       const label = p.bundlePosition
@@ -6121,9 +6185,9 @@ function buildProductCardExportHtml(p) {
   const eff = effectiveCost(p);
   const costLine = eff > 0 ? money(eff) : '—';
   const perDay = calcCostPerDay(p);
-  const perDayLine = perDay != null ? `${moneyFine(perDay)}/day` : '—';
+  const perDayLine = perDay != null ? `${moneyPrecise(perDay)}/day` : '—';
   const perUnit = calcCostPerUnit(p);
-  const perUnitLine = perUnit != null ? `${moneyFine(perUnit)}/${escapeHtml(p.unit)}` : '—';
+  const perUnitLine = perUnit != null ? `${moneyPrecise(perUnit)}/${escapeHtml(unitAbbrev(p.unit))}` : '—';
   const sizeLine = p.size && p.unit ? `${escapeHtml(p.size)} ${escapeHtml(p.unit)}` : '—';
   const status = isFinished(p) ? 'Finished' : isActive(p) ? 'Active' : 'Inventory';
   const statusColor = isFinished(p) ? '#5b3ba8' : isActive(p) ? '#2d8a5f' : '#8a5a00';

@@ -2051,6 +2051,16 @@ button.stat.is-selected:hover {
 
 .products .num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* v0.31.0: unit suffix on the $/unit column ("$1.67/oz"). Muted + slightly
+ * smaller so the amount stays the thing you read first, and the suffix reads
+ * as a label rather than part of the number. Kept inline so the cell still
+ * right-aligns as one unit. */
+.per-unit-suffix {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  margin-left: 1px;
+}
+
 .actions-col, .actions-cell { text-align: right; }
 .actions-cell button {
   background: transparent;

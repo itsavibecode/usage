@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.30.0
+**Version:** v0.31.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.30.0)
+## Current status (v0.31.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,11 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.31.0 — 2026-08-06
+- **`$/unit` column now carries its unit** — `$1.67/oz`, `$0.067/ct`, `$0.22/load` — so the number is interpretable without cross-referencing the Size column. New `formatCostPerUnit(p)` appends the unit in a muted `.per-unit-suffix` span (smaller + `--text-muted`) so the amount stays the thing you read first. `UNIT_ABBREV` shortens only the three units too long to sit in a table cell (`count`→`ct`, `serving`→`srv`, `sheet`→`sht`); everything else passes through unchanged. The share/PNG card already displayed the unit, so this brings the table into line with it.
+- **Fixed: per-unit and per-day amounts collapsing to `$0.00`.** v0.16.1 capped `moneyFine` at 2 decimals to stop these columns forcing horizontal scroll — correct for typical values, but it silently broke high-count products. 1000 sheets of toilet paper at $0.89 is `$0.00089/sheet`, which rendered as **`$0.00`**; 500 cotton swabs at $3.49 rendered `$0.01` against a true `$0.007` (a 43% error). New `moneyPrecise()` scales precision with magnitude — `>= $0.10` → 2 decimals, `>= $0.01` → 3, `< $0.01` → 4 — so ordinary values stay exactly as short as before and only genuinely tiny ones get wider. The no-horizontal-scroll constraint that motivated v0.16.1 still holds. Applied to `$/unit` and `$/day` across the table, mobile cards, and the share/PNG card.
+- Formatter cache is keyed on `userCurrency` and self-invalidates, so the two existing cache-reset sites didn't need to learn about it. **CSV/JSON export is deliberately unchanged** — it still exports the raw numeric value (`0.067`), not the formatted string, so spreadsheet math keeps working.
 
 ### v0.30.0 — 2026-08-06
 - **Three configurable month-by-month charts on the Dashboard**, each with a chart-type switcher (Line / Area / Bar) and a range switcher (6M / 12M / 24M / All):
