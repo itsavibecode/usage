@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.31.1
+**Version:** v0.32.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.31.1)
+## Current status (v0.32.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.32.0 — 2026-08-07
+- **ASIN-driven form fill.** The Amazon ASIN field gains a **Look up** button. It fills `productType`, `productName`, `brand`, `size`, `unit`, `upc` and `imageUrl` from the most recent product already tracked under that ASIN, then falls back to any UPCitemdb item cached this session carrying it. Never overwrites a field the user has already typed into; reports how many fields it filled.
+- **Why it matches local history rather than calling an API — verified, not assumed.** There is no free ASIN → product lookup. Tested against the live endpoints: UPCitemdb's keyword search for an ASIN returns `NOT_FOUND`, and passing an ASIN as `upc` returns `INVALID`; Amazon's Product Advertising API requires affiliate credentials. What *does* work is the reverse — a UPC lookup returns an `asin` field (verified: UPC `012044039540` → `B00B30SHBA`), which v0.28.0 already captures. For a repeat-purchase tracker, an ASIN you are re-buying is nearly always one already in your own history, so that is the index we search.
+- **An ASIN or Amazon URL pasted into the UPC box reroutes itself** to the ASIN field with a status message, instead of failing an `INVALID` lookup. Guarded on `normalizeUpc(raw).length >= 8` so a real or part-typed UPC is never hijacked — including the ambiguous all-digit 10-character case, which stays treated as a UPC. Detection covers bare ASINs, lowercase, `/dp/`, `/gp/product/`, `/product/` and `?asin=` URL forms (11/11 unit cases pass).
+- Also noted while testing: the shared Apps Script UPC proxy was returning `EXCEED_LIMIT` — UPCitemdb rate-limits per IP and Apps Script pools IPs across many users, so UPC auto-fill is intermittently unavailable through it. Pre-existing behaviour, documented at `UPCITEMDB_URL`, not introduced here.
 
 ### v0.31.1 — 2026-08-06
 - **Fixed: row action buttons appearing indented on some rows.** The actions cell used `justify-content: flex-end` (v0.17.1), which kept the right edge tidy but left the *left* edge ragged — because rows don't all have the same button count. `History` only renders when a UPC has 2+ price points (`priceHistoryCount(upc) >= 2`), so a product bought only once shows 5 buttons instead of 6 and its whole group slid right, reading as misaligned next to its neighbours. Now `flex-start`, so `Edit / Finish / Duplicate` sit in the same place on every row and a short row simply ends earlier. The `ACTIONS` header was switched from `text-align: right` to `left` to sit over the first button rather than over the ragged far edge.

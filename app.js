@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.31.1
+/* Usage Tracker — v0.32.0
+ * v0.32.0: ASIN "Look up" fills the form from a product you've tracked before; an ASIN/Amazon URL pasted into the UPC box reroutes itself.
  * v0.31.1: Row action buttons anchor left so rows missing the History button no longer look indented.
  * v0.31.0: $/unit shows its unit ("$1.67/oz", "$0.067/ct") and per-unit / per-day money scales precision so tiny values stop collapsing to $0.00.
  * v0.30.0: Three configurable month-by-month charts (cost, avg $/day, avg lifespan) with line/area/bar + 6M/12M/24M/All switchers; prefs sync per chart.
@@ -625,7 +626,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.31.1';
+const APP_VERSION = '0.32.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -921,6 +922,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.32.0',
+    date: '2026-08-07',
+    tags: ['new'],
+    title: 'Fill the form from an Amazon ASIN',
+    body: 'The Amazon ASIN field has its own Look up button. If you have tracked that product before, it fills in the type, name, brand, size, unit and UPC from your last one — handy for a repeat buy. Paste a whole Amazon link and it pulls the ASIN out for you, and if you paste one into the UPC box by mistake it quietly moves it to the right field. Note it matches your own history, not Amazon: there is no free ASIN lookup, so for a brand-new product the UPC is still the way to auto-fill (and that fills the ASIN in too).',
+  },
   {
     version: '0.31.1',
     date: '2026-08-06',
@@ -6869,6 +6877,112 @@ function normalizeAsin(raw) {
   return '';
 }
 
+// v0.32.0 — ASIN-driven form fill.
+//
+// Why this matches local history instead of calling an API: there is no free
+// ASIN -> product lookup. UPCitemdb (our UPC source) has no ASIN index — a
+// keyword search for an ASIN returns NOT_FOUND, and passing one as `upc`
+// returns INVALID. Amazon's own Product Advertising API needs affiliate
+// credentials. Verified against the live endpoints, not assumed.
+//
+// What DOES work, and is arguably more useful for a repeat-purchase tracker:
+// the ASIN of something you are buying again is almost always an ASIN you have
+// already recorded. So we match against the user's own products first, then the
+// session UPC cache (whose UPCitemdb items carry an `asin` field — confirmed:
+// UPC 012044039540 returns asin B00B30SHBA).
+//
+// Note the reverse direction already works and needs no help here: a UPC lookup
+// fills the ASIN in automatically (v0.28.0), because UPCitemdb returns it.
+
+// Most recent tracked product carrying this ASIN. Favorites are eligible —
+// a catalog entry is exactly the kind of thing worth copying from.
+function findProductByAsin(asin) {
+  if (!asin) return null;
+  const matches = products.filter(p => normalizeAsin(p.asin) === asin);
+  if (!matches.length) return null;
+  matches.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  return matches[0];
+}
+
+// Any UPCitemdb item cached this session whose asin matches. Cheap (in-memory)
+// and covers "I looked this UPC up a minute ago" without a second API call.
+function findCachedItemByAsin(asin) {
+  if (!asin) return null;
+  for (const item of upcCache.values()) {
+    if (item && normalizeAsin(item.asin) === asin) return item;
+  }
+  return null;
+}
+
+function setAsinStatus(text, kind = '') {
+  const el = document.getElementById('asin-status');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.remove('is-busy', 'is-error', 'is-ok');
+  if (kind) el.classList.add(`is-${kind}`);
+}
+
+// Catalog-ish fields worth copying from a previous purchase. Deliberately
+// excludes dates, cost and bundle info — those describe a specific purchase,
+// not the product.
+const ASIN_CARRY_FIELDS = ['productType', 'productName', 'brand', 'size', 'unit', 'upc', 'imageUrl'];
+
+function lookupAsinAndFill() {
+  const f = form();
+  const raw = (f.elements.asin?.value || '').trim();
+  if (!raw) { setAsinStatus('Enter an ASIN or paste an Amazon link first.', 'error'); return; }
+
+  const asin = normalizeAsin(raw);
+  if (!asin) {
+    setAsinStatus('That does not look like an ASIN or an Amazon product URL.', 'error');
+    return;
+  }
+  // Normalising a pasted URL down to the bare ASIN is itself useful feedback.
+  if (f.elements.asin.value !== asin) {
+    f.elements.asin.value = asin;
+    syncAsinField();
+  }
+
+  // 1. A product you've already tracked under this ASIN.
+  const prior = findProductByAsin(asin);
+  if (prior) {
+    const filled = [];
+    for (const key of ASIN_CARRY_FIELDS) {
+      const el = f.elements[key];
+      if (!el) continue;
+      const val = prior[key];
+      if (val == null || val === '') continue;
+      if ((el.value ?? '').toString().trim() !== '') continue; // never clobber typed input
+      el.value = val;
+      filled.push(key);
+    }
+    syncDialogImagePreview();
+    syncAmazonCheckLink(f.elements.upc?.value || '');
+    setAsinStatus(
+      filled.length
+        ? `Filled from "${prior.productName || 'a saved product'}" (${filled.length} field${filled.length === 1 ? '' : 's'}).`
+        : `Matched "${prior.productName || 'a saved product'}" — every field was already filled in.`,
+      'ok'
+    );
+    return;
+  }
+
+  // 2. A UPCitemdb item cached this session that carries this ASIN.
+  const cached = findCachedItemByAsin(asin);
+  if (cached) {
+    applyUpcItemToForm(cached);
+    setAsinStatus('Filled from a UPC lookup you ran earlier this session.', 'ok');
+    return;
+  }
+
+  // 3. Nothing local, and no API can resolve it — say so plainly and point at
+  // the path that does work (UPC), rather than failing silently.
+  setAsinStatus(
+    'No saved product with that ASIN. Amazon has no free product lookup, so enter the UPC and press its Look up to auto-fill — that also fills the ASIN in for you.',
+    'error'
+  );
+}
+
 function amazonUrlForAsin(asin) {
   return `https://www.amazon.com/dp/${encodeURIComponent(asin)}`;
 }
@@ -7592,6 +7706,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const upc = form().elements.upc.value;
     lookupAndOfferUpc(upc, { fromScan: false, forceFresh: true });
   });
+  // v0.32.0: ASIN Look up — fills the form from a product already tracked
+  // under that ASIN (no free ASIN->product API exists; see lookupAsinAndFill).
+  document.getElementById('btn-lookup-asin')?.addEventListener('click', lookupAsinAndFill);
   document.getElementById('scanner-close').addEventListener('click', closeScanner);
   document.getElementById('scanner-cancel').addEventListener('click', closeScanner);
   // Browser Esc-closes dialogs by firing a "close" event — release the camera if that happens
@@ -7599,6 +7716,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // UPC blur → look up; skip if the value is unchanged from a prior lookup
   let lastLookedUpUpc = '';
+  // v0.32.0: an Amazon URL or a bare ASIN pasted into the UPC box is a natural
+  // mistake — both identify the product, and the UPC field is the one that
+  // looks like "the lookup box". Rather than letting it fail an INVALID lookup,
+  // move it to the ASIN field and say so. Guarded on there being no digits-only
+  // UPC present, so a real UPC is never hijacked.
+  f.elements.upc.addEventListener('input', () => {
+    const raw = (f.elements.upc.value || '').trim();
+    if (!raw || normalizeUpc(raw).length >= 8) return; // looks like a real UPC
+    const asin = normalizeAsin(raw);
+    if (!asin) return;
+    f.elements.upc.value = '';
+    if (f.elements.asin) {
+      f.elements.asin.value = asin;
+      syncAsinField();
+      setUpcStatus('That is an Amazon ASIN — moved it to the Amazon ASIN field below.', 'ok');
+      setAsinStatus('Press Look up to fill from a product you have tracked with this ASIN.');
+    }
+  });
   f.elements.upc.addEventListener('blur', () => {
     const code = normalizeUpc(f.elements.upc.value);
     if (!code || code === lastLookedUpUpc) return;

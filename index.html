@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.31.1">
+  <meta name="version" content="0.32.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -76,7 +76,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.31.1</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.32.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -617,7 +617,16 @@
              reorder link. Accepts a pasted Amazon URL and extracts the ASIN. -->
         <label class="field" id="asin-field-wrap" data-tracked-only hidden>
           <span>Amazon ASIN <em class="muted">(for a 1-tap reorder link)</em></span>
-          <input name="asin" type="text" maxlength="200" autocapitalize="characters" spellcheck="false" placeholder="e.g. B01N7O8XYZ — or paste the Amazon product URL">
+          <!-- v0.32.0: "Look up" fills the rest of the form from a product you
+               have already tracked under this ASIN. Amazon has no free product
+               API, so this matches your own history rather than the internet. -->
+          <div class="input-with-btn">
+            <input name="asin" type="text" maxlength="200" autocapitalize="characters" spellcheck="false" placeholder="e.g. B01N7O8XYZ — or paste the Amazon product URL">
+            <button type="button" id="btn-lookup-asin" class="btn btn-scan" title="Fill the form from a product you tracked before with this ASIN">
+              Look up
+            </button>
+          </div>
+          <span class="upc-status" id="asin-status" aria-live="polite"></span>
           <a id="asin-open-amazon" class="upc-check-link" href="#" target="_blank" rel="noopener" hidden>Open on Amazon &#x2197;</a>
         </label>
 
