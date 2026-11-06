@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.32.0
+**Version:** v0.33.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.32.0)
+## Current status (v0.33.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,10 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.33.0 — 2026-11-06
+- **iOS home-screen app now runs edge to edge, with safe areas respected.** The A2HS plumbing was already there (apple-touch-icon, `apple-mobile-web-app-capable`, title, manifest, theme-color), but the CSS had zero `env(safe-area-inset-*)`. Added `viewport-fit=cover`, switched the status bar to `black-translucent`, and padded `.site-header` (top/left/right), `main` (left/right/bottom) and the top-center `.toast` (top) with `env()` insets. Both halves had to land together: cover or black-translucent **without** the insets is precisely what puts the header under the status bar. The mobile `@media` block previously reset header and main padding with the `padding` shorthand, which would have clobbered the insets exactly where they matter, so those were re-expressed too. `env()` resolves to 0 elsewhere, so desktop and Android are untouched.
+- **Fixed three WCAG AA contrast failures**, all measured rather than eyeballed. `--text-muted` was `#6b7390`: 4.69:1 on white (pass) but **4.37:1 on `--bg`** and **4.49:1 on `--surface-alt`**, both under the 4.5:1 floor for normal text, and the second is the classic near-threshold case that displays as 4.49 and still fails. Now `#636b86`, measuring 5.28 / 4.92 / 5.05. `--success` was `#2d8a5f`: **4.28:1 on white** and only **3.77:1 on the `.badge-active` background**. Now `#277551`, measuring 5.60:1 and 4.94:1. Verified with the antislop contrast checker.
 
 ### v0.32.0 — 2026-08-07
 - **ASIN-driven form fill.** The Amazon ASIN field gains a **Look up** button. It fills `productType`, `productName`, `brand`, `size`, `unit`, `upc` and `imageUrl` from the most recent product already tracked under that ASIN, then falls back to any UPCitemdb item cached this session carrying it. Never overwrites a field the user has already typed into; reports how many fields it filled.

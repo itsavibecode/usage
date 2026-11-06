@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.32.0
+/* Usage Tracker — v0.33.0
+ * v0.33.0: Edge-to-edge on an iPhone home screen (safe-area insets) + WCAG AA contrast fixes for muted text and the active badge.
  * v0.32.0: ASIN "Look up" fills the form from a product you've tracked before; an ASIN/Amazon URL pasted into the UPC box reroutes itself.
  * v0.31.1: Row action buttons anchor left so rows missing the History button no longer look indented.
  * v0.31.0: $/unit shows its unit ("$1.67/oz", "$0.067/ct") and per-unit / per-day money scales precision so tiny values stop collapsing to $0.00.
@@ -626,7 +627,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.32.0';
+const APP_VERSION = '0.33.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -922,6 +923,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.33.0',
+    date: '2026-11-06',
+    tags: ['improvement', 'fix'],
+    title: 'Looks right on an iPhone home screen, and easier to read',
+    body: 'Added to your home screen, the app now fills the whole phone screen properly instead of leaving the header tucked under the clock, and the bottom row clears the home bar. Separately, some of the lighter grey text and the green "active" badge were too faint to meet the accessibility standard for readable text, so both are slightly darker now.',
+  },
   {
     version: '0.32.0',
     date: '2026-08-07',

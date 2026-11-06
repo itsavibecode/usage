@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.32.0">
+  <!-- v0.33.0: viewport-fit=cover lets the app fill a notched iPhone edge to
+       edge when launched from the home screen. Paired with black-translucent
+       below and env(safe-area-inset-*) padding in style.css - cover WITHOUT
+       those insets is what puts the header under the status bar. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="version" content="0.33.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -36,7 +40,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#2b5fd9">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Usage Tracker">
   <!-- Open Graph + Twitter Cards. Renders branded previews in Slack, Discord,
        iMessage, Twitter/X, Facebook, LinkedIn, etc. when the URL is shared.
@@ -76,7 +80,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.32.0</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.33.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>

@@ -4,12 +4,18 @@
   --surface-alt: #f9fafc;
   --border: #e3e7ef;
   --text: #1a2238;
-  --text-muted: #6b7390;
+  /* v0.33.0: darkened from #6b7390, which measured 4.37:1 on --bg and 4.49:1
+     on --surface-alt - both below the 4.5:1 WCAG AA floor for normal text.
+     #636b86 measures 5.28 / 4.92 / 5.05 on surface / bg / surface-alt. */
+  --text-muted: #636b86;
   --primary: #2b5fd9;
   --primary-hover: #1f4ec2;
   --danger: #c23b3b;
   --danger-hover: #9e2c2c;
-  --success: #2d8a5f;
+  /* v0.33.0: darkened from #2d8a5f, which measured 4.28:1 on white and only
+     3.77:1 on the .badge-active background (#e3f5ec). #277551 measures
+     5.60:1 on white and 4.94:1 on the badge. */
+  --success: #277551;
   --shadow-sm: 0 1px 2px rgba(20, 30, 60, 0.06);
   --shadow-md: 0 4px 16px rgba(20, 30, 60, 0.12);
   --radius: 8px;
@@ -39,7 +45,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  /* v0.33.0: safe-area insets. With viewport-fit=cover + black-translucent the
+     web view extends under the iOS status bar and around the notch, so the
+     header has to pad itself clear of both. env() is 0 everywhere else, so
+     desktop and Android are unchanged. */
+  padding: calc(16px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-right, 0px)) 16px calc(24px + env(safe-area-inset-left, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
@@ -200,7 +210,9 @@ html, body {
 
 /* Main */
 main {
-  padding: 20px 24px 40px;
+  /* v0.33.0: left/right clear the landscape notch, bottom clears the home
+     indicator so the last row is never under it. */
+  padding: 20px calc(24px + env(safe-area-inset-right, 0px)) calc(40px + env(safe-area-inset-bottom, 0px)) calc(24px + env(safe-area-inset-left, 0px));
   max-width: 100%;
 }
 
@@ -2871,7 +2883,9 @@ dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
  * (border, padding, etc.) and position it at the top center. */
 .toast {
   position: fixed;
-  top: 24px;
+  /* v0.33.0: top-center toast would sit under the iOS status bar once the web
+     view extends beneath it. */
+  top: calc(24px + env(safe-area-inset-top, 0px));
   bottom: auto;
   left: 50%;
   margin: 0;
@@ -3718,8 +3732,14 @@ body.is-demo-mode .site-footer { display: none; }
 
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
-  .site-header { padding: 12px 16px; }
-  main { padding: 16px; }
+  /* v0.33.0: these shorthands previously reset the safe-area padding set on
+     the base rules, which is exactly where it matters most - re-apply it. */
+  .site-header {
+    padding: calc(12px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) 12px calc(16px + env(safe-area-inset-left, 0px));
+  }
+  main {
+    padding: 16px calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  }
   .user-chip span { max-width: 80px; }
   .auth-card { padding: 24px 20px; }
   .chart-box { height: 220px; }
