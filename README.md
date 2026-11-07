@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.33.0
+**Version:** v0.34.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.33.0)
+## Current status (v0.34.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -180,6 +180,12 @@ Version is displayed in the site header next to the logo. It's defined in four p
 - This README
 
 ## Changelog
+
+### v0.34.0 — 2026-11-06
+- **Add-to-home-screen help that exists on every browser.** The v0.23.0 "Install app" button only appeared when the browser fired `beforeinstallprompt`, which **Safari never does** - so on iOS, the platform where home-screen apps matter most, there was no route at all. It also sat in the signed-in toolbar, so a first-time visitor never saw it either. New `renderInstallHelp()` resolves one of four situations and renders the right thing: **installed** (confirm, offer nothing), **prompt** (a real install button), **ios** (the Share → Add to Home Screen steps, with the share glyph drawn inline because "the share icon" is not findable by someone who does not already know it), **manual** (browser-menu wording for desktop Chrome/Edge and Firefox).
+- **Two surfaces, one source.** A **Settings → Add to home screen** section for anyone who went looking, and a short tip on the **signed-out screen** for first-time visitors, since that is the only thing a brand-new visitor sees. Both are rendered by the same function so their wording can never drift apart.
+- **The first-visit tip is deliberately not a modal.** An install interstitial over a sign-in screen is the kind of nag that gets a site closed, so it is a quiet dismissible aside under the demo link. Dismissal is remembered (`usage.installHintDismissed.v1`), and it is hidden outright when the app is already installed. iPadOS 13+ reports itself as MacIntel, so the iOS check pairs the platform string with `maxTouchPoints` to tell an iPad from a desktop Mac.
+- New controls here are built at the **44px touch minimum** (the install button and the tip's dismiss target), rather than matching the older, smaller buttons elsewhere in the UI.
 
 ### v0.33.0 — 2026-11-06
 - **iOS home-screen app now runs edge to edge, with safe areas respected.** The A2HS plumbing was already there (apple-touch-icon, `apple-mobile-web-app-capable`, title, manifest, theme-color), but the CSS had zero `env(safe-area-inset-*)`. Added `viewport-fit=cover`, switched the status bar to `black-translucent`, and padded `.site-header` (top/left/right), `main` (left/right/bottom) and the top-center `.toast` (top) with `env()` insets. Both halves had to land together: cover or black-translucent **without** the insets is precisely what puts the header under the status bar. The mobile `@media` block previously reset header and main padding with the `padding` shorthand, which would have clobbered the insets exactly where they matter, so those were re-expressed too. `env()` resolves to 0 elsewhere, so desktop and Android are untouched.

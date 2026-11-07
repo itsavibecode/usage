@@ -3096,6 +3096,91 @@ body.is-demo-mode .site-footer { display: none; }
 }
 .btn-ghost:hover { background: var(--surface); color: var(--text); border-color: var(--border); }
 
+/* v0.34.0 — "Add to home screen" help (Settings section + auth-gate tip).
+ * Colors are the existing tokens, so both inherit the contrast fixes from
+ * v0.33.0. New interactive controls here are built at the 44px touch
+ * minimum rather than matching the older, smaller buttons. */
+
+.install-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.install-note-quiet {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.install-note-ok {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.install-steps {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.install-steps li { margin: 2px 0; }
+
+/* The iOS share glyph sits inline mid-sentence, so it needs to ride the text
+ * baseline rather than sit on it. */
+.install-inline-icon {
+  vertical-align: -3px;
+  margin: 0 1px;
+  color: var(--primary);
+}
+
+.install-now-btn {
+  min-height: 44px;
+  padding: 10px 18px;
+}
+
+/* --- auth-gate tip --- */
+.auth-install-hint {
+  position: relative;
+  margin-top: 18px;
+  padding: 14px 38px 14px 16px;
+  text-align: left;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.auth-install-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.auth-install-hint .install-steps { margin-bottom: 0; }
+.auth-install-hint .install-note:last-child { margin-bottom: 0; }
+
+/* 44x44 touch target; the glyph inside stays visually small. */
+.auth-install-dismiss {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.auth-install-dismiss:hover { color: var(--text); background: var(--surface); }
+.auth-install-dismiss:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
 /* Loading state */
 .loading-state {
   text-align: center;

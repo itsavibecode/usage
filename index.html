@@ -7,7 +7,7 @@
        below and env(safe-area-inset-*) padding in style.css - cover WITHOUT
        those insets is what puts the header under the status bar. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="version" content="0.33.0">
+  <meta name="version" content="0.34.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -80,7 +80,7 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.33.0</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.34.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -143,6 +143,16 @@
       <p class="auth-demo-link">
         Or <a href="?demo=1">try the demo</a> first — no sign-in needed, sample products only.
       </p>
+      <!-- v0.34.0: first-visit home-screen hint. A quiet, dismissible line
+           rather than a modal or a banner: an install interstitial over a
+           sign-in screen is the kind of nag that gets a site closed. Hidden
+           when already installed, and once dismissed it stays dismissed
+           (localStorage). Body filled by renderInstallHelp(). -->
+      <div class="auth-install-hint" id="auth-install-hint" hidden>
+        <button type="button" class="auth-install-dismiss" id="auth-install-dismiss" aria-label="Dismiss home screen tip">&times;</button>
+        <p class="auth-install-title">Use it like an app</p>
+        <div id="auth-install-body"></div>
+      </div>
     </div>
   </section>
 
@@ -891,6 +901,19 @@
         </ul>
 
         <p class="settings-status" id="settings-status" aria-live="polite"></p>
+      </section>
+
+      <!-- v0.34.0: Add to home screen. The toolbar "Install app" button only
+           appears when the browser fires beforeinstallprompt, which Safari
+           never does, so iOS users previously had no route at all. This
+           section always has an answer: a real install button where the
+           browser supports one, and the exact manual steps where it does not.
+           Body is rendered by renderInstallHelp() since it depends on the
+           browser and on whether the app is already installed. -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">Add to home screen</h3>
+        <p class="settings-section-lead">Open Usage Tracker like a normal app, straight from your phone's home screen. No app store, no download.</p>
+        <div id="settings-install-body"></div>
       </section>
 
       <!-- v0.18.2: one-shot tool to backfill brand + product-image data on

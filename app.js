@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.33.0
+/* Usage Tracker — v0.34.0
+ * v0.34.0: Add-to-home-screen help that works on every browser - a Settings section plus a dismissible first-visit tip, with real iOS steps.
  * v0.33.0: Edge-to-edge on an iPhone home screen (safe-area insets) + WCAG AA contrast fixes for muted text and the active badge.
  * v0.32.0: ASIN "Look up" fills the form from a product you've tracked before; an ASIN/Amazon URL pasted into the UPC box reroutes itself.
  * v0.31.1: Row action buttons anchor left so rows missing the History button no longer look indented.
@@ -627,7 +628,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.33.0';
+const APP_VERSION = '0.34.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -923,6 +924,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.34.0',
+    date: '2026-11-06',
+    tags: ['new'],
+    title: 'Help getting the app onto your home screen',
+    body: 'Settings has a new "Add to home screen" section that tells you exactly what to do on the browser you are actually using - a one-tap install button on Android and Chrome, and the real Share menu steps on iPhone and iPad, where Safari never offered a button. There is also a short tip on the sign-in screen for first-time visitors, which you can dismiss and will not come back.',
+  },
   {
     version: '0.33.0',
     date: '2026-11-06',
@@ -5685,6 +5693,11 @@ async function openSettingsDialog() {
   const status = document.getElementById('settings-status');
   if (!dlg || !enabledInput || !emailInput) return;
 
+  // v0.34.0: re-render the home-screen help on every open, since the
+  // install state can change between opens (user installs, or the browser
+  // fires beforeinstallprompt late).
+  renderInstallHelp();
+
   // Reset dialog state every open. Status line is also cleared.
   enabledInput.checked = false;
   emailInput.value = '';
@@ -7486,6 +7499,9 @@ function showSignedIn(user) {
 
 function showSignedOut() {
   document.getElementById('auth-gate').hidden = false;
+  // v0.34.0: first-visit home-screen tip, shown on the signed-out screen
+  // because that is the only thing a brand-new visitor sees.
+  renderInstallHelp();
   document.getElementById('main-wrap').hidden = true;
   document.getElementById('toolbar').hidden = true;
   document.getElementById('user-chip').hidden = true;
@@ -7570,6 +7586,122 @@ async function doSignOut() {
 // (single-use per session per browser spec).
 let _deferredInstallPrompt = null;
 
+/* v0.34.0 — "Add to home screen" help that always has an answer.
+ *
+ * The v0.23.0 toolbar button only appears when the browser fires
+ * `beforeinstallprompt`. Safari never fires it, so on iOS (the platform where
+ * home-screen apps are most used) the button never appeared, and it sat in the
+ * signed-in toolbar anyway, so a first-time visitor never saw it either.
+ *
+ * This renders the right thing for the browser in hand:
+ *   installed -> confirm, offer nothing
+ *   prompt    -> a real button that triggers the native install
+ *   ios       -> the Share -> Add to Home Screen steps
+ *   manual    -> generic browser-menu wording (desktop Chrome/Edge, Firefox)
+ */
+
+const INSTALL_HINT_DISMISS_KEY = 'usage.installHintDismissed.v1';
+
+function isStandaloneDisplay() {
+  try {
+    return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+  } catch { return false; }
+}
+
+// iPadOS 13+ reports itself as MacIntel, so a touch-point check is needed to
+// tell an iPad from a desktop Mac.
+function isIosLike() {
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;
+}
+
+function installSituation() {
+  if (isStandaloneDisplay()) return 'installed';
+  if (_deferredInstallPrompt) return 'prompt';
+  if (isIosLike()) return 'ios';
+  return 'manual';
+}
+
+// Inline SVG of the iOS share glyph. Drawn rather than described because
+// "the share icon" is not findable by someone who does not already know it.
+const IOS_SHARE_SVG = '<svg class="install-inline-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+
+// Returns { html, needsButton } for a situation. Shared by the Settings
+// section and the auth-gate hint so the two can never drift apart.
+function installHelpContent(situation, compact) {
+  if (situation === 'installed') {
+    return { html: '<p class="install-note install-note-ok">You\'re already running the installed app. Nothing to do.</p>', needsButton: false };
+  }
+  if (situation === 'prompt') {
+    return {
+      html: '<p class="install-note">Your browser can install it directly.</p>'
+          + '<button type="button" class="btn btn-primary install-now-btn">Install Usage Tracker</button>',
+      needsButton: true
+    };
+  }
+  if (situation === 'ios') {
+    const lead = compact
+      ? '<p class="install-note">On iPhone or iPad:</p>'
+      : '<p class="install-note">Safari can\'t install it for you, so iOS needs three taps:</p>';
+    return {
+      html: lead
+        + '<ol class="install-steps">'
+        + '<li>Tap the Share button ' + IOS_SHARE_SVG + ' at the bottom of Safari.</li>'
+        + '<li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>'
+        + '<li>Tap <strong>Add</strong>.</li>'
+        + '</ol>'
+        + '<p class="install-note install-note-quiet">Has to be Safari. Chrome and Firefox on iOS can\'t add to the home screen.</p>',
+      needsButton: false
+    };
+  }
+  return {
+    html: '<p class="install-note">Open your browser\'s menu and look for <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>'
+        + '<p class="install-note install-note-quiet">On Android that\'s the three-dot menu in Chrome. On desktop Chrome or Edge it\'s the install icon in the address bar.</p>',
+    needsButton: false
+  };
+}
+
+// Renders both surfaces. Called when Settings opens, when the auth gate shows,
+// and again if beforeinstallprompt arrives late (it can fire after first paint).
+function renderInstallHelp() {
+  const situation = installSituation();
+
+  const settingsHost = document.getElementById('settings-install-body');
+  if (settingsHost) {
+    const { html, needsButton } = installHelpContent(situation, false);
+    settingsHost.innerHTML = html;
+    if (needsButton) {
+      settingsHost.querySelector('.install-now-btn')?.addEventListener('click', handleInstallClick);
+    }
+  }
+
+  const hint = document.getElementById('auth-install-hint');
+  const hintHost = document.getElementById('auth-install-body');
+  if (hint && hintHost) {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(INSTALL_HINT_DISMISS_KEY) === '1'; } catch {}
+    // Nothing to offer an installed user, and never re-nag a dismissal.
+    if (situation === 'installed' || dismissed) {
+      hint.hidden = true;
+    } else {
+      const { html, needsButton } = installHelpContent(situation, true);
+      hintHost.innerHTML = html;
+      if (needsButton) {
+        hintHost.querySelector('.install-now-btn')?.addEventListener('click', handleInstallClick);
+      }
+      hint.hidden = false;
+    }
+  }
+}
+
+function dismissInstallHint() {
+  try { localStorage.setItem(INSTALL_HINT_DISMISS_KEY, '1'); } catch {}
+  const hint = document.getElementById('auth-install-hint');
+  if (hint) hint.hidden = true;
+}
+
 function applyInstallButtonVisibility() {
   const btn = document.getElementById('btn-install-app');
   if (!btn) return;
@@ -7580,6 +7712,9 @@ function applyInstallButtonVisibility() {
     || window.navigator.standalone === true;
   const show = !!_deferredInstallPrompt && !standalone;
   btn.hidden = !show;
+  // v0.34.0: the prompt can arrive after first paint, which changes what the
+  // Settings section and the auth-gate hint should say.
+  renderInstallHelp();
 }
 
 async function handleInstallClick() {
@@ -7647,6 +7782,8 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('Usage Tracker installed.');
   });
   document.getElementById('btn-install-app')?.addEventListener('click', handleInstallClick);
+  // v0.34.0: dismissing the first-visit tip is remembered, so it never nags twice.
+  document.getElementById('auth-install-dismiss')?.addEventListener('click', dismissInstallHint);
   applyInstallButtonVisibility();
 
   document.getElementById('btn-signin').addEventListener('click', doSignIn);
