@@ -7,7 +7,7 @@
        below and env(safe-area-inset-*) padding in style.css - cover WITHOUT
        those insets is what puts the header under the status bar. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="version" content="0.34.0">
+  <meta name="version" content="0.35.0">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
@@ -80,11 +80,15 @@
              new" changelog dialog. .has-unread class is toggled by JS to
              show a small primary-blue dot when there's a newer entry
              than the user has previously viewed. -->
-        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.34.0</button>
+        <button type="button" class="version" id="version" title="What's new — click for the changelog">v0.35.0</button>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
       <button type="button" id="btn-add" class="btn btn-primary">+ Add product</button>
+      <!-- v0.35.0: saved drafts. Hidden until there is at least one, so the
+           toolbar stays as short as it was for anyone who never saves one.
+           Label text (the count) is written by renderDraftsButton. -->
+      <button type="button" id="btn-drafts" class="btn" title="Open your saved drafts" hidden>Drafts (0)</button>
       <div class="dropdown">
         <button type="button" id="btn-import" class="btn">Import &#9662;</button>
         <div class="dropdown-menu" id="import-menu">
@@ -723,6 +727,12 @@
       </div>
 
       <footer class="dialog-footer">
+        <!-- v0.35.0: Save draft keeps a partly-filled Add form without running
+             any validation, for the case where the price or size is not known
+             yet. Visibility is set in JS (syncSaveDraftVisibility) rather than
+             with data-tracked-only, because it also has to hide when the dialog
+             is editing an existing product, which CSS cannot see. -->
+        <button type="button" class="btn btn-draft" id="dialog-save-draft">Save draft</button>
         <button type="button" class="btn" id="dialog-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary" id="dialog-save">Save</button>
       </footer>
@@ -1025,6 +1035,22 @@
       <div class="stat-detail-total" id="stat-detail-total"></div>
       <div class="stat-detail-list" id="stat-detail-list"></div>
       <p class="stat-detail-empty" id="stat-detail-empty" hidden>No products contributed to this stat.</p>
+    </div>
+  </dialog>
+
+  <!-- v0.35.0: drafts picker. Lists every saved draft newest first with a
+       Resume and a Delete action. Drafts live in their own Firestore
+       subcollection, never in `products`, so a half-filled row can never
+       reach the table, the stats, the charts or an export. -->
+  <dialog id="drafts-dialog" class="drafts-dialog" aria-labelledby="drafts-title">
+    <header class="dialog-header">
+      <h2 id="drafts-title">Saved drafts</h2>
+      <button type="button" class="icon-btn" id="drafts-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="drafts-body">
+      <p class="drafts-lead">Products you started adding and saved for later. Resuming one reopens the Add form with everything you had filled in.</p>
+      <div class="drafts-list" id="drafts-list"></div>
+      <p class="drafts-empty" id="drafts-empty" hidden>No saved drafts right now. Start adding a product and choose <strong>Save draft</strong> to keep what you have typed so far.</p>
     </div>
   </dialog>
 

@@ -1,6 +1,6 @@
 # Usage Tracker
 
-**Version:** v0.34.0
+**Version:** v0.35.0
 
 A personal product usage tracker. Log everyday products (shampoo, toothpaste, deodorant, etc.), when you start and finish them, and what they cost — then get a clear picture of per-unit and per-day cost, total spend, and which items are still active.
 
@@ -8,7 +8,7 @@ Hosted as a static site on GitHub Pages with a Firebase Firestore backend. Phase
 
 ---
 
-## Current status (v0.34.0)
+## Current status (v0.35.0)
 
 ### ✅ Phase 1 — Data structure
 Data schema and calculations are in place. Each product stores:
@@ -65,9 +65,12 @@ No access to Gmail, Drive, contacts, or other Google services. When signed out, 
 Firestore, with security rules scoped to `request.auth.uid` so each account can only read/write its own products. Documents:
 
 - `/users/{uid}/products/{productId}` — one doc per tracked product
+- `/users/{uid}/drafts/{draftId}` — one doc per unfinished Add form (v0.35.0). Kept out of `products` on purpose: a row with no cost or size would skew every total, average, chart, reorder reminder and export.
+- `/users/{uid}/activity/{entryId}` — the activity log
 - `/users/{uid}/meta/customTypes` — the user's custom product types list
+- `/users/{uid}/meta/uiPrefs`, `/meta/emailPrefs`, `/meta/welcomeSeen` — per-user settings
 
-All reads use `onSnapshot` so changes propagate live across tabs and devices. On first sign-in, any leftover localStorage data is detected and the app offers to migrate it into Firestore (archived locally as `.migrated` after upload, not deleted).
+Products and custom types use `onSnapshot` so changes propagate live across tabs and devices. The activity log and drafts are read once per session with `getDocs`, since both only ever change from the tab in front of you. On first sign-in, any leftover localStorage data is detected and the app offers to migrate it into Firestore (archived locally as `.migrated` after upload, not deleted).
 
 ### ✅ Phase 5 — Dashboard
 A **Dashboard** tab beside the Table view (toggle in the page body). Extras on the dashboard:
@@ -172,14 +175,27 @@ usage/
 
 ## Version
 
-Version is displayed in the site header next to the logo. It's defined in four places that must stay in sync on each release:
+Version is displayed in the site header next to the logo. It's defined in several places that must stay in sync on each release:
 
-- `APP_VERSION` constant in `app.js`
-- `<meta name="version">` in `index.html`
-- Visible version text in the header (`#version` span)
-- This README
+- `APP_VERSION` constant in `app.js`, plus the header block comment and the top `CHANGELOG` entry
+- `<meta name="version">` and the visible version chip (`#version`) in `index.html`
+- `SHELL_VERSION` in `sw.js` (bumping it is what makes a returning visitor pick up the new shell)
+- `<meta name="version">` and the `.version` chip in `404.html` and `legal.html`
+- The `**Version:**` line, the `## Current status (...)` heading and the changelog in this README
 
 ## Changelog
+
+### v0.35.0 — 2026-11-25
+- **Why this exists:** the Add dialog refuses to save without `productType`, `productName`, `size`, `unit`, `cost` and `upc`. That is correct for a product, and useless for the moment the user is actually in - interrupted mid-form, or holding an item whose price they will not know until they check the receipt. Before this, the only choices were to invent a number or lose the typing. **Save draft** keeps the form exactly as it stands and runs none of those checks.
+- **Drafts are stored in their own subcollection**, `/users/{uid}/drafts/{draftId}`, never in `products`. This is the whole architectural point. A row in `products` with no `cost` or `size` would not sit quietly: it would skew total spend, YTD spend, the rolling 30-day tile, every `$/unit` and `$/day` average, the per-type mean lifespan that drives reorder reminders, the dashboard charts, the row filters, and both CSV and JSON export. Keeping drafts out of that collection means a half-finished product is incapable of reaching any of it. `draftsColl()` sits beside `activityColl()` and reads the same way. The existing security rule, `/users/{userId}/{document=**}`, already matches any depth under a user's own subtree, so **no rules change was needed** - verified rather than assumed.
+- **A draft stores `id`, `createdAt`, `updatedAt` and only the fields that had a value**, read through the existing `FIELDS` array. A field added to the product schema later becomes draftable with no change to the drafts code, and the picker's "Filled in: ..." summary picks it up too - it reads each field's name from the form's own `<label>` rather than a second hardcoded map, so the two can never drift apart.
+- **The one guard is that a draft cannot be empty.** `purchaseDate` is excluded from that test (`DRAFT_AUTOFILLED_FIELDS`) because the dialog pre-fills it with today's date, so without the exclusion an untouched form would always have looked worth saving.
+- **Multiple drafts**, listed newest first in a small picker behind a **Drafts (N)** toolbar button that stays hidden while N is 0, so the toolbar is unchanged for anyone who never saves one. Each row shows the product name (or "Untitled draft"), how long ago it was saved in relative terms, which fields are filled, and Resume / Delete.
+- **Resuming** reopens the Add dialog through `openAddDialog()` - so the dropdowns, bundle picker and image preview are all set up the usual way - then overwrites every field from the draft and remembers which draft it came from. A **successful** product save deletes that draft; cancelling leaves it alone, which is the entire reason it was saved. `openAddDialog()` clears the remembered id first, so a plain "+ Add product" can never delete an unrelated draft.
+- **Deleting a draft goes through the shared confirm dialog, not a toast.** It destroys typing, and a toast cannot be answered. After a delete the picker stays open on its empty state rather than vanishing from under someone with more than one to clear.
+- **Save draft is hidden when it would be wrong:** editing an existing product (the product is already somewhere to keep partial work) and favorite mode (a favorite needs only a type and a name, so there is nothing to be partway through). That visibility is JS-driven rather than `data-tracked-only`, because the editing case depends on `editingId`, which CSS cannot see.
+- **Demo mode** keeps drafts in memory for the session and never writes to Firestore, matching the way `saveProduct` intercepts demo mode. The confirming toast says so rather than implying the draft will still be there tomorrow.
+- Both new controls are built at the **44px touch minimum**, continuing the v0.34.0 standard for new controls rather than matching the shorter buttons beside them. The picker rows card-stack below 640px so the actions move under the details instead of squeezing the name, keeping the dialog clear of a horizontal scrollbar at any width. Colors are existing custom properties only, all of them contrast-fixed in v0.33.0.
 
 ### v0.34.0 — 2026-11-06
 - **Add-to-home-screen help that exists on every browser.** The v0.23.0 "Install app" button only appeared when the browser fired `beforeinstallprompt`, which **Safari never does** - so on iOS, the platform where home-screen apps matter most, there was no route at all. It also sat in the signed-in toolbar, so a first-time visitor never saw it either. New `renderInstallHelp()` resolves one of four situations and renders the right thing: **installed** (confirm, offer nothing), **prompt** (a real install button), **ios** (the Share → Add to Home Screen steps, with the share glyph drawn inline because "the share icon" is not findable by someone who does not already know it), **manual** (browser-menu wording for desktop Chrome/Edge and Firefox).

@@ -1,4 +1,5 @@
-/* Usage Tracker — v0.34.0
+/* Usage Tracker — v0.35.0
+ * v0.35.0: Save draft - a half-filled Add product form can be kept for later, in its own drafts store, never in `products`.
  * v0.34.0: Add-to-home-screen help that works on every browser - a Settings section plus a dismissible first-visit tip, with real iOS steps.
  * v0.33.0: Edge-to-edge on an iPhone home screen (safe-area insets) + WCAG AA contrast fixes for muted text and the active badge.
  * v0.32.0: ASIN "Look up" fills the form from a product you've tracked before; an ASIN/Amazon URL pasted into the UPC box reroutes itself.
@@ -628,7 +629,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.34.0';
+const APP_VERSION = '0.35.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -924,6 +925,13 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.35.0',
+    date: '2026-11-25',
+    tags: ['new'],
+    title: 'Save a half-filled product as a draft',
+    body: 'Adding a product needs a type, name, size, unit, cost and UPC before it will save, which is no help if you get interrupted or you do not know the price yet. The Add form now has a Save draft button that keeps whatever you have typed so far, with nothing required. Saved drafts appear as a Drafts button in the toolbar, which only shows up once you have one, and resuming a draft reopens the form exactly as you left it. Finish the product and save it and the draft clears itself; cancel and the draft stays put for next time. Drafts are kept apart from your real products, so a half-filled one never turns up in your table, your totals or an export.',
+  },
   {
     version: '0.34.0',
     date: '2026-11-06',
@@ -2036,6 +2044,72 @@ function activityKey() {
 
 function activityColl(uid = currentUser?.uid) {
   return collection(db, 'users', uid, 'activity');
+}
+
+// v0.35.0: drafts get their own subcollection, deliberately NOT `products`.
+// A draft is a product with no size, unit, cost or UPC yet, and a row like
+// that sitting in `products` would quietly corrupt every total, average,
+// filter, chart, reorder reminder and export that reads from it. The existing
+// rules already cover this path - /users/{userId}/{document=**} matches any
+// depth under the user's own subtree - so no rules change was needed.
+function draftsColl(uid = currentUser?.uid) {
+  return collection(db, 'users', uid, 'drafts');
+}
+function draftDoc(id, uid = currentUser?.uid) {
+  return doc(db, 'users', uid, 'drafts', id);
+}
+
+// In-memory mirror, newest first, so the toolbar count and the picker both
+// render synchronously - the same arrangement `products` and `activityEntries`
+// use. Kept current by persistDraft / removeDraft rather than a listener,
+// because drafts are only ever written from the tab the user is typing in.
+let drafts = [];
+
+function sortDraftsNewestFirst(list) {
+  return list.slice().sort((a, b) =>
+    String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+}
+
+async function loadDrafts(uid) {
+  if (isDemoMode) { drafts = []; renderDraftsButton(); return; }
+  if (!uid) return;
+  try {
+    const snap = await getDocs(draftsColl(uid));
+    const list = [];
+    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    drafts = sortDraftsNewestFirst(list);
+  } catch (e) {
+    // Best-effort, like the activity log: a drafts read that fails leaves the
+    // toolbar button hidden rather than blocking sign-in behind an error.
+    console.warn('Drafts fetch failed:', e);
+    drafts = [];
+  }
+  renderDraftsButton();
+}
+
+// Firestore first, memory second, so a write that failed can never leave a
+// draft listed in the picker that does not actually exist. Demo mode has no
+// user to write under, so it stays in memory for the session - the same
+// interception saveProduct makes.
+async function persistDraft(draft) {
+  if (!isDemoMode) {
+    try { await setDoc(draftDoc(draft.id), draft); }
+    catch (e) { toast('Could not save draft: ' + e.message); throw e; }
+  }
+  const idx = drafts.findIndex(d => d.id === draft.id);
+  if (idx >= 0) drafts[idx] = draft;
+  else drafts.push(draft);
+  drafts = sortDraftsNewestFirst(drafts);
+  renderDraftsButton();
+}
+
+async function removeDraft(id) {
+  if (!isDemoMode) {
+    try { await deleteDoc(draftDoc(id)); }
+    catch (e) { toast('Could not delete draft: ' + e.message); throw e; }
+  }
+  drafts = drafts.filter(d => d.id !== id);
+  renderDraftsButton();
 }
 
 // In-memory cache of activity entries so the page render stays sync. Refreshed
@@ -5012,10 +5086,18 @@ function applyDialogMode(mode) {
       delete el.dataset.wasRequired;
     }
   }
+  syncSaveDraftVisibility(); // v0.35.0 - drafts are an Add-mode affordance only
 }
 
 function openAddDialog() {
   editingId = null;
+  // v0.35.0: every route into this dialog detaches it from any draft first,
+  // and only resumeDraft re-attaches one, immediately after opening. Otherwise
+  // a draft resumed and then abandoned with Escape (which never runs
+  // closeDialog) would still be attached, and the next product saved would
+  // delete it. Done on open rather than on close because the <dialog> close
+  // event is queued, so clearing there races with the next open.
+  resumingDraftId = null;
   applyDialogMode('tracked');
   document.getElementById('dialog-title').textContent = 'Add product';
   const f = form();
@@ -5046,6 +5128,7 @@ function openEditDialog(id) {
   const p = products.find(x => x.id === id);
   if (!p) return;
   editingId = id;
+  resumingDraftId = null; // v0.35.0 - see openAddDialog
   document.getElementById('dialog-title').textContent = 'Edit product';
   const f = form();
   f.reset();
@@ -5063,6 +5146,9 @@ function openEditDialog(id) {
   syncAmazonCheckLink(p.upc); // v0.9.0 — show Amazon link if existing UPC is set
   syncAsinField(); // v0.28.0 — reveal ASIN field if store is Amazon or an ASIN exists
   syncDialogImagePreview(); // v0.15.1 — show existing image
+  // v0.35.0: Edit reaches the dialog without applyDialogMode, so the Save
+  // draft button has to be hidden here by hand.
+  syncSaveDraftVisibility();
   dialog().showModal();
 }
 
@@ -5070,6 +5156,9 @@ function closeDialog() {
   dialog().close();
   editingId = null;
   pendingDuplicateSourceId = null; // v0.7.17 — clear duplicate flag on cancel
+  // v0.35.0: forget which draft this was, but do NOT delete it. Closing the
+  // dialog without saving is exactly the case the draft exists for.
+  resumingDraftId = null;
   applyDialogMode('tracked'); // v0.15.0 — reset to tracked default
 }
 
@@ -5078,6 +5167,7 @@ function closeDialog() {
 // so handleSubmit knows to skip date/cost/bundle validation.
 function openAddFavoriteDialog() {
   editingId = null;
+  resumingDraftId = null; // v0.35.0 - see openAddDialog
   applyDialogMode('favorite');
   document.getElementById('dialog-title').textContent = 'Add favorite';
   const f = form();
@@ -5101,6 +5191,7 @@ function openEditFavoriteDialog(id) {
   const p = products.find(x => x.id === id);
   if (!p || !isFavorite(p)) return;
   editingId = id;
+  resumingDraftId = null; // v0.35.0 - see openAddDialog
   applyDialogMode('favorite');
   document.getElementById('dialog-title').textContent = 'Edit favorite';
   const f = form();
@@ -5356,6 +5447,7 @@ async function handleSubmit(e) {
         }
         created.forEach(p => logActivity('add', p));
         toast(`Added ${bs} bundle items — 1 of ${bs} … ${bs} of ${bs}`);
+        discardResumedDraft(); // v0.35.0 — the product it was holding now exists
         closeDialog();
       } catch {
         toast('Something went wrong creating the bundle');
@@ -5430,6 +5522,7 @@ async function handleSubmit(e) {
     if (!editingId && pendingDuplicateSourceId) action = 'duplicate';
     logActivity(action, product);
     pendingDuplicateSourceId = null;
+    discardResumedDraft(); // v0.35.0 — the product it was holding now exists
     closeDialog();
   } catch {
     // toast already shown by saveProduct
@@ -5462,6 +5555,259 @@ function confirmDelete(id) {
     cd.close(); cleanup();
   };
   no.onclick = () => { cd.close(); cleanup(); };
+}
+
+/* ---------- v0.35.0 drafts ---------- */
+
+/* The Add dialog demands a product type, name, size, unit, cost and UPC before
+ * it will save anything. If you are interrupted halfway, or the price is still
+ * unknown, there was no way to keep the typing. A draft keeps the form as it
+ * stands, runs none of those checks, and lives in its own subcollection until
+ * you come back and finish it.
+ */
+
+// Which draft the Add dialog was opened from, so a successful product save can
+// clear it. Null whenever the dialog was not opened from a draft.
+let resumingDraftId = null;
+
+// Fields the Add dialog fills in for you (purchaseDate defaults to today), so
+// an untouched form must not count as worth saving on their strength alone.
+const DRAFT_AUTOFILLED_FIELDS = ['purchaseDate'];
+
+// How many field names the picker lists before summarising the rest.
+const DRAFT_SUMMARY_MAX = 4;
+
+// Read the form into an object holding only the fields that carry a value.
+// Driven by FIELDS, so a field added to the product schema becomes draftable
+// with no change here.
+function readDraftFieldsFromForm() {
+  const f = form();
+  const out = {};
+  for (const key of FIELDS) {
+    // `id` is assigned by the draft itself; `createdAt` belongs to the product
+    // the draft eventually becomes, and has no input to read.
+    if (key === 'id' || key === 'createdAt') continue;
+    const el = f.elements[key];
+    if (!el) continue;
+    if (el.type === 'checkbox') {
+      if (el.checked) out[key] = true;
+    } else {
+      const v = (el.value ?? '').toString().trim();
+      // ADD_NEW is the "+ Add new..." sentinel, not a value anyone typed.
+      if (v && v !== ADD_NEW) out[key] = v;
+    }
+  }
+  return out;
+}
+
+function draftHasAnything(fields) {
+  return Object.keys(fields).some(k => !DRAFT_AUTOFILLED_FIELDS.includes(k));
+}
+
+// Save draft only makes sense for a product being added. An existing product
+// already has somewhere to keep partial work (itself), and a favorite needs
+// only a type and a name, so there is nothing to be partway through.
+function syncSaveDraftVisibility() {
+  const btn = document.getElementById('dialog-save-draft');
+  if (!btn) return;
+  btn.hidden = !!editingId || dialogMode === 'favorite';
+}
+
+function renderDraftsButton() {
+  const btn = document.getElementById('btn-drafts');
+  if (!btn) return;
+  btn.hidden = drafts.length === 0;
+  btn.textContent = `Drafts (${drafts.length})`;
+}
+
+async function saveDraftFromForm() {
+  if (!currentUser && !isDemoMode) { toast('Please sign in first'); return; }
+  const fields = readDraftFieldsFromForm();
+  // The only guard on a draft: there has to be something in it. Everything
+  // else the Add form insists on is exactly what a draft is allowed to skip.
+  if (!draftHasAnything(fields)) {
+    toast('Nothing to save yet. Fill in at least one field.');
+    return;
+  }
+  const btn = document.getElementById('dialog-save-draft');
+  btn.disabled = true;
+  const now = new Date().toISOString();
+  const existing = resumingDraftId ? drafts.find(d => d.id === resumingDraftId) : null;
+  const draft = {
+    id: existing?.id || newId(),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    ...fields,
+  };
+  try {
+    await persistDraft(draft);
+    closeDialog();
+    toast(isDemoMode
+      ? 'Draft saved for this session only (demo mode)'
+      : 'Draft saved. Reopen it from Drafts in the toolbar.');
+  } catch {
+    // persistDraft already said why. Leave the dialog open so the typing that
+    // failed to save is still on screen.
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Field names come from the form's own labels rather than a second hardcoded
+// map, so a renamed or newly added field reads correctly in the picker without
+// having to be listed in two places. Hidden inputs have no label, so fall back
+// to splitting the camelCase key.
+function draftFieldLabel(key) {
+  const el = form()?.elements?.[key];
+  const label = el?.closest?.('label.field');
+  const span = label?.querySelector(':scope > span');
+  // Labels carry a required marker (`<em>*</em>`) inside the span; a draft has
+  // no required fields, so the asterisk would only be confusing here.
+  const text = (span?.textContent || '').replace(/\s*\*\s*$/, '').trim();
+  if (text) return text;
+  return key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+}
+
+function draftFilledSummary(d) {
+  const labels = FIELDS
+    .filter(k => k !== 'id' && k !== 'createdAt'
+      && k !== 'productName' // already the row's heading
+      && Object.prototype.hasOwnProperty.call(d, k))
+    .map(draftFieldLabel);
+  if (labels.length === 0) return '';
+  // "and 1 more" costs as many characters as the field name it is hiding, so
+  // the cut only happens when it actually shortens the line.
+  if (labels.length <= DRAFT_SUMMARY_MAX + 1) return labels.join(', ');
+  const rest = labels.length - DRAFT_SUMMARY_MAX;
+  return `${labels.slice(0, DRAFT_SUMMARY_MAX).join(', ')} and ${rest} more`;
+}
+
+// Drafts are short-lived by nature, so "4 hours ago" answers the real question
+// (is this still the thing I was doing?) better than a timestamp. Past a week
+// that stops being true, so it falls back to the date.
+function draftRelativeTime(iso) {
+  const then = new Date(iso);
+  if (isNaN(then)) return 'at an unknown time';
+  const secs = Math.round((Date.now() - then.getTime()) / 1000);
+  if (secs < 45) return 'just now';
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  return `on ${formatDate(String(iso).slice(0, 10))}`;
+}
+
+function renderDraftsList() {
+  const list = document.getElementById('drafts-list');
+  const empty = document.getElementById('drafts-empty');
+  const lead = document.querySelector('.drafts-lead');
+  if (!list || !empty) return;
+  if (drafts.length === 0) {
+    list.innerHTML = '';
+    empty.hidden = false;
+    if (lead) lead.hidden = true;
+    return;
+  }
+  empty.hidden = true;
+  if (lead) lead.hidden = false;
+  list.innerHTML = sortDraftsNewestFirst(drafts).map(d => {
+    const name = (d.productName || '').trim();
+    const summary = draftFilledSummary(d);
+    const summaryMarkup = summary
+      ? `<span class="draft-filled">Filled in: ${escapeHtml(summary)}</span>`
+      : '';
+    return `<div class="draft-row">
+      <div class="draft-info">
+        <span class="draft-name${name ? '' : ' draft-name-blank'}">${escapeHtml(name || 'Untitled draft')}</span>
+        <span class="draft-when">Saved ${escapeHtml(draftRelativeTime(d.updatedAt))}</span>
+        ${summaryMarkup}
+      </div>
+      <div class="draft-actions">
+        <button type="button" class="btn btn-primary draft-resume" data-id="${escapeHtml(d.id)}">Resume</button>
+        <button type="button" class="btn draft-delete" data-id="${escapeHtml(d.id)}">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openDraftsDialog() {
+  renderDraftsList();
+  document.getElementById('drafts-dialog')?.showModal();
+}
+
+function closeDraftsDialog() {
+  document.getElementById('drafts-dialog')?.close();
+}
+
+// Reopen the Add dialog exactly as the draft left it. Goes through
+// openAddDialog so the selects, the bundle picker and the image preview are
+// all set up the usual way, then overwrites every field from the draft.
+function resumeDraft(id) {
+  const d = drafts.find(x => x.id === id);
+  if (!d) { toast('That draft is no longer there.'); renderDraftsList(); return; }
+  closeDraftsDialog();
+  openAddDialog();
+  resumingDraftId = d.id; // after openAddDialog, which clears it
+  const f = form();
+  // Re-run with the draft as `current` so a type / store / card the draft used
+  // is present in its dropdown even if nothing else in the data uses it.
+  populateFormSelects(d);
+  for (const key of FIELDS) {
+    if (key === 'id' || key === 'createdAt') continue;
+    const el = f.elements[key];
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!d[key];
+    else el.value = d[key] ?? '';
+  }
+  setBundleSizeVisibility();
+  setUpcStatus('');
+  syncAmazonCheckLink(d.upc || '');
+  syncAsinField();
+  syncDialogImagePreview();
+  document.getElementById('dialog-title').textContent = 'Resume draft';
+}
+
+// Deleting a draft throws away typing, so it goes through the shared confirm
+// dialog. A toast cannot be answered, so it is the wrong shape for a decision.
+function confirmDeleteDraft(id) {
+  const d = drafts.find(x => x.id === id);
+  if (!d) return;
+  const name = (d.productName || '').trim();
+  document.getElementById('confirm-message').textContent = name
+    ? `Delete the draft "${name}"? This cannot be undone.`
+    : 'Delete this untitled draft? This cannot be undone.';
+  const cd = document.getElementById('confirm-dialog');
+  const yes = document.getElementById('confirm-yes');
+  const no = document.getElementById('confirm-no');
+  const cleanup = () => { yes.onclick = null; no.onclick = null; };
+  yes.onclick = async () => {
+    yes.disabled = true;
+    try {
+      await removeDraft(id);
+      toast('Draft deleted');
+    } catch {}
+    finally { yes.disabled = false; }
+    cd.close();
+    cleanup();
+    // Stay on the picker, falling back to its empty state, rather than closing
+    // it out from under someone who may have more than one to clear.
+    renderDraftsList();
+  };
+  no.onclick = () => { cd.close(); cleanup(); };
+  cd.showModal();
+}
+
+// A draft has done its job once the product it was holding is saved. Not
+// awaited: the product is already stored, and the only cost of a failed
+// cleanup is a stale row in the picker, not lost data.
+function discardResumedDraft() {
+  const id = resumingDraftId;
+  if (!id) return;
+  resumingDraftId = null;
+  removeDraft(id).catch(err => console.warn('Draft cleanup failed:', err));
 }
 
 /* ---------- v0.14.1 quick-finish dialog ---------- */
@@ -7543,6 +7889,9 @@ function enterDemoMode() {
   // is the only data source for the session.
   products = DEMO_PRODUCTS.slice();
   customTypesCache = [];
+  // v0.35.0: demo drafts start empty and stay in memory for the session.
+  drafts = [];
+  renderDraftsButton();
   firstSnapshotSeen = true;
   render();
 }
@@ -7804,6 +8153,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-add').addEventListener('click', openAddDialog);
   document.getElementById('dialog-close').addEventListener('click', closeDialog);
   document.getElementById('dialog-cancel').addEventListener('click', closeDialog);
+
+  // v0.35.0: drafts. The list is delegated because its rows are re-rendered
+  // after every save and delete.
+  document.getElementById('dialog-save-draft')?.addEventListener('click', saveDraftFromForm);
+  document.getElementById('btn-drafts')?.addEventListener('click', openDraftsDialog);
+  document.getElementById('drafts-close')?.addEventListener('click', closeDraftsDialog);
+  document.getElementById('drafts-list')?.addEventListener('click', e => {
+    const resume = e.target.closest('.draft-resume');
+    if (resume) { resumeDraft(resume.dataset.id); return; }
+    const del = e.target.closest('.draft-delete');
+    if (del) confirmDeleteDraft(del.dataset.id);
+  });
 
   // v0.7.23: keyboard shortcut — `n` opens the Add dialog. Only fires when
   // no text input is focused (so typing "n" in a search/text field stays
@@ -8418,11 +8779,18 @@ document.addEventListener('DOMContentLoaded', () => {
       // First-time users get their current localStorage values seeded to
       // the cloud. Async + fire-and-forget — same reasoning as above.
       loadAndApplyUiPrefs(user.uid).catch(() => {});
+
+      // v0.35.0: one-shot read of the drafts subcollection, the same shape as
+      // the activity log. Drafts only ever change from the tab being typed in,
+      // so there is nothing for a listener to catch.
+      loadDrafts(user.uid).catch(() => {});
     } else {
       showSignedOut();
       unsubscribeData();
       products = [];
       customTypesCache = [];
+      drafts = [];            // v0.35.0 - never show one user's drafts to the next
+      renderDraftsButton();
       render();
     }
   });

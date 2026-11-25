@@ -4141,3 +4141,149 @@ body.is-demo-mode .site-footer { display: none; }
   .density-toggle,
   .columns-dropdown { display: none; }
 }
+
+/* v0.35.0 - Save draft + the drafts picker.
+ *
+ * "Save draft" sits at the left edge of the dialog footer (margin-right:
+ * auto), away from the Cancel / Save pair, because it is a third outcome
+ * rather than a variant of either. Its visibility is set in JS rather than
+ * with data-tracked-only, because it also has to disappear when the dialog is
+ * editing an existing product, which CSS cannot see.
+ *
+ * Both new buttons are built at the 44px touch minimum - the v0.34.0 standard
+ * for new controls - rather than matching the older, shorter buttons beside
+ * them. Colors are existing custom properties only, all contrast-fixed in
+ * v0.33.0, so nothing new needed measuring.
+ */
+.btn-draft {
+  margin-right: auto;
+  min-height: 44px;
+}
+.btn-draft:focus-visible,
+#btn-drafts:focus-visible,
+.draft-actions .btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+#btn-drafts { min-height: 44px; }
+
+.drafts-dialog {
+  max-width: 560px;
+  width: 92vw;
+  max-height: 88vh;
+}
+.drafts-body {
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+  max-height: calc(88vh - 56px);
+}
+.drafts-lead {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.drafts-empty {
+  margin: 0;
+  padding: 20px 16px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.drafts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* minmax(0, 1fr) rather than 1fr so a long product name shrinks instead of
+ * forcing the row wider than the dialog. */
+.draft-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.draft-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.draft-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* A blank name is a legitimate state for a draft, not an error. Italic and
+ * muted says "we filled this in for you" without a warning color. */
+.draft-name-blank {
+  font-weight: 500;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.draft-when,
+.draft-filled {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.draft-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.draft-actions .btn { min-height: 44px; }
+
+/* Resume is the primary action on every row, so Delete is outlined rather
+ * than filled (deliberately not .btn-danger) - two solid buttons per row,
+ * repeated down the list, gave a destructive action the same pull as the one
+ * people actually came for. Red text and a red border still read as
+ * destructive. --danger on --surface measures 5.27:1, clearing both the 4.5:1
+ * text floor and the 3:1 floor for the border; hover inverts to white on
+ * --danger, the same 5.27:1 pairing .btn-danger already ships. */
+.draft-delete {
+  background: var(--surface);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.draft-delete:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+/* Card stack under 640px: the two actions move to a full-width row beneath
+ * the draft's details, instead of squeezing the name into a column too narrow
+ * to read. Keeps the row clear of a horizontal scrollbar at any width. The
+ * footer override is scoped to the product dialog so the other dialogs'
+ * two-button footers are left exactly as they were. */
+@media (max-width: 640px) {
+  .drafts-dialog { max-width: 96vw; }
+  .drafts-body { padding: 12px 14px 18px; }
+  .draft-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .draft-actions { width: 100%; }
+  .draft-actions .btn {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+  .product-dialog .dialog-footer { flex-wrap: wrap; }
+  .product-dialog .btn-draft {
+    margin-right: 0;
+    width: 100%;
+    justify-content: center;
+  }
+}
